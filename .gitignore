@@ -1,4 +1,8 @@
+blobs/*
 smw.sfc
 *.sfc
 smwpicker_auth.json
+rhmd_sample2.dat
+patch/*
+temp/*
 
