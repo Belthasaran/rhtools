@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# Copyright C Belthasar 2023 All Rights Reserved
 
 import os
 import json
@@ -147,7 +148,7 @@ def randlevel_function(args):
               rlist2 = [x[2] for x in rlist]
               print(str(lidlistr2))
               print("RLIST2 = "+str(rlist2))
-    except err as Exception:
+    except Exception as err:
          print('ERR:' + str(err))
     rlist2 = [*set(rlist2)]  # Reduce rlist2 down to uniques
     lidlist = rlist2

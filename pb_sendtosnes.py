@@ -1,3 +1,5 @@
+# Copyright C Belthasar 2023 All Rights Reserved
+
 from zipfile import ZipFile
 import re
 import hashlib

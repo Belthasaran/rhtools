@@ -1,3 +1,5 @@
+# Copyright C Belthasar 2023 All Rights Reserved
+
 def get_b_patch(pid, chosenlid):
     lob = chosenlid & 0xff
     hib = (chosenlid & 0xff00)  >> 8

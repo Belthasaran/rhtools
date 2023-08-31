@@ -1,3 +1,5 @@
+# Copyright C Belthasar 2023 All Rights Reserved
+
 import os
 import json
 import random
