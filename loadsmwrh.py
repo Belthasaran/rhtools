@@ -29,6 +29,8 @@ def rhmd_path():
         return "rhmd.dat"
     if os.path.exists("rhmd_dist.dat"):
         return "rhmd_dist.dat"
+    if os.path.exists("rhmd_sample2.dat"):
+        return "rhmd_sample2.dat"
     if os.path.exists("rhmd_sample.dat"):
         return "rhmd_sample.dat"
     return "rhmd_dist.dat"
