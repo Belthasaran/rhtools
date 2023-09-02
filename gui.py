@@ -27,18 +27,18 @@ window = Tk()
 window.geometry("800x600")
 window.configure(bg = "#FFFFFF")
 
-
 canvas = Canvas(
     window,
     bg = "#FFFFFF",
-    height = 600, 
-    width = 719,
+#    height = 600, 
+#    width = 719,
     bd = 0,
     highlightthickness = 0,
     relief = "ridge"
 )
-
-canvas.place(x = 0, y = 0)
+##canvas.place(x = 0, y = 0)
+#canvas.grid(column=0,row=0,rowspan=2,sticky="news")
+canvas.pack(side=tk.TOP,fill=tk.BOTH)
 prect  = canvas.create_rectangle(
     18.0,
     79.0,
@@ -47,6 +47,10 @@ prect  = canvas.create_rectangle(
     fill="#F3F5FF",
     outline="") ##PANEL
 
+canvas.columnconfigure(0, weight=1)
+canvas.columnconfigure(1, weight=1)
+canvas.columnconfigure(2, weight=1)
+
 dataframe1 = Frame(canvas)
 dataframe1.grid(row=4,column=0,pady=60,sticky="news")
 dataframe1.rowconfigure(0, weight=1)
@@ -54,10 +58,14 @@ dataframe1.rowconfigure(1, weight=1)
 dataframe1.rowconfigure(2, weight=1)
 dataframe1.rowconfigure(3, weight=1)
 dataframe1.rowconfigure(4, weight=5)
-dataframe1.columnconfigure(0, weight=10)
-dataframe1.columnconfigure(1, weight=10)
+dataframe1.columnconfigure(0, weight=1)
+dataframe1.columnconfigure(1, weight=1)
+dataframe1.columnconfigure(2, weight=1)
 
-tva = Treeview(dataframe1, columns=['name','type','author','length'], show='headings')
+tva = Treeview(dataframe1, columns=['id','name','type','author','length'], show='headings')
+tva.heading('id', text='Id')
+tva.column('id', width=100, anchor=tk.W)
+
 tva.heading('name', text='Name')
 tva.column('name', width=220, anchor=tk.W)
 
@@ -87,7 +95,7 @@ tva.grid(row=2,column=0,sticky="news")
 
 # name type author length description
 for he in loadsmwrh.get_hacklist_data():
-    tva.insert('', tk.END, values=[
+    tva.insert('', tk.END, values=[  he['id'],
                he['name'],
                he['type'],
                he['authors'],
@@ -110,7 +118,7 @@ entry_bg_1 = canvas.create_image(
 )
 
 filterText = StringVar()
-filterframe = Frame()
+filterframe = Frame(canvas)
 entry_1 = Entry(filterframe,
     bd=0,
     bg="#F1F5FF",
@@ -120,8 +128,8 @@ entry_1 = Entry(filterframe,
     width=40
 )
 
-label_1 = Label(text="Filter  ")
-label_1.grid(column=0,row=0,sticky="ews")
+label_1 = Label(filterframe,text="Filter  ")
+label_1.grid(column=0,row=0,sticky="news")
 #entry_1.bind('<<Insert>>', lambda: print('entry_1'))
 #entry_1.place(
 #    x=33.0,
@@ -129,7 +137,7 @@ label_1.grid(column=0,row=0,sticky="ews")
 #    width=360.0,
 #    height=54.0
 #)
-filterframe.grid(row=0,column=1)
+filterframe.grid(row=0,column=0,sticky="news")
 entry_1.grid(row=0,column=1,padx=4)
 def filterChanged(var):
    print('filter: '+str(var.get()))
@@ -203,12 +211,12 @@ button_3 = Button(actionframe,
     command=lambda: print("button_3 clicked"),
     relief="flat"
 )
-button_3.place(
-    x=568.0,
-    y=211.0,
-    width=122.0,
-    height=47.0
-)
+#button_3.place(
+#    x=568.0,
+#    y=211.0,
+#    width=122.0,
+#    height=47.0
+#)
 #button_3.grid(row=0,column=5) # Specific Levels
 button_3.grid(row=3,column=0)
 
@@ -256,12 +264,12 @@ button_6 = Button(subactionframe,
     command=lambda: print("button_6 clicked"),
     relief="flat"
 )
-button_6.place(
-    x=568.0,
-    y=281.0,
-    width=127.0,
-    height=41.0
-)
+#button_6.place(
+#    x=568.0,
+#    y=281.0,
+#    width=127.0,
+#    height=41.0
+#)
 #button_6.grid(row=0,column=5) # Random hack any
 button_6.grid(row=0,column=0)
 
@@ -274,12 +282,12 @@ button_7 = Button(subactionframe,
     command=lambda: print("button_7 clicked"),
     relief="flat"
 )
-button_7.place(
-    x=568.0,
-    y=334.0,
-    width=127.0,
-    height=47.0
-)
+#button_7.place(
+#    x=568.0,
+#    y=334.0,
+#    width=127.0,
+#    height=47.0
+#)
 #button_7.grid(row=0,column=5) # Random level
 button_7.grid(row=1,column=0)
 
@@ -292,12 +300,12 @@ button_8 = Button(subactionframe,
     command=lambda: print("button_8 clicked"),
     relief="flat"
 )
-button_8.place(
-    x=568.0,
-    y=389.0,
-    width=127.0,
-    height=53.0
-)
+#button_8.place(
+#    x=568.0,
+#    y=389.0,
+#    width=127.0,
+#    height=53.0
+#)
 #Launch options button_8.grid(row=0,column=5)
 button_8.grid(row=3,column=0)
 
@@ -317,5 +325,5 @@ canvas.create_text(
     fill="#000000",
     font=("Inter", 12 * -1)
 )
-#window.resizable(True, True)
+window.resizable(True, True)
 window.mainloop()
