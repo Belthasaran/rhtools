@@ -38,7 +38,7 @@ canvas = Canvas(
 )
 ##canvas.place(x = 0, y = 0)
 #canvas.grid(column=0,row=0,rowspan=2,sticky="news")
-canvas.pack(side=tk.TOP,fill=tk.BOTH)
+canvas.pack(side=tk.TOP,fill=tk.BOTH, expand=True)
 prect  = canvas.create_rectangle(
     18.0,
     79.0,
@@ -47,18 +47,18 @@ prect  = canvas.create_rectangle(
     fill="#F3F5FF",
     outline="") ##PANEL
 
-canvas.columnconfigure(0, weight=1)
+canvas.columnconfigure(0, weight=5)
 canvas.columnconfigure(1, weight=1)
-canvas.columnconfigure(2, weight=1)
+#canvas.columnconfigure(2, weight=1)
 
 dataframe1 = Frame(canvas)
-dataframe1.grid(row=4,column=0,pady=60,sticky="news")
+dataframe1.grid(row=1,rowspan=10,column=0,pady=60,sticky="news")
 dataframe1.rowconfigure(0, weight=1)
 dataframe1.rowconfigure(1, weight=1)
 dataframe1.rowconfigure(2, weight=1)
 dataframe1.rowconfigure(3, weight=1)
 dataframe1.rowconfigure(4, weight=5)
-dataframe1.columnconfigure(0, weight=1)
+dataframe1.columnconfigure(0, weight=10)
 dataframe1.columnconfigure(1, weight=1)
 dataframe1.columnconfigure(2, weight=1)
 
@@ -78,12 +78,19 @@ tva.column('author', width=100, anchor=tk.W)
 tva.heading('length', text='Length')
 tva.column('length', width=50, anchor=tk.W)
 
-canvas.rowconfigure(0,weight=10)
-canvas.rowconfigure(1,weight=10)
-canvas.rowconfigure(2,weight=10)
+canvas.rowconfigure(0,weight=1)
+canvas.rowconfigure(1,weight=1)
+canvas.rowconfigure(2,weight=1)
 canvas.rowconfigure(3,weight=1)
-canvas.rowconfigure(4,weight=10)
-tva.grid(row=2,column=0,sticky="news")
+canvas.rowconfigure(4,weight=1)
+canvas.rowconfigure(5,weight=1)
+canvas.rowconfigure(6,weight=1)
+canvas.rowconfigure(7,weight=1)
+canvas.rowconfigure(8,weight=1)
+canvas.rowconfigure(9,weight=1)
+canvas.rowconfigure(10,weight=1)
+
+tva.grid(row=2, rowspan=5,column=0,sticky="news")
 #tva.insert('', tk.END, values=['a','b','c','d'])
 #tva.place(
 #    x=33.0,
@@ -107,7 +114,7 @@ for he in loadsmwrh.get_hacklist_data():
 #    tva.insert('', tk.END, values=['a','b','c','d'])
 scrollbar = Scrollbar(dataframe1, orient=tk.VERTICAL, command=tva.yview)
 tva.configure(yscroll=scrollbar.set)
-scrollbar.grid(row=2,column=1,sticky='ns')
+scrollbar.grid(row=2,rowspan=5,column=1,sticky='ns')
 
 entry_image_1 = PhotoImage(
     file=relative_to_assets("entry_1.png"))
@@ -161,19 +168,21 @@ canvas.create_rectangle(
     outline="")
 
 actionframe = Frame(canvas)
-actionframe.grid(row=0,column=5,rowspan=5)
+actionframe.grid(row=0,column=1,rowspan=2)
 
 subactionframe = Frame(canvas)
-subactionframe.grid(row=5, column=5, rowspan=3)
+subactionframe.grid(row=3,column=1,rowspan=2)
 
 button_image_1 = PhotoImage(
     file=relative_to_assets("button_1.png"))
 button_1 = Button(actionframe,
-    image=button_image_1,
-    borderwidth=0,
-    highlightthickness=0,
+    #image=button_image_1,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_1 clicked"),
-    relief="flat"
+    text="Hack Options",
+    state=tk.DISABLED
+    #relief="flat"
 )
 #button_1.place(
 #    x=568.0,
@@ -187,11 +196,12 @@ button_1.grid(row=2,column=0)
 button_image_2 = PhotoImage(
     file=relative_to_assets("button_2.png"))
 button_2 = Button(actionframe,
-    image=button_image_2,
-    borderwidth=0,
-    highlightthickness=0,
+    text="Play this hack",
+    #image=button_image_2,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_2 clicked"),
-    relief="flat"
+    #relief="flat"
 )
 #button_2.place(
 #    x=568.0,
@@ -205,11 +215,13 @@ button_2.grid(row=0,column=0) # Play this hack
 button_image_3 = PhotoImage(
     file=relative_to_assets("button_3.png"))
 button_3 = Button(actionframe,
-    image=button_image_3,
+    #image=button_image_3,
     borderwidth=0,
     highlightthickness=0,
     command=lambda: print("button_3 clicked"),
-    relief="flat"
+    relief="flat",
+    text=".. Specific Level",
+    state=tk.DISABLED
 )
 #button_3.place(
 #    x=568.0,
@@ -223,11 +235,13 @@ button_3.grid(row=3,column=0)
 button_image_4 = PhotoImage(
     file=relative_to_assets("button_4.png"))
 button_4 = Button(actionframe,
-    image=button_image_4,
-    borderwidth=0,
-    highlightthickness=0,
+    text="Mark as done",
+    #image=button_image_4,
+    state=tk.DISABLED,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_4 clicked"),
-    relief="flat"
+    #relief="flat"
 )
 #button_4.place(
 #    x=568.0,
@@ -241,11 +255,12 @@ button_4.grid(row=1,column=0)
 button_image_5 = PhotoImage(
     file=relative_to_assets("button_5.png"))
 button_5 = Button(filterframe,
-    image=button_image_5,
-    borderwidth=0,
-    highlightthickness=0,
+    #image=button_image_5,
+    text="Random Hack (filtered)",
+    borderwidth=3,
+    highlightthickness=1,
     command=lambda: print("button_5 clicked"),
-    relief="flat"
+    #relief="flat"
 )
 #button_5.place(
 #    x=411.0,
@@ -258,11 +273,12 @@ button_5.grid(row=0,column=2,sticky="news") # Random filtered
 button_image_6 = PhotoImage(
     file=relative_to_assets("button_6.png"))
 button_6 = Button(subactionframe,
-    image=button_image_6,
-    borderwidth=0,
-    highlightthickness=0,
+    #image=button_image_6,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_6 clicked"),
-    relief="flat"
+    #relief="flat",
+    text="Random Hack (any)"
 )
 #button_6.place(
 #    x=568.0,
@@ -277,10 +293,11 @@ button_image_7 = PhotoImage(
     file=relative_to_assets("button_7.png"))
 button_7 = Button(subactionframe,
     image=button_image_7,
-    borderwidth=0,
-    highlightthickness=0,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_7 clicked"),
-    relief="flat"
+    #relief="flat",
+    text="Random Level"
 )
 #button_7.place(
 #    x=568.0,
@@ -295,10 +312,10 @@ button_image_8 = PhotoImage(
     file=relative_to_assets("button_8.png"))
 button_8 = Button(subactionframe,
     image=button_image_8,
-    borderwidth=0,
-    highlightthickness=0,
+    borderwidth=1,
+    highlightthickness=1,
     command=lambda: print("button_8 clicked"),
-    relief="flat"
+    #relief="flat"
 )
 #button_8.place(
 #    x=568.0,
