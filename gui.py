@@ -31,7 +31,7 @@ window.configure(bg = "#FFFFFF")
 canvas = Canvas(
     window,
     bg = "#FFFFFF",
-    height = 464,
+    height = 600, 
     width = 719,
     bd = 0,
     highlightthickness = 0,
@@ -48,7 +48,14 @@ prect  = canvas.create_rectangle(
     outline="") ##PANEL
 
 dataframe1 = Frame(canvas)
-dataframe1.grid(row=4,column=0)
+dataframe1.grid(row=4,column=0,pady=60,sticky="news")
+dataframe1.rowconfigure(0, weight=1)
+dataframe1.rowconfigure(1, weight=1)
+dataframe1.rowconfigure(2, weight=1)
+dataframe1.rowconfigure(3, weight=1)
+dataframe1.rowconfigure(4, weight=5)
+dataframe1.columnconfigure(0, weight=10)
+dataframe1.columnconfigure(1, weight=10)
 
 tva = Treeview(dataframe1, columns=['name','type','author','length'], show='headings')
 tva.heading('name', text='Name')
@@ -68,7 +75,7 @@ canvas.rowconfigure(1,weight=10)
 canvas.rowconfigure(2,weight=10)
 canvas.rowconfigure(3,weight=1)
 canvas.rowconfigure(4,weight=10)
-tva.grid(row=4,column=0)
+tva.grid(row=2,column=0,sticky="news")
 #tva.insert('', tk.END, values=['a','b','c','d'])
 #tva.place(
 #    x=33.0,
@@ -76,7 +83,7 @@ tva.grid(row=4,column=0)
 #    width=360.0, #360
 #    height=54.0
 #)
-#tva.pack(side=tk.BOTTOM, fill=tk.X, expand=False)
+#tva.pack(side=tk.BOTTOM, fill=tk.X, expand=True)
 
 # name type author length description
 for he in loadsmwrh.get_hacklist_data():
@@ -92,7 +99,7 @@ for he in loadsmwrh.get_hacklist_data():
 #    tva.insert('', tk.END, values=['a','b','c','d'])
 scrollbar = Scrollbar(dataframe1, orient=tk.VERTICAL, command=tva.yview)
 tva.configure(yscroll=scrollbar.set)
-scrollbar.grid(row=0,column=1,sticky='ns')
+scrollbar.grid(row=2,column=1,sticky='ns')
 
 entry_image_1 = PhotoImage(
     file=relative_to_assets("entry_1.png"))
@@ -109,11 +116,12 @@ entry_1 = Entry(filterframe,
     bg="#F1F5FF",
     fg="#000716",
     highlightthickness=0,
-    textvariable = filterText
+    textvariable = filterText,
+    width=40
 )
 
 label_1 = Label(text="Filter  ")
-label_1.grid(column=0,row=0)
+label_1.grid(column=0,row=0,sticky="ews")
 #entry_1.bind('<<Insert>>', lambda: print('entry_1'))
 #entry_1.place(
 #    x=33.0,
@@ -122,7 +130,7 @@ label_1.grid(column=0,row=0)
 #    height=54.0
 #)
 filterframe.grid(row=0,column=1)
-entry_1.grid(row=0,column=1)
+entry_1.grid(row=0,column=1,padx=4)
 def filterChanged(var):
    print('filter: '+str(var.get()))
 filterText.trace("w", lambda name, index, mode, var=filterText: filterChanged(var))
@@ -145,44 +153,50 @@ canvas.create_rectangle(
     outline="")
 
 actionframe = Frame(canvas)
+actionframe.grid(row=0,column=5,rowspan=5)
+
+subactionframe = Frame(canvas)
+subactionframe.grid(row=5, column=5, rowspan=3)
 
 button_image_1 = PhotoImage(
     file=relative_to_assets("button_1.png"))
-button_1 = Button(
+button_1 = Button(actionframe,
     image=button_image_1,
     borderwidth=0,
     highlightthickness=0,
     command=lambda: print("button_1 clicked"),
     relief="flat"
 )
-button_1.place(
-    x=568.0,
-    y=164.0,
-    width=122.0,
-    height=47.0
-)
+#button_1.place(
+#    x=568.0,
+#    y=164.0,
+#    width=122.0,
+#    height=47.0
+#)
+button_1.grid(row=2,column=0)
 #button_1.grid(row=0,column=5) # H. Options
 
 button_image_2 = PhotoImage(
     file=relative_to_assets("button_2.png"))
-button_2 = Button(
+button_2 = Button(actionframe,
     image=button_image_2,
     borderwidth=0,
     highlightthickness=0,
     command=lambda: print("button_2 clicked"),
     relief="flat"
 )
-button_2.place(
-    x=568.0,
-    y=71.0,
-    width=122.0,
-    height=47.0
-)
+#button_2.place(
+#    x=568.0,
+#    y=71.0,
+#    width=122.0,
+#    height=47.0
+#)
+button_2.grid(row=0,column=0) # Play this hack
 #button_2.grid(row=0,column=5)  Play this hack
 
 button_image_3 = PhotoImage(
     file=relative_to_assets("button_3.png"))
-button_3 = Button(
+button_3 = Button(actionframe,
     image=button_image_3,
     borderwidth=0,
     highlightthickness=0,
@@ -196,23 +210,25 @@ button_3.place(
     height=47.0
 )
 #button_3.grid(row=0,column=5) # Specific Levels
+button_3.grid(row=3,column=0)
 
 button_image_4 = PhotoImage(
     file=relative_to_assets("button_4.png"))
-button_4 = Button(
+button_4 = Button(actionframe,
     image=button_image_4,
     borderwidth=0,
     highlightthickness=0,
     command=lambda: print("button_4 clicked"),
     relief="flat"
 )
-button_4.place(
-    x=568.0,
-    y=118.0,
-    width=122.0,
-    height=47.0
-)
+#button_4.place(
+#    x=568.0,
+#    y=118.0,
+#    width=122.0,
+#    height=47.0
+#)
 #button_4.grid(row=0,column=5) # Mark as done
+button_4.grid(row=1,column=0)
 
 button_image_5 = PhotoImage(
     file=relative_to_assets("button_5.png"))
@@ -229,11 +245,11 @@ button_5 = Button(filterframe,
 #    width=117.0,
 #    height=51.0
 #)
-button_5.grid(row=0,column=2) # Random filtered
+button_5.grid(row=0,column=2,sticky="news") # Random filtered
 
 button_image_6 = PhotoImage(
     file=relative_to_assets("button_6.png"))
-button_6 = Button(
+button_6 = Button(subactionframe,
     image=button_image_6,
     borderwidth=0,
     highlightthickness=0,
@@ -247,10 +263,11 @@ button_6.place(
     height=41.0
 )
 #button_6.grid(row=0,column=5) # Random hack any
+button_6.grid(row=0,column=0)
 
 button_image_7 = PhotoImage(
     file=relative_to_assets("button_7.png"))
-button_7 = Button(
+button_7 = Button(subactionframe,
     image=button_image_7,
     borderwidth=0,
     highlightthickness=0,
@@ -264,10 +281,11 @@ button_7.place(
     height=47.0
 )
 #button_7.grid(row=0,column=5) # Random level
+button_7.grid(row=1,column=0)
 
 button_image_8 = PhotoImage(
     file=relative_to_assets("button_8.png"))
-button_8 = Button(
+button_8 = Button(subactionframe,
     image=button_image_8,
     borderwidth=0,
     highlightthickness=0,
@@ -281,6 +299,7 @@ button_8.place(
     height=53.0
 )
 #Launch options button_8.grid(row=0,column=5)
+button_8.grid(row=3,column=0)
 
 canvas.create_rectangle(
     22.0,
