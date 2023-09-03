@@ -235,7 +235,9 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
      Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
 
 
-6.  OPTIONAL STEP,   create a  patchblob bundle or pset.
+# PSETS
+
+  OPTIONAL STEP when recording hacks in Database ,   create a  patchblob bundle or pset.
     A pset is a .zip file containing many hacks sorted by Id prefix.
     Each pset Zip appears as an entry in psets.dat.
 
