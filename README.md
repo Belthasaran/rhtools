@@ -225,8 +225,6 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
 
     At this point the  hacks/example  File has Already been updated and is ready to add to the database.
 
-
-
 5.      bash do_addhacks.sh
      This script will scan the  hacks/  directory  and attempt to add all hacks found in hacks/ to the database.
 
@@ -235,6 +233,73 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
 
      Two hacks should Never have the same ID specified.
      Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
+
+
+6.  OPTIONAL STEP,   create a  patchblob bundle or pset.
+    A pset is a .zip file containing many hacks sorted by Id prefix.
+    Each pset Zip appears as an entry in psets.dat.
+
+    This allows creating a series of zip files which contain thousands of patches,
+and the correct .Zip file and patchblob can be automatically downloaded from a URL listed
+in psets.dat
+
+  For example  the following psets.dat entry describes a zipfile for hacks whose Id starts with "yy" or with "0":
+       [ 
+         {
+             "hash": "blah blah",
+             "ipfs": "blah blah",
+             "key": "blobs/setpblob_pblob_yy_0.zip",
+             "publicUrl": "https://example.com/setpblob_pblob_yy_0.zip"
+         }
+        ]
+
+     The publicUrl and ipfs keys provided are means of downloading the bundle of patches.
+
+     $ unzip -v setpblob_pblob_12_0.zip 
+     Archive:  setpblob_pblob_12_0.zip
+      Length   Method    Size  Cmpr    Date    Time   CRC-32   Name
+     --------  ------  ------- ---- ---------- ----- --------  ----
+      144784  Defl:X   144809   0% 09-25-2022 19:40 f25b70a5  pblob_12113_f9265e50c7
+      195604  Defl:X   195634   0% 09-25-2022 19:41 671f7f23  pblob_12147_9769da55a4
+      382336  Defl:X   382396   0% 09-25-2022 19:41 484c01d0  pblob_12161_d771eb4106
+      443780  Defl:X   443850   0% 09-25-2022 19:41 e9fb1b6f  pblob_12162_b350b852de
+      280112  Defl:X   280157   0% 09-25-2022 19:41 e8df416c  pblob_12310_f82fac72b5
+      187952  Defl:X   187982   0% 09-25-2022 19:41 2ea40806  pblob_12691_6f8c3e795f
+      360992  Defl:X   361052   0% 09-25-2022 19:41 f037e71f  pblob_12718_4722953c1f
+      181840  Defl:X   181870   0% 09-25-2022 19:41 2cc49613  pblob_12725_e2df438cde
+      355440  Defl:X   355495   0% 09-25-2022 19:41 9b012201  pblob_12758_cf7edded64
+       31980  Stored    31980   0% 09-25-2022 19:41 10b6d8b3  pblob_12794_5910f4da19
+      356152  Defl:X   356207   0% 09-25-2022 19:41 02138bde  pblob_12810_b6d84ce128
+      170576  Defl:X   170606   0% 09-25-2022 19:41 a23b70d6  pblob_12812_05b7bfe1d0
+     1552124  Defl:X  1552364   0% 09-25-2022 19:41 042e4376  pblob_12826_bef1d64bc8
+       40008  Defl:X    40018   0% 09-25-2022 19:41 65af08e3  pblob_12884_9924411293
+      337380  Defl:X   337435   0% 09-25-2022 19:41 06fcc7c8  pblob_12916_3c3da10642
+      425324  Defl:X   425389   0% 09-25-2022 19:41 4da45e40  pblob_12920_a2ded008d2
+      269748  Defl:X   269793   0% 09-25-2022 19:41 b8bd4b02  pblob_12923_4a82423cd8
+      400436  Defl:X   400501   0% 09-25-2022 19:41 e00a8a47  pblob_12947_09eb4fe759
+       70428  Defl:X    70443   0% 09-25-2022 19:41 54265079  pblob_12979_581435c6df
+    --------          -------  ---                            -------
+     6186996          6187981   0%                            19 files
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
