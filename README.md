@@ -19,7 +19,7 @@ This program is incomplete and a work in progress.
       rhtools-sampledata-202308.tar.gz
       flips-rhtool-0.1_2023.tar.gz
       
-
+# Graphical User Interface
 
  After installing the pre-requisites:
     You can run the GUI by launching gui.py
