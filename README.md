@@ -10,6 +10,17 @@ This program is incomplete and a work in progress.
    *  Please install the pre-requisites Including: Flips, Asar,
       and a Legally-acquired original SMW rom as discussed in the Section Pre-requisites.
 
+ Download
+    Download FLIPS and  the Program from
+      https://github.com/Belthasaran/rhtools/releases
+
+      For Windows users, I recommend extracting all 3 files in C:\SNESGAMING
+      rhtools-0.2.tar.gz
+      rhtools-sampledata-202308.tar.gz
+      flips-rhtool-0.1_2023.tar.gz
+      
+
+
  After installing the pre-requisites:
     You can run the GUI by launching gui.py
       python3 gui.py
