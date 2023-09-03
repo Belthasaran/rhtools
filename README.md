@@ -133,5 +133,85 @@ pip3 install requests
 pip3 install compress
 
 
+## Database Maintenance
+
+
+PROCEDURE TO ADD A HACK TO THE DATABASE:
+
+
+To add hack with ID example1234
+
+1. Create folders  zips/ hacks/
+
+2.   create  hacks/example1234.json
+
+The JSON file should contain Information which identifies the hack..
+
+{
+    "added": "2023-09-03",
+    "author": "test",
+    "authors": "test",
+    "demo": "No",
+    "description": "test",
+    "id": "example1234",
+    "length": "unknown",
+    "name": "example hack",
+    "rating": [
+        "0.0"
+    ],
+    "tags": [
+        "traditional"
+    ],
+    "tags_href": "",
+    "type": "Standard: Normal",
+    "url": "https://example.com/info/smw_example"
+    "name_href": "//dl.example.com/download/smw_example.zip",
+    "author_href": "/?p=profile&id=example",
+}
+
+
+3.  Create   zips/example1234.zip
+
+The .zip file should contain  example1234.bps   with the Patch data.
+the Patch must be against the vanilla SMW game in BPS file format.
+
+
+4.  Run mkblob
+     python3 mkblob.py  example1234
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
