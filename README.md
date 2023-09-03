@@ -3,7 +3,7 @@ This program assists with managing and launching SMW Romhack files by automating
 
 A searchable database is provided, allowing any hack in the database to be automatically patched and sent to a SNES or emulator on demand - by searching and specifying the patch number.
 
-The database collected allows automating operations such as "Choose and launch a random romhack based on criteria X, Y, and Z"
+The database collected allows automating operations such as "Choose and launch a random game from the collection based on criteria X, Y, and Z"
 
 This is a sample release.
 This program is incomplete and a work in progress.
