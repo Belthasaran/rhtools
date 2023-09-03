@@ -8,6 +8,7 @@ import requests
 import hashlib
 import base64
 import time
+from pathlib import Path
 from compress import Compressor
 
 from cryptography.fernet import Fernet
@@ -63,6 +64,29 @@ def get_pnum(hackid):
 def has_pnum(hackid):
     return not(get_pnum(hackid) == None)
 
+def get_optfile_path():
+    return 'rhtools_options.dat'
+
+def get_local_options():
+    opthash = {}
+    optfile = get_optfile_path()
+    if os.path.exists(optfile):
+        optfileh = open( optfile, 'r' )
+        opthash = json.loads(optfileh.read())
+        optfileh.close()
+    if not('launcher1' in opthash):
+         opthash['launcher1'] = str(Path('llaunch_rand.sh')) + ' %file'
+    if not('launcher2' in opthash):
+         opthash['launcher2'] = 'default'
+    return opthash
+
+def save_local_options(opthash):
+    optfile = get_optfile_path()
+    optfiletmp = get_optfile_path() + 'tmp'
+    optfileh = open( optfiletmp, 'w')
+    optfileh.write(json.dumps(opthash) + "\n")
+    optfileh.close()
+    os.replace(optfiletmp, optfile)
     
 
 def path_rerequisites():

@@ -6,6 +6,7 @@
 from pathlib import Path
 import tkinter as tk
 import loadsmwrh
+import gui_launchoptions
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -19,6 +20,14 @@ ASSETS_PATH = OUTPUT_PATH / Path(r"assets/frame0")
 
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
+
+def launch_options_click(root):
+    gui_launchoptions.launch_options_click(root)
+  
+def button_play_hack(root,tva):
+   print('S' + str(tva))  
+
+  #import gui_launchoptions
 
 
 window = Tk()
@@ -200,7 +209,7 @@ button_2 = Button(actionframe,
     #image=button_image_2,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: print("button_2 clicked"),
+    command=lambda: button_play_hack(window,tva),
     #relief="flat"
 )
 #button_2.place(
@@ -314,7 +323,7 @@ button_8 = Button(subactionframe,
     image=button_image_8,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: print("button_8 clicked"),
+    command=lambda: launch_options_click(window),
     #relief="flat"
 )
 #button_8.place(
@@ -344,3 +353,6 @@ canvas.create_text(
 )
 window.resizable(True, True)
 window.mainloop()
+
+
+
