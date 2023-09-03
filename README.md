@@ -114,8 +114,10 @@ I recommend the following article:
 https://ubuntu.com/tutorials/install-ubuntu-on-wsl2-on-windows-10#1-overview
 
 In short - the first steps are:
-wsl --set-default-version 2
-wsl install -d ubuntu
+
+  wsl --set-default-version 2
+
+  wsl install -d ubuntu
 
 After you have installed your environment,  Launch  MobaXterm, 
 choose "Start Local Terminal" and double click the WSL-Ubuntu user Session.
