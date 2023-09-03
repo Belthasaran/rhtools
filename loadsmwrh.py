@@ -36,6 +36,8 @@ def rhmd_path():
         return "rhmd_sample2.dat"
     if os.path.exists("rhmd_sample.dat"):
         return "rhmd_sample.dat"
+    if not os.path.exists("rhmd_dist.dat"):
+        raise Exception('No rhmd DAT file found..  Did you forget to extract rhtools-sampledata-20xx.tar.gz ?')
     return "rhmd_dist.dat"
 
 
