@@ -8,3 +8,6 @@ temp/*
 
 rhtools_options.dat
 rhtools_options.dattmp
+log.txt
+log_b.txt
+exclude.dat
