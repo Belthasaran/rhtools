@@ -20,6 +20,8 @@ This program is incomplete and a work in progress.
       flips-rhtool-0.1_2023.tar.gz
       
 # Graphical User Interface
+ 
+ This program contains a GUI https://github.com/Belthasaran/rhtools/blob/main/gui.py
 
  After installing the pre-requisites:
     You can run the GUI by launching gui.py
