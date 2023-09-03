@@ -1,7 +1,7 @@
 # Purpose of this Program
 This program assists with managing and launching SMW Romhack files by automating download, patching, local file management.
 
-A searchable database is provided, allowing any hack in the database to be automatically patched and sent to a SNES or emulator on demand - by searching and specifying the patch number.
+A searchable database is provided, allowing any hack in the database to be automatically patched and loaded into RetroArch or consoles  on demand - by searching and specifying the patch number.
 
 The database collected allows automating operations such as "Choose and launch a random game from the collection based on criteria X, Y, and Z"
 
@@ -51,7 +51,7 @@ This program is incomplete and a work in progress.
        DRAM World: 
       # python3 pb_repatch.py 11374
 
-    You can send a ROM to the emulated or real  SNES by running pb_sendtosnes.py
+    You can send a ROM to the SNES by running pb_sendtosnes.py
       # python3 pb_sendtosnes.py rom/blah.sfc
 
        This requires an Emulator be installed Or  Usb2snes AND
