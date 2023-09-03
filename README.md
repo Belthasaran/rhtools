@@ -25,6 +25,8 @@ This program is incomplete and a work in progress.
     You can run the GUI by launching gui.py
       python3 gui.py
 
+![ScreenShot](assets/screenshot1.png)
+
     Currently the GUI only supports listing all Hacks in
     the database and choosing a hack.   
 
