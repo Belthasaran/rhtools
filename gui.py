@@ -5,8 +5,11 @@
 
 from pathlib import Path
 import tkinter as tk
+import tkinter.messagebox
 import loadsmwrh
 import gui_launchoptions
+import pb_repatch
+import pb_sendtosnes
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -25,7 +28,19 @@ def launch_options_click(root):
     gui_launchoptions.launch_options_click(root)
   
 def button_play_hack(root,tva):
-   print('S' + str(tva))  
+   current = tva.focus()
+   item = tva.item(current)
+   ohash = loadsmwrh.get_local_options()
+   if not('values' in item) or len(item['values'])<1:
+       tkinter.messagebox.showerror(message='Please choose a hack from the list')   
+   else:
+       print('S' + str(item))  
+       result = pb_repatch.repatch_function(['launch1',item['values'][0]])
+       if result:
+           print(str(result))
+           sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+           if not(sendresult):
+               tkinter.messagebox.showerror(message='Launcher1 failed to run (please check launch options)')
 
   #import gui_launchoptions
 
