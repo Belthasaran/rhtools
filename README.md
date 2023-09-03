@@ -130,8 +130,9 @@ Open a  Ubuntu-WSL Tab
 
 then
 
-cd /mnt/c/snesgaming/rhtools
-python3 gui.py
+    cd /mnt/c/snesgaming/rhtools
+
+    python3 gui.py
 
 
 ## PIP Modules:
@@ -139,11 +140,15 @@ python3 gui.py
 
 pip3 install -r requirements.txt
 
-Please install
-pip3 install ipfshttpclient
-pip3 install cryptography
-pip3 install requests
-pip3 install compress
+Please install:
+
+    pip3 install ipfshttpclient
+
+    pip3 install cryptography
+
+    pip3 install requests
+
+    pip3 install compress
 
 
 ## Database Maintenance
