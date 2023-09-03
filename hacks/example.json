@@ -1,0 +1,22 @@
+{
+    "added": "2023-09-03",
+    "author": "test",
+    "authors": "test",
+    "demo": "No",
+    "description": "test",
+    "id": "smw_example",
+    "length": "unknown",
+    "name": "example hack",
+    "rating": [
+        "0.0"
+    ],
+    "tags": [
+        "traditional"
+    ],
+    "tags_href": "",
+    "type": "Standard: Normal",
+    "url": "https://example.com/info/smw_example"
+    "name_href": "//dl.smwcentral.net/download/smw_example.zip",
+    "author_href": "/?p=profile&id=example",
+}
+
