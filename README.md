@@ -53,6 +53,20 @@ This file should be vanilla SMW.
 Name the file smw.sfc  and Place the file in the same folder you
 run the program from
 
+## FLIPS and ASAR
+
+- You need the floating IPS Patcher flips And ASAR 1.71 installed.
+
+- Those products are both under the GNU GPL.  For your convenience: This website contains
+a copy of them:  Download  flips-rhtool-0.1_2023.tar.gz
+
+If you are a Windows Subsystem for Linux user,  then just use 7-zip to extract the file and its subfolders in C:\SNESGAMING
+
+Linux users can extract the archive and then copy  bin/flips and bin/asar   To  /usr/local/bin.
+  tar zxvf flips-rhtool-0.1_2023.tar.gz
+  sudo cp bin/flips /usr/local/bin
+  sudo cp bin/asar /usr/local/bin
+
 ## Linux
 
 This program is written on Linux to run on Linux.
@@ -60,8 +74,10 @@ This program is written on Linux to run on Linux.
 The following steps are for Windows users.
 
 Windows users should still be able to run this program:
-    * First: install Windows Subsystem for Linux,
+    * First: install Windows Subsystem for Linux (see below for details)
     * Next: download and install MobaXterm
+
+## Setup for Windows Users
 
 Windows users: Please create a directory named C:\SNESGAMING
 and put these scripts in a folder named RHTOOLS below C:\SNESGAMING
@@ -69,6 +85,8 @@ and put these scripts in a folder named RHTOOLS below C:\SNESGAMING
 When you install ASAR and FLIPS as required,  create a
 folder called C:\SNESGAMING\bin   then copy The linux versions of
 asar and flips to that bin folder.
+
+## Windows Subsystem for Linux
 
 I recommend the following article:
 https://ubuntu.com/tutorials/install-ubuntu-on-wsl2-on-windows-10#1-overview
