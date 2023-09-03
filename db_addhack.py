@@ -34,6 +34,24 @@ def addhack_function(args):
     data = f1.read()
     f1.close()
     addhackinfo = json.loads(data)
+    if not('name' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - name attribute not found')
+        return
+    if not('id' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - id attribute not found')
+        return
+    if not('author' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - author attribute not found')
+        return
+    if not('description' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - description attribute not found')
+        return
+    if not('patchblob1_name' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - patchblob1_name attribute not found')
+        return
+    if not('patchblob1_sha224' in addhackinfo):
+        print('ERROR: ' + str(hackid) + ' - patchblob1_sha224 attribute not found')
+        return
     if not(type(addhackinfo) == list):
         addhackinfo = [addhackinfo]
     hacklist = hacklist + addhackinfo

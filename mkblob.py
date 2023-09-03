@@ -21,7 +21,10 @@ def mkblob_function(args):
     fr = open(os.path.join('hacks', str(hackid) ))
     hackinfo = json.load(fr)
     fr.close()
-    
+ 
+    if ('patchblob1_name' in hackinfo):
+        print('ERROR: ' + str(hackid) + ' - patchblob1 already defined')
+        return   
       
     with ZipFile(filename, 'r') as zip:
         found = False
