@@ -143,9 +143,12 @@ To add hack with ID example1234
 
 1. Create folders  zips/ hacks/
 
-2.   create  hacks/example1234.json
+2.   create  hacks/example1234
+     This should be a text file in JSON format.
 
 The JSON file should contain Information which identifies the hack..
+
+You will need to either prepare this manually or by other means:
 
 {
     "added": "2023-09-03",
@@ -164,9 +167,9 @@ The JSON file should contain Information which identifies the hack..
     ],
     "tags_href": "",
     "type": "Standard: Normal",
-    "url": "https://example.com/info/smw_example"
+    "url": "https://example.com/info/smw_example",
     "name_href": "//dl.example.com/download/smw_example.zip",
-    "author_href": "/?p=profile&id=example",
+    "author_href": "/?p=profile&id=example"
 }
 
 
@@ -179,12 +182,23 @@ the Patch must be against the vanilla SMW game in BPS file format.
 4.  Run mkblob
      python3 mkblob.py  example1234
 
+     The program mkblob will Automatically extract the ".zip" file and apply the patch.
+     The output looks like:
+
+     $ python3 mkblob.py example
+
+example.bps
+The patch was applied successfully!
+::: {'added': '2023-09-03', 'author': 'test', 'authors': 'test', 'demo': 'No', 'description': 'test', 'id': 'example', 'length': 'unknown', 'name': 'example hack', 'rating': ['0.0'], 'tags': ['traditional'], 'tags_href': '', 'type': 'Standard: Normal', 'url': 'https://example.com/info/smw_example', 'name_href': '//dl.example.com/download/smw_example.zip', 'author_href': '/?p=profile&id=example', 'patch': 'patch/Rf_sNY6-VeRrbd3ehCVZ8r6qsJcsGOsg', 'pat_sha224': '07886ea9791a671581e7bd2e5bc36999bf9e1598838d5b7f505f173a', 'pat_sha1': '556ada885b72ba0c060d7a569a357501509c2b7a', 'pat_shake_128': 'Rf_sNY6-VeRrbd3ehCVZ8r6qsJcsGOsg', 'result_sha224': 'fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08', 'result_sha1': '6b47bb75d16514b6a476aa0c73a683a2a4c18765', 'result_shake1': '1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL', 'rom': 'rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc', 'patchblob1_name': 'pblob_example_a45829efe5', 'patchblob1_key': 'dGRJUDJWc0txZXA2b2E5a0lxa1dQV2d1c2VQZWZ2aW14SU1MMzJFMWc1ND0=', 'patchblob1_sha224': 'a45829efe55990d404d9136207f9ded73793b9b9e761195baf2e3d31', 'romblob_salt': 'kyjCSqrKdeH3l4_t5gbcbQ==', 'romblob_name': 'rblob_example_f1fc80f5d9'}
+rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
+
+
+    At this point the  hacks/example  File has Already been updated and is ready to add to the database.
 
 
 
-
-
-
+5.      bash do_addhacks.sh
+     This script will scan the  hacks/  directory  and attempt to add them to the database.
 
 
 

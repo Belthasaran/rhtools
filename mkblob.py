@@ -146,6 +146,7 @@ def mkblob_function(args):
                 f2 = open(os.path.join("hacks", hackinfo["id"])  + ".new", "w")
                 f2.write( json.dumps(hackinfo) + "\n" )
                 f2.close()
+                os.replace(os.path.join("hacks", hackinfo["id"]) + "", os.path.join("hacks", hackinfo["id"])  + ".original")
                 os.replace(os.path.join("hacks", hackinfo["id"])  + ".new", os.path.join("hacks", hackinfo["id"])  + "")
 
 
