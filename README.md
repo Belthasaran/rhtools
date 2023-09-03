@@ -175,14 +175,22 @@ You will need to either prepare this manually or by other means:
 
 3.  Create   zips/example1234.zip
 
-The .zip file should contain  example1234.bps   with the Patch data.
+The .zip file should contain A file named example1234.bps   with the Patch data.
 the Patch must be against the vanilla SMW game in BPS file format.
+
+The filename is generally important, but it Must end with .bps, And there should
+be only one BPS file within the .zip file.
 
 
 4.  Run mkblob
      python3 mkblob.py  example1234
 
      The program mkblob will Automatically extract the ".zip" file and apply the patch.
+     If the patching is successful, then the BPS blob will be saved to the blobs/ directory,
+     And  hacks/example1234  will be updated to add Verification checksums, and
+     a unique key for the blob.   The BPS will be compressed and encrypted for the purpose
+     of verifying integrity when launching or using the patch later.
+
      The output looks like:
 
      $ python3 mkblob.py example
@@ -198,7 +206,14 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
 
 
 5.      bash do_addhacks.sh
-     This script will scan the  hacks/  directory  and attempt to add them to the database.
+     This script will scan the  hacks/  directory  and attempt to add all hacks found in hacks/ to the database.
+
+     NOTE:  If a hack by that same ID is already in the local database, then it will be removed and replaced with
+     the items found in hacks/.   
+
+     Two hacks should Never have the same ID specified.
+     Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
+
 
 
 
