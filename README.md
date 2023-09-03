@@ -70,6 +70,13 @@ run the program from
 
 - You need the floating IPS Patcher flips And ASAR 1.71 installed.
 
+- Please use the see the flips-rhtool package from
+      https://github.com/Belthasaran/rhtools/releases
+
+  The flips and asar binaries must be placed in either a specific folder or the present working directory.
+
+  The release zip files include all source code and are intended to be exracted into the C:\snesgaming folder.
+
 - Those products are both under the GNU GPL.  For your convenience: This website contains
 a copy of them:  Download  flips-rhtool-0.1_2023.tar.gz
 
