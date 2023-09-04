@@ -13,7 +13,7 @@ import db_addhack
 def addall_function(args):
     files = os.listdir('hacks')
     for filename in files: 
-        if re.match('^[a-z0-9]+$', filename):
+        if re.match('^[a-z0-9]+$', filename) and not(filename == 'result'):
             db_addhack.addhack_function(['addhack', filename])
 
 if __name__ == '__main__':

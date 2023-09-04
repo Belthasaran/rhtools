@@ -25,6 +25,9 @@ def addhack_function(args):
     hacklist = loadsmwrh.get_hacklist_data(filename=None)
     #
     for i in range(len(hacklist)): 
+         if type(hacklist[i]) == list:
+             hacklist[i] = hacklist[i][0]
+         #print('' + str(i) + ' ::  ' + str(hacklist[i]))
          if hacklist[i]['id'] == hackid:
              if force == True:
                  print('NOTE: Hack id '+hackid+' already exists in dataset, and database entry will be overwritten')
