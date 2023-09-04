@@ -26,10 +26,10 @@ def addhack_function(args):
     #
     for i in range(len(hacklist)): 
          if hacklist[i]['id'] == hackid:
-             if force == True
+             if force == True:
                  print('NOTE: Hack id '+hackid+' already exists in dataset, and database entry will be overwritten')
              else:
-                 print('Skip Hack id '+hackid+' already in database'
+                 print('Skip Hack id '+hackid+' already in database')
                  #
              del hacklist[i]
              break
