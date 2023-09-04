@@ -24,6 +24,10 @@ This program is incomplete and a work in progress.
       flips-rhtool-0.1_2023.tar.gz
       
 # Graphical User Interface
+
+ GUI version is for test purposes, and this tool only has a limited subset of SMW game directory listings.
+ (More complete data is available for the text-based Search-Only tool
+  rhinfotool https://github.com/Belthasaran/rhinfotool/releases/ )
  
  This program contains a GUI https://github.com/Belthasaran/rhtools/blob/main/gui.py
 
