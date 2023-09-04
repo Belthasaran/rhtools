@@ -155,11 +155,11 @@ def get_hacklist_data(filename=None):
      data = None
      return hacklist
 
-def get_hackdict():
+def get_hackdict(skipdups=False):
      hacklist = get_hacklist_data()
      hackdict = {}
      for u in range(len(hacklist)):
-         if hacklist[u]['id'] in hackdict.keys():
+         if hacklist[u]['id'] in hackdict.keys() and not skipdups:
             raise Exception('Oops: duplicate hack ids in list')
          hackdict[ hacklist[u]['id']] = hacklist[u]
      return hackdict
