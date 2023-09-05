@@ -174,25 +174,36 @@ To add hack with ID example1234
 
 The JSON file should contain Information which identifies the hack..
 
-You will need to either prepare this manually or by other means:
+Starting with 0.4 you can use the 'python3 db_makehack.py uniqueid'  Utility to help create the JSON file.
+
+Be prepared to answer these questions
+
+    $ python3 db_makehack.py local_123456
+    Hack name:test hack
+    Enter author names:tester
+    Description:this is just a test
+    Length (example: "5 exits"), or unknown:2 exits
+    Please choose type from above list: 1
+    Is the hack a demo?  Yes or No: No
+    Specify tags
+    Enter a tag to add, or -tag to remove a tag, +add to create a new tag, list to display common tags, or done to accept: normal
+    Selected tags = ['normal']
+    Enter a tag to add, or -tag to remove a tag, +add to create a new tag, list to display common tags, or done to accept: done
+    That done does not seem to be in the list of known tags -  Try +tag 
+    Enter optional author URL (or leave blank): 
+    Enter URL for information about the hack (or leave blank): 
+    Enter direct URL to the raw Zip file (or leave blank): http://example.com/download/local123456.zip
+
+EXAMPLE:
 
 {
-    "added": "2023-09-03",
-    "author": "test",
-    "authors": "test",
-    "demo": "No",
-    "description": "test",
-    "id": "example1234",
-    "length": "unknown",
-    "name": "example hack",
-    "rating": [
-        "0.0"
-    ],
+    "added": "2023-09-03", "author": "test", "authors": "test",
+    "demo": "No", "description": "test", "id": "example1234",
+    "length": "unknown", "name": "example hack", "rating": [ "0.0" ],
     "tags": [
         "traditional"
     ],
-    "tags_href": "",
-    "type": "Standard: Normal",
+    "tags_href": "", "type": "Standard: Normal",
     "url": "https://example.com/info/smw_example",
     "name_href": "//dl.example.com/download/smw_example.zip",
     "author_href": "/?p=profile&id=example"
@@ -216,6 +227,11 @@ be only one BPS file within the .zip file.
      And  hacks/example1234  will be updated to add Verification checksums, and
      a unique key for the blob.   The BPS will be compressed and encrypted for the purpose
      of verifying integrity when launching or using the patch later.
+
+     Important Note: If you are intending to distribute the patch blob:
+     The blob file is encrypted and unreadable without the key which is entered into hacks/example1234
+     by mkblob -- running mkblob a second time would cause a loss of the previous key - Both files
+     (or the database file) are required to use the patch blob.
 
      The output looks like:
 
