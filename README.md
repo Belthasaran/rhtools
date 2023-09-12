@@ -306,6 +306,7 @@ in psets.dat
   
 # Example Level loading Patch: Storks
 
+
 Storks, Apes, and Crocodiles is a SMW hack.  This particular one has been assigned game id number: 27282.
 
 The URL for more information about the game is at <A HREF="https://www.smwcentral.net/?p=section&a=details&id=27282" REL="nofollow">https://www.smwcentral.net/?p=section&a=details&id=27282</A>
@@ -336,7 +337,7 @@ Main:
     RTS
 ```
 
-In order to make the local modification available in rhtools,  I edited asm1.py  to add  a condition to get_a_patch() for patch number 20,
+In order to make the local modification Which alters the game Storks to let me play any level usable in rhtools,  I edited asm1.py  to add  a condition to get_a_patch() for patch number 20,
 then I added this function  get_c_patch(pid,chosenlid)
 
 Finally, I add the following entry to pnums.dat
