@@ -378,9 +378,9 @@ I can also specify a level directly through, for example
 
 python3 pb_lvlrand.py 27282 0x0F
 
+In any case..  Patch number 20 allows me to jump into the game and try out playing any random level instead of level 1.
 
-
-
+Of course after finishing the level it will not naturally proceed to the next level.  
 
 
 
