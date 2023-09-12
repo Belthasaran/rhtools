@@ -304,6 +304,91 @@ in psets.dat
      6186996          6187981   0%                            19 files
 
   
+# Example Level loading Patch: Storks
+
+Storks, Apes, and Crocodiles is a SMW hack.  This particular one has been assigned game id number: 27282.
+
+The URL for more information about the game is at <A HREF="https://www.smwcentral.net/?p=section&a=details&id=27282" REL="nofollow">https://www.smwcentral.net/?p=section&a=details&id=27282</A>
+
+In the game of Storks... I just wanted to be able to try playing any level number, not just level number 1.
+
+after a few days with a debugger, I came up with this patch variant
+
+```
+; I just want to try playing levels in Storks other than Level 1...
+;
+; asar temp3.asm storks_copy2.sfc ; snes9x -conf snes9xb.conf storks_copy2.sfc
+;  Found valid level numbers: #$01, #$02, #$03, #$04, #$05, #$06, #$07, #$09, #$0A, #$0B, #$0C, #$0D, #$0E, #$0F, #$10, #$11, #$12
+!levelnumber = #$0F
+org $85d856
+    JSR Main ;jsr n n   +2 d85a  (length=3)
+    BNE $3   ; len=2    (bne,       length=2) ;  bne n
+    JMP $d8a5 ; len=3     (jmp $nnnn, length=3) ;  jmp n n   ; +3
+org $85f8f0
+Main:
+    LDA !levelnumber
+    STA $13bf
+    CPX #$03
+    BNE .etest
+        LDA $0109
+    RTS
+    .etest:
+    RTS
+```
+
+In order to make the local modification available in rhtools,  I edited asm1.py  to add  a condition to get_a_patch() for patch number 20,
+then I added this function  get_c_patch(pid,chosenlid)
+
+Finally, I add the following entry to pnums.dat
+
+```
+27282 20
+```
+
+And then log the Valid level ID numbers in log.txt
+
+```
+> 27282 2 20 2 1694519499 _ 0x0
+> 27282 2 20 2 1694519499 _ 0x0
+> 27282 3 20 3 1694519556 _ 0x0
+> 27282 4 20 4 1694519572 _ 0x0
+> 27282 5 20 5 1694519585 _ 0x0
+> 27282 6 20 6 1694519601 _ 0x0
+> 27282 7 20 7 1694519624 _ 0x0
+> 27282 7 20 7 1694519637 _ 0x0
+> 27282 8 20 8 1694519650 _ 0x0
+> 27282 9 20 9 1694519664 _ 0x0
+> 27282 A 20 10 1694519705 _ 0x0
+> 27282 B 20 11 1694519721 _ 0x0
+> 27282 C 20 12 1694519734 _ 0x0
+> 27282 D 20 13 1694519748 _ 0x0
+> 27282 E 20 14 1694519762 _ 0x0
+> 27282 F 20 15 1694519776 _ 0x0
+> 27282 10 20 16 1694519830 _ 0x0
+> 27282 11 20 17 1694519842 _ 0x0
+> 27282 12 20 18 1694519855 _ 0x0
+```
+
+After doing this, the data mining process is complete, and I can load Any random storks level by running
+
+python3 pb_randomlevel.py 27282
+
+I can also specify a level directly through, for example
+
+python3 pb_lvlrand.py 27282 0x0F
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
