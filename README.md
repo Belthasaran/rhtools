@@ -309,7 +309,7 @@ in psets.dat
 
 Storks, Apes, and Crocodiles is a SMW hack.  This particular one has been assigned game id number: 27282.
 
-The URL for more information about the game is at <A HREF="https://www.smwcentral.net/?p=section&a=details&id=27282" REL="nofollow">https://www.smwcentral.net/?p=section&a=details&id=27282</A>
+The URL for more information about the game is at <A HREF="https://www.smwcentral.net/?p=section&a=details&id=27282" TARGET="_new" REL="nofollow">https://www.smwcentral.net/?p=section&a=details&id=27282</A>
 
 In the game of Storks... I just wanted to be able to try playing any level number, not just level number 1.
 
