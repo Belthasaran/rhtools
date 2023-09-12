@@ -372,7 +372,7 @@ And then log the Valid level ID numbers in log.txt
 
 After doing this, the data mining process is complete, and I can load Any random storks level by running
 
-python3 pb_randomlevel.py 27282
+python3 pb_lvlrand.py 27282
 
 I can also specify a level directly through, for example
 
