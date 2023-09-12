@@ -1,4 +1,31 @@
-# Copyright C Belthasar 2023 All Rights Reserved
+def get_c_patch(pid, chosenlid):
+    return """
+org $9CB1 ; skip intro
+db $00
+org $00A09C ; short timer
+db $10
+
+; I just want to try playing levels in Storks other than Level 1...
+;
+; asar temp3.asm storks_copy2.sfc ; snes9x -conf snes9xb.conf storks_copy2.sfc
+!levelnumber = #""" + str(chosenlid)  + """
+org $85d856
+    JSR Main ;jsr n n   +2 d85a  (length=3)
+    BNE $3   ; len=2    (bne,       length=2) ;  bne n   
+    JMP $d8a5 ; len=3     (jmp $nnnn, length=3) ;  jmp n n   ; +3
+org $85f8f0
+Main:
+    LDA !levelnumber
+    STA $13bf
+    CPX #$03
+    BNE .etest 
+        LDA $0109
+    RTS
+    .etest:
+    RTS
+"""
+
+
 
 def get_b_patch(pid, chosenlid):
     lob = chosenlid & 0xff
@@ -193,6 +220,8 @@ Ret2:
     return basep_q
 
 def get_a_patch(pid,chosenlid):
+    if pid == 20:
+        return get_c_patch(pid, chosenlid)
     if pid == 8 or pid == 9 or pid == 10 or pid == 11 or pid == 12 or pid == 13:
         return get_b_patch(pid,chosenlid)
     if pid == 1000:
