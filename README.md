@@ -418,7 +418,7 @@ For example:
     "$109", "$14", "$107", "$107", "$1", "$10C", "$7", "$10B", "$10F", "$106", "$105", "$102", "$103", "$101", "$1D8" ],
     "custompatches" : [{
         "name" : "patch1",
-        "asartemplate" : "!levelid = #%idnunmber%\norg $85d856\n JSR Main\nBNE $3\nJMP $d8a5\norg $85f8f0\nMain:\nLDA !levelnumber\n STA $13bf\nCPX #$03\nBNE .etest\nLDA $0109\nRTS\n.etest:\nRTS\n",
+        "asartemplate" : "!levelid = #%%levelid%%\norg $85d856\n JSR Main\nBNE $3\nJMP $d8a5\norg $85f8f0\nMain:\nLDA !levelnumber\n STA $13bf\nCPX #$03\nBNE .etest\nLDA $0109\nRTS\n.etest:\nRTS\n",
         "levelids" : [ "$123" ]  
     }],
     "authors": "PangaeaPanga", "demo": "No",
