@@ -77,7 +77,7 @@ def get_local_options():
         opthash = json.loads(optfileh.read())
         optfileh.close()
     if not('launcher1' in opthash):
-         opthash['launcher1'] = str(Path('llaunch_rand.sh')) + ' %file'
+         opthash['launcher1'] = str(os.path.join('.','llaunch_rand.sh')) + ' %file'
     if not('launcher2' in opthash):
          opthash['launcher2'] = 'default'
     return opthash
