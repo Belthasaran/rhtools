@@ -10,6 +10,7 @@ import loadsmwrh
 import gui_launchoptions
 import pb_repatch
 import pb_sendtosnes
+import pb_lvlrand
 import re
 
 # from tkinter import *
@@ -48,6 +49,27 @@ def button_play_hack(root,tva):
                tkinter.messagebox.showerror(message='Launcher1 failed to run (please check launch options)')
 
   #import gui_launchoptions
+
+
+def button_play_randlevel(root,tva):
+   current = tva.focus()
+   item = tva.item(current)
+   ohash = loadsmwrh.get_local_options()
+   if not('values' in item) or len(item['values'])<1:
+       tkinter.messagebox.showerror(message='Please choose a hack from the list')
+   else:
+       print('S' + str(item))
+       result = pb_lvlrand.randlevel_function(['guilaunch', str(item['values'][0])  ] )
+       #result = pb_repatch.repatch_function(['launch1', str(item['values'][0]]))
+       if result:
+           print(str(result))
+       #    sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+       else:
+            tkinter.messagebox.showerror(message='(lvlrand.py) Process failed')
+       #    if not(sendresult):
+       #        tkinter.messagebox.showerror(message='Launcher1 failed to run (please check launch options)')
+
+
 
 
 window = Tk()
@@ -439,7 +461,8 @@ button_7 = Button(subactionframe,
     image=button_image_7,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: print("button_7 clicked"),
+    command= lambda: button_play_randlevel(window,tva),
+    #command=lambda: print("button_7 clicked"),
     #relief="flat",
     text="Random Level"
 )

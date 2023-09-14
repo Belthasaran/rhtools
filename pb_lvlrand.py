@@ -118,7 +118,7 @@ def randlevel_function(args):
     romfile = pb_repatch.repatch_function(['repatch', chosen])
     if not romfile:
         print('Repatch failed')
-        sys.exit(1)
+        return None
     hackfn = romfile
     hackfp = hackfn
     #hackfp = "rom/" + hackfn
