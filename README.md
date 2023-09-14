@@ -434,7 +434,7 @@ For example:
    }
 ```
 
-If you created a Hack and can supply these JSON fields for a Hack on SMWc,  then you can add these fields to your JSON file in hacks/<ID NUMBER>
+If you created a Hack and can supply these JSON fields for a Hack on SMWc,  then you can add these fields to your JSON file in hacks/<ID>
 
 Hacks not on SMWc require assignemnt of a unique ID number.   For the time being, please use
 
