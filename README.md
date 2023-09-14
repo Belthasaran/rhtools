@@ -409,9 +409,9 @@ In addition, a  Custom game-picking patch is specified for an extra level Id $12
 
 For example:
 ```
-   { "added": "2015-06-22 02:10:27 AM", "author": "PangaeaPanga", "author_href": "/?p=profile&id=3491",
+   { "added": "2015-06-22 02:10:27 AM", "author": "PangaeaPanga", "author_href": "",
     "description": "Current version: 1.2", "featured": "No", "id": "11374", "length": "18 exit(s)",
-    "name": "Super Dram World", "name_href": "//dl.smwcentral.net/11374/Super%20Dram%20World%20v1.2%20Music.zip",
+    "name": "Super Dram World", "name_href": "http://example.com/11374/example.zip",
     "notes" : "extra notes go here", 
     "picklevel.patchnum" : "20",
     "picklevel.stdlevels" : [ "$135", "$6", "$2", "$F", "$C", "$5", "$3", "$B",
@@ -422,14 +422,20 @@ For example:
         "levelids" : [ "$123" ]  
     }],
     "authors": "PangaeaPanga", "demo": "No",
-    "pat_sha1": "d53b4dd82295fa9765d2bf023b5cf113cfa1a8d2", "pat_sha224": "7a815b5fe8591a7255de168232417cb3488d4161c0e79ac5a63e537f",
-    "pat_shake_128": "fS103JtJSMDmc195nfui9tOqvlz-WWtV", "patch": "patch/fS103JtJSMDmc195nfui9tOqvlz-WWtV",
-    "patchblob1_key": "bU9uR0NOSExLUzNVTUpDcHktZkhqM0pEMTl2bVRTZWN3dnI1REZjbGQ2WT0=", "patchblob1_name": "pblob_11374_7003deed8b",
-    "patchblob1_sha224": "7003deed8bad89e4981fd92cd7dc4260ac9cd4fcab12f16dd8cbc803", "rating": [ "4.3" ],
-    "result_sha1": "e876453387f92f645ac58a42650c8ea0f06e71cf", "result_sha224": "9f0f600ba992cc421e128bd771fe72309e41572b9949cdadcec347d3",
+    "pat_sha1": "d53b4dd82295fa9765d2bf023b5cf113cfa1a8d2", 
+    "pat_sha224": "7a815b5fe8591a7255de168232417cb3488d4161c0e79ac5a63e537f",
+    "pat_shake_128": "fS103JtJSMDmc195nfui9tOqvlz-WWtV", 
+    "patch": "patch/fS103JtJSMDmc195nfui9tOqvlz-WWtV",
+    "patchblob1_key": "bU9uR0NOSExLUzNVTUpDcHktZkhqM0pEMTl2bVRTZWN3dnI1REZjbGQ2WT0=", 
+    "patchblob1_name": "pblob_11374_7003deed8b",
+    "patchblob1_sha224": "7003deed8bad89e4981fd92cd7dc4260ac9cd4fcab12f16dd8cbc803", 
+    "rating": [ "4.3" ],
+    "result_sha1": "e876453387f92f645ac58a42650c8ea0f06e71cf", 
+    "result_sha224": "9f0f600ba992cc421e128bd771fe72309e41572b9949cdadcec347d3",
     "result_shake1": "ei6vPa66P1H6dJjgLHqsL_JWmSeOD8v7",
-    "tags": [ "glitch", "vanilla" ], "tags_href": "/?p=section&s=smwhacks&u=0&f%5Btags%5D=glitch",
-    "type": "Kaizo: Intermediate", "url": "https://www.smwcentral.net/?p=section&a=details&id=11374",
+    "tags": [ "glitch", "vanilla" ], "tags_href": "",
+    "type": "Kaizo: Intermediate", 
+    "url": "https://www.smwcentral.net/?p=section&a=details&id=11374",
     "comments": "24 ",
     "comments_href": "#comments"
    }
