@@ -251,8 +251,11 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
      NOTE:  If a hack by that same ID is already in the local database, then it will be removed and replaced with
      the items found in hacks/.   
 
-     Two hacks should Never have the same ID specified.
-     Suggestion: Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
+     Assuming the direct download URL is populated and correct, then the game could presumably be added to the repository for display in the GUI and selection.
+
+     The game ID numbers should be unique to each hack: no two different hacks should ever have the same level ID.
+     Conflicting IDs result in the later entry being treated as a "new version" that replaces the old version's data.
+     Suggestion: Do not use a numeric ID number unless the hack is on SMWC, and your ID number matches the hack's ID number on SMWc.
 
      Please use db_makehack.py <Unique ID>
 
