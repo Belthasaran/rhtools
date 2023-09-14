@@ -439,21 +439,7 @@ Hacks not on SMWc require assignemnt of a unique ID number.   For the time being
 To create a temporary local id.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+The hope would be that in a future version Hack creators or users could submit their JSON Hack metadata to be added, and all users of the program would then have access to all games.
 
 
 
