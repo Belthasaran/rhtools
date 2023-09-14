@@ -252,7 +252,15 @@ rom/example_1SNFIbeimj0ck4t5ylWe6a80jqt9gYkL.sfc
      the items found in hacks/.   
 
      Two hacks should Never have the same ID specified.
-     Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
+     Suggestion: Do not use a numeric ID number, unless the hack is on SMWC, and your ID number matches theirs!
+
+     Please use db_makehack.py <Unique ID>
+
+     For SMW-Central hacks please use th SMWc ID number
+
+     If you dont have an ID, then use  python3 tempid.py FILENAME
+
+     Tempid.py will create a temporary local ID based on a timestamp and part of a file hash
 
 
 # PSETS
@@ -383,39 +391,52 @@ In any case..  Patch number 20 allows me to jump into the game and try out playi
 Of course after finishing the level it will not naturally proceed to the next level.  
 
 
+# JSON Format for specifying custom patches
 
+This functionality is not yet checked in Lvlrand, but the expectation is to be able to Add JSON fields for indicating 
+the hack-specific level id patch number, or custom ASM template, Instead of log.txt:  when adding a hack to the database.
 
+This allows setting hack-specific requirements for random level section  when Adding a Hack to the database.
+For example, some hacks may require setting switch palaces on certain levels.
 
+For this example, JSON fields are added to use Patch #20 for DRAM World, for Level IDs  [ "$135", "$6", "$2", "$F", "$C", "$5", "$3", "$B",
+    "$109", "$14", "$107", "$107", "$1", "$10C" "$7", "$10B", "$10F", "$106", "$105", "$102", "$103", "$101", "$1D8" ]
 
+In addition, a  Custom game-picking patch is specified for an extra level Id $123.
 
+For example:
+```
+   { "added": "2015-06-22 02:10:27 AM", "author": "PangaeaPanga", "author_href": "/?p=profile&id=3491",
+    "description": "Current version: 1.2", "featured": "No", "id": "11374", "length": "18 exit(s)",
+    "name": "Super Dram World", "name_href": "//dl.smwcentral.net/11374/Super%20Dram%20World%20v1.2%20Music.zip",
+    "picklevel.patchnum" : "20",
+    "picklevel.stdlevels" : [ "$135", "$6", "$2", "$F", "$C", "$5", "$3", "$B",
+    "$109", "$14", "$107", "$107", "$1", "$10C", "$7", "$10B", "$10F", "$106", "$105", "$102", "$103", "$101", "$1D8" ],
+    "custompatches" : [{
+        "name" : "patch1",
+        "asartemplate" : "!levelid = #%idnunmber%\norg $85d856\n JSR Main\nBNE $3\nJMP $d8a5\norg $85f8f0\nMain:\nLDA !levelnumber\n STA $13bf\nCPX #$03\nBNE .etest\nLDA $0109\nRTS\n.etest:\nRTS\n",
+        "levelids" : [ "$123" ]  
+    }],
+    "authors": "PangaeaPanga", "demo": "No",
+    "pat_sha1": "d53b4dd82295fa9765d2bf023b5cf113cfa1a8d2", "pat_sha224": "7a815b5fe8591a7255de168232417cb3488d4161c0e79ac5a63e537f",
+    "pat_shake_128": "fS103JtJSMDmc195nfui9tOqvlz-WWtV", "patch": "patch/fS103JtJSMDmc195nfui9tOqvlz-WWtV",
+    "patchblob1_key": "bU9uR0NOSExLUzNVTUpDcHktZkhqM0pEMTl2bVRTZWN3dnI1REZjbGQ2WT0=", "patchblob1_name": "pblob_11374_7003deed8b",
+    "patchblob1_sha224": "7003deed8bad89e4981fd92cd7dc4260ac9cd4fcab12f16dd8cbc803", "rating": [ "4.3" ],
+    "result_sha1": "e876453387f92f645ac58a42650c8ea0f06e71cf", "result_sha224": "9f0f600ba992cc421e128bd771fe72309e41572b9949cdadcec347d3",
+    "result_shake1": "ei6vPa66P1H6dJjgLHqsL_JWmSeOD8v7",
+    "tags": [ "glitch", "vanilla" ], "tags_href": "/?p=section&s=smwhacks&u=0&f%5Btags%5D=glitch",
+    "type": "Kaizo: Intermediate", "url": "https://www.smwcentral.net/?p=section&a=details&id=11374",
+    "comments": "24 ",
+    "comments_href": "#comments"
+   }
+```
 
+If you created a Hack and can supply these JSON fields for a Hack on SMWc,  then you can add these fields to your JSON file in hacks/<ID NUMBER>
 
+Hacks not on SMWc require assignemnt of a unique ID number.   For the time being, please use
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      python3 tempid.py <FILENAME>
+To create a temporary local id.
 
 
 
