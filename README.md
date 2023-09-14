@@ -412,6 +412,7 @@ For example:
    { "added": "2015-06-22 02:10:27 AM", "author": "PangaeaPanga", "author_href": "/?p=profile&id=3491",
     "description": "Current version: 1.2", "featured": "No", "id": "11374", "length": "18 exit(s)",
     "name": "Super Dram World", "name_href": "//dl.smwcentral.net/11374/Super%20Dram%20World%20v1.2%20Music.zip",
+    "notes" : "extra notes go here", 
     "picklevel.patchnum" : "20",
     "picklevel.stdlevels" : [ "$135", "$6", "$2", "$F", "$C", "$5", "$3", "$B",
     "$109", "$14", "$107", "$107", "$1", "$10C", "$7", "$10B", "$10F", "$106", "$105", "$102", "$103", "$101", "$1D8" ],
