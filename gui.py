@@ -436,6 +436,15 @@ button_5 = Button(filterframe,
 #)
 button_5.grid(row=0,column=2,sticky="news") # Random filtered
 
+
+label_xnum = Label(filterframe, font=(None,14),
+  text=("* DB: %d hacks: %s" % ( len(hackdict.keys()), loadsmwrh.rhmd_path()  )),
+)
+
+label_xnum.configure(bg = "#35393e", foreground="white")
+label_xnum.grid(column=3,row=0,sticky="news")
+
+
 button_image_6 = PhotoImage(
     file=relative_to_assets("button_6.png"))
 button_6 = Button(subactionframe,

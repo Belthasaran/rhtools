@@ -17,6 +17,12 @@ def makehack_function(args):
     taglist = json.load(f0)
     f0.close()
 
+    if len(args) < 2:
+        print('Please use db_makehack.py <Unique ID>')
+        print('For SMW-Central hacks please use th SMWc ID number')
+        print('If you dont have an ID, then use  python3 tempid.py FILENAME')
+        print('Tempid.py will create a temporary ID based on a timestamp and part of a file hash')
+        return None
 
     hackid = (args[1])
     filename = os.path.join("hacks", "") + str(hackid) + ""
