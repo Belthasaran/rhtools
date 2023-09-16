@@ -413,9 +413,10 @@ For example:
     "description": "Current version: 1.2", "featured": "No", "id": "11374", "length": "18 exit(s)",
     "name": "Super Dram World", "name_href": "http://example.com/11374/example.zip",
     "notes" : "extra notes go here", 
-    "picklevel.patchnum" : "20",
+    "picklevel.stdpatchnum" : "20",
     "picklevel.stdlevels" : [ "$135", "$6", "$2", "$F", "$C", "$5", "$3", "$B",
     "$109", "$14", "$107", "$107", "$1", "$10C", "$7", "$10B", "$10F", "$106", "$105", "$102", "$103", "$101", "$1D8" ],
+    "picklevel.levelinfo" : { "$6" : { "patchnum" : 2,  "name" : "Example name for level 2",  "difficulty": "9" } },
     "custompatches" : [{
         "name" : "patch1",
         "asartemplate" : "!levelid = #%%levelid%%\norg $85d856\n JSR Main\nBNE $3\nJMP $d8a5\norg $85f8f0\nMain:\nLDA !levelnumber\n STA $13bf\nCPX #$03\nBNE .etest\nLDA $0109\nRTS\n.etest:\nRTS\n",
