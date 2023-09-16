@@ -18,10 +18,12 @@ This program is incomplete and a work in progress.
     Download FLIPS and  the Program from
       https://github.com/Belthasaran/rhtools/releases
 
-      For Windows users, I recommend extracting all 3 files in C:\SNESGAMING
-      rhtools-0.2.tar.gz
-      rhtools-sampledata-202308.tar.gz
-      flips-rhtool-0.1_2023.tar.gz
+      For Windows users, I recommend extracting all 3 files in C:\SNESGAMING   (In this order):
+      rhtools-0.4_20230914.tar.gz
+      flips-rhtool-0.4_202309.tar.gz
+      rhtools-sampledata-20230914.tar.gz
+
+      Note that the sampledata archive would overwrite the database - If you have local hacks, then be sure to re-add the local hacks after any reinstall/update.    'python3 do_addhacks.py'  to scann the hacks/ directory 
       
 # Graphical User Interface
 
