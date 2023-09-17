@@ -51,7 +51,7 @@ def randlevel_count(hid):
         f0 = open('pnums.dat','r')
         for line in f0.readlines():
            e0 = line.split(' ')
-           if hid == e0[0]:
+           if str(hid) == e0[0]:
               found = True
               break
         f0.close()
@@ -60,7 +60,7 @@ def randlevel_count(hid):
         f1 = open('log.txt', 'r')
         for line in f1.readlines():
              e0 = line.split(' ')
-             if e0[1] == hid:
+             if e0[1] == str(hid):
                  if e0[6] in includecodes:
                     scount = scount+1
         f1.close()

@@ -13,3 +13,6 @@ pip3 install compress
 #npm install -g  @fleekhq/fleek-storage-js
 
 
+pip3 install aiofiles
+pip3 install websockets
+
