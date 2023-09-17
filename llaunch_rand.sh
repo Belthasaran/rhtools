@@ -1,3 +1,4 @@
+#!/bin/bash
 #~/BizHawk/EmuHawkMono.sh $*
 #~/BizHawk/EmuHawkMono.sh $(pwd)/$*
 #snes9x -conf $(pwd)/snes9xb.conf $(pwd)/$*

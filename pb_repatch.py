@@ -1,5 +1,3 @@
-# Copyright C Belthasar 2023 All Rights Reserved
-
 from zipfile import ZipFile
 import re
 import hashlib
@@ -68,18 +66,28 @@ def repatch_function(args):
     shake1_patched = (base64.b64encode(hashlib.shake_128(data).digest(24), b"_-")).decode('latin1')
     sha1_patched = (hashlib.sha1(data).hexdigest())
     xsha224_patched = hashlib.sha224(data).hexdigest()
+
+    jsonfilename = ''
     
     if re.match('.*repatch.*', args[0]):
         romfilename = hackinfo["id"] + "_" + shake1_patched  + ".sfc"
+        jsonfilename = hackinfo["id"] + "_" + shake1_patched  + ".sfcjson"
     else:
         romfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfc"
+        jsonfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfcjson"
+
     f0 = open(os.path.join("rom", romfilename) + ".new", "wb")
     f0.write(data)
+    f0.close()
+
+    f0 = open(os.path.join("rom", jsonfilename) + ".new", "w")
+    f0.write(json.dumps(hackinfo))
     f0.close()
     print('Expected sha224(result) = ' + hackinfo["result_sha224"])
     print('Actual sha224(result) = ' + xsha224_patched)
     if xsha224_patched == hackinfo["result_sha224"]:
         os.replace(os.path.join("rom", romfilename) + ".new", os.path.join("rom", romfilename))
+        os.replace(os.path.join("rom", jsonfilename) + ".new", os.path.join("rom", jsonfilename))
     else:
         print('Error: Checksum of patched ROM does not match expected value.   Possible file corruption or incorrect SMW ROM')
     
@@ -90,6 +98,7 @@ def repatch_function(args):
     hackinfo["result_sha1"] = sha1_patched
     hackinfo["result_shake1"] = shake1_patched
     hackinfo["rom"] = os.path.join("rom",  romfilename)
+    hackinfo["romjson"] = os.path.join("rom",  jsonfilename)
     #            f2 = open(os.path.join("pat_meta",  shake1) + ".new", "w")
     #            f2.write( json.dumps(hackinfo) + "\n" )
     #            f2.close()

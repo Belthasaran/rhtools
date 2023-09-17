@@ -134,8 +134,10 @@ def get_core_meta():
      uad = get_userauth_data()
 
 def get_hacklist_data(filename=None):
-     dekey = base64.urlsafe_b64decode( bytes(rhmd_key(rhmd_path()), 'ascii') )
-     frn = Fernet( rhmd_key(rhmd_path())  )
+     if not(filename):
+         filename = rhmd_path()
+     dekey = base64.urlsafe_b64decode( bytes(rhmd_key(filename), 'ascii') )
+     frn = Fernet( rhmd_key(filename)  )
 
      if filename == None:
          listfile = open(rhmd_path(), 'r')

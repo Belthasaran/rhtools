@@ -30,8 +30,22 @@ detached_items = []
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
+def tva_selection_changed(root, tva, button_7, x):
+    current = tva.focus()
+    item = tva.item(current)
+    if not('values' in item) or len(item['values']) < 1  or pb_lvlrand.randlevel_count(item['values'][0]) < 1:
+        button_7.configure(state=tk.DISABLED)
+    else:
+        button_7.configure(state=tk.NORMAL)
+    pass
+
 def launch_options_click(root):
     gui_launchoptions.launch_options_click(root)
+
+def btn_randomhack_any(root,tva):
+    #ohash = loadsmwrh.get_local_options()
+    pass
+
   
 def button_play_hack(root,tva):
    current = tva.focus()
@@ -117,6 +131,7 @@ dataframe1.columnconfigure(2, weight=1)
 tvStyle = Style()
 tvStyle.theme_use("default")
 tvStyle.configure("Treeview",
+         selectmode="browse",
          background="black",
          fieldbackground="black",
          rowheight=30,
@@ -222,6 +237,8 @@ label_1.grid(column=0,row=0,sticky="news")
 #    width=360.0,
 #    height=54.0
 #)
+
+tva.bind('<<TreeviewSelect>>', lambda x: tva_selection_changed(window, tva, button_7, x)) 
 
 
 filterframe.grid(row=0,column=0,sticky="news")
@@ -426,6 +443,7 @@ button_5 = Button(filterframe,
     borderwidth=3,
     highlightthickness=1,
     command=lambda: print("button_5 clicked"),
+    state=tk.DISABLED
     #relief="flat"
 )
 #button_5.place(
@@ -438,7 +456,7 @@ button_5.grid(row=0,column=2,sticky="news") # Random filtered
 
 
 label_xnum = Label(filterframe, font=(None,14),
-  text=("* DB: %d hacks: %s" % ( len(hackdict.keys()), loadsmwrh.rhmd_path()  )),
+  text=("* DB: Loaded %d hacks: %s" % ( len(hackdict.keys()), loadsmwrh.rhmd_path()  )),
 )
 
 label_xnum.configure(bg = "#35393e", foreground="white")
@@ -451,9 +469,10 @@ button_6 = Button(subactionframe,
     #image=button_image_6,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: print("button_6 clicked"),
+    command=lambda: btn_randomhack_any(window),
     #relief="flat",
-    text="Random Hack (any)"
+    text="Random Hack (any)",
+    state=tk.DISABLED
 )
 #button_6.place(
 #    x=568.0,
@@ -473,7 +492,8 @@ button_7 = Button(subactionframe,
     command= lambda: button_play_randlevel(window,tva),
     #command=lambda: print("button_7 clicked"),
     #relief="flat",
-    text="Random Level"
+    text="Random Level",
+    state=tk.DISABLED
 )
 #button_7.place(
 #    x=568.0,

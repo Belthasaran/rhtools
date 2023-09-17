@@ -43,6 +43,31 @@ def readfileat(pa,addr,le):
    bufferx = (f.read())
    return bufferx[addr:addr+le]
 
+def randlevel_count(hid):
+    includecodes = ['+', '_', 'B', 'G', 'M']
+    found = False
+    scount = 0
+    try:
+        f0 = open('pnums.dat','r')
+        for line in f0.readlines():
+           e0 = line.split(' ')
+           if hid == e0[0]:
+              found = True
+              break
+        f0.close()
+        if not(found):
+           return 0
+        f1 = open('log.txt', 'r')
+        for line in f1.readlines():
+             e0 = line.split(' ')
+             if e0[1] == hid:
+                 if e0[6] in includecodes:
+                    scount = scount+1
+        f1.close()
+        return scount
+    except:
+         return 0
+
 def randlevel_function(args):
     includecodes = ['+', '_', 'B', 'G', 'M']
     generalexclude = []

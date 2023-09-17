@@ -161,6 +161,11 @@ Please install:
     pip3 install compress
 
 
+    pip3 install aiofiles
+
+    pip3 install websockets
+
+
 ## Database Maintenance
 
 
