@@ -337,9 +337,9 @@ def randlevel_function(args):
     print(" author: " + str(chosenrecord["author"]))
     print("   (chosen=%s,levelid=%s (hex $%X),pnum=%s,ts=%s)" % ( chosen, chosenlid,int(chosenlid), patchnum, int(tsv1)  ))
     time.sleep(10) #SL 10
-    os.system("bash rlaunch.sh " + romfile)
-    os.system("bash llaunch_rand.sh " + romfile)
-    #os.system(flips_cmd+" --apply " + os.path.join('patch', shake1) +"  smw.sfc " + os.path.join('temp', 'result'))
+    #os.system("bash rlaunch.sh " + romfile)
+    #os.system("bash llaunch_rand.sh " + romfile)
+    ####os.system(flips_cmd+" --apply " + os.path.join('patch', shake1) +"  smw.sfc " + os.path.join('temp', 'result'))
     az = romfile.replace( os.path.join('rom', ''), '' )
     return romfile.replace( '.sfc', '')
 
