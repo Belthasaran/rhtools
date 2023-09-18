@@ -37,6 +37,7 @@ def tva_selection_changed(root, tva, button_7, x):
         button_7.configure(state=tk.DISABLED)
     else:
         button_7.configure(state=tk.NORMAL)
+    root.update()
     pass
 
 def launch_options_click(root):
@@ -47,7 +48,7 @@ def btn_randomhack_any(root,tva):
     pass
 
   
-def button_play_hack(root,tva):
+def button_play_hack(root,tva,label_status):
    current = tva.focus()
    item = tva.item(current)
    ohash = loadsmwrh.get_local_options()
@@ -55,12 +56,21 @@ def button_play_hack(root,tva):
        tkinter.messagebox.showerror(message='Please choose a hack from the list')   
    else:
        print('S' + str(item))  
-       result = pb_repatch.repatch_function(['launch1',item['values'][0]])
+       if label_status:
+           label_status.configure(text='Patching %s. %s' % (str(item['values'][0]), item['values'][1]))
+           root.update()
+       result = pb_repatch.repatch_function(['launch1',str(item['values'][0])] )
        if result:
            print(str(result))
+           if label_status:
+               label_status.configure(text='Sending ' + str(result) + ' to SNES')
+               root.update()
            sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
            if not(sendresult):
                tkinter.messagebox.showerror(message='Launcher1 failed to run (please check launch options)')
+           else:
+               if label_status:
+                   label_status.configure(text='Ok, ' + str(result) + ' should be running.')
 
   #import gui_launchoptions
 
@@ -185,7 +195,7 @@ ipos = 0
 for hek in hackdict.keys():
  ipos = ipos + 1
  he = hackdict[hek]
- ti = (    tva.insert('', tk.END, values=[  he['id'],
+ ti = (    tva.insert('', tk.END, values=[  str(he['id']),
                he['name'],
                he['type'],
                he['authors'],
@@ -383,7 +393,7 @@ button_2 = Button(actionframe,
     #image=button_image_2,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: button_play_hack(window,tva),
+    command=lambda: button_play_hack(window,tva,label_xnum),
     #relief="flat"
 )
 #button_2.place(
