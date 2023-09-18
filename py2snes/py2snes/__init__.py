@@ -358,8 +358,12 @@ class snes():
                 return True
         finally:
             self.request_lock.release()
-            if size > 2048*1024:
-                await asyncio.sleep(20) #even more ugly hacks for really large ROMs
+            try:
+                if os.path.getsize(srcfile) > 2048*1024:
+                    await asyncio.sleep(20) #even more ugly hacks for really large ROMs
+            except:
+                await asyncio.sleep(20)
+                pass
             await self.List('/') #ugly hack to figure out when the file is actually done copying
 
     async def recv_loop(self):
