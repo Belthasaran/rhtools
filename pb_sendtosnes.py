@@ -38,7 +38,9 @@ async def sendtosnes_function_async(args):
 
                 basefilename = os.path.basename(romfile)
                 await snes.PutFile(args[1], '/xfer/'+basefilename)
-                print('Upload ended, attempting to boot')
+                time.sleep(15)
+                await snes.List('/xfer')
+                print('Upload ended, attempting to boot []'+basefilename)
                 await snes.Boot('/xfer/'+basefilename)
                 print('Ok')
                 return True
