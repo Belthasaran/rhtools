@@ -35,7 +35,7 @@ async def snes_put(args):
     print('Attach done')
     print('usb2snes information:')
     print(await snes.Info())
-    image = args[0]
+    image = args[1]
     result = await snes.PutFile(image, '/xfer/' + os.path.basename(image))
     print('Result = ' + str(result))
     return snes
