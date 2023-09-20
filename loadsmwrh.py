@@ -20,6 +20,9 @@ from zipfile import ZipFile
 def rhmd_key(fpath):
     # used for sample data
     return 'JtSYvgCpAX4Hz_J63g-5dmDKbJp_Dl2GnKL_yuhoEck='
+
+def rhad_key(fpath):
+    return 'JtSYvgCpAX4Hz_J63g-5dmDKbJp_Dl2GnKL_yuhoEck='
     
 
 def hacklist_path():
@@ -39,6 +42,23 @@ def rhmd_path():
     if not os.path.exists("rhmd_dist.dat"):
         raise Exception('No rhmd DAT file found..  Did you forget to extract rhtools-sampledata-20xx.tar.gz ?')
     return "rhmd_dist.dat"
+
+
+def rhad_path(docreate=False):
+    if 'RHAD_FILE' in os.environ:
+        return os.environ['RHAD_FILE']
+    if os.path.exists("rhad.dat") or docreate:
+        return "rhad.dat"
+    if os.path.exists("rhad_dist.dat"):
+        return "rhad_dist.dat"
+    if os.path.exists("rhad_sample2.dat"):
+        return "rhad_sample2.dat"
+    if os.path.exists("rhad_sample.dat"):
+        return "rhad_sample.dat"
+    if not os.path.exists("rhad_dist.dat"):
+        raise Exception('No rhad DAT file found..')
+    return "rhad_dist.dat"
+
 
 
 cachepnums = {}
@@ -157,6 +177,31 @@ def get_hacklist_data(filename=None):
      data = None
      return hacklist
 
+def get_note_dict(filename=None):
+     if not(filename):
+         filename = rhad_path(docreate=False)
+     dekey = base64.urlsafe_b64decode( bytes(rhad_key(filename), 'ascii') )
+     frn = Fernet( rhad_key(filename)  )
+
+     if filename == None:
+         listfile = open(rhad_path(), 'r')
+     else:
+         listfile = open(filename, 'r')
+     data = listfile.read()
+     if data[0]=='*':
+        comp = Compressor()
+        comp.use_lzma()
+        hacklist = json.loads( comp.decompress(frn.decrypt(  bytes(data,'utf8') )) )
+     elif data[0] == '[' or data[0] == '{':
+          #if data[0] == '{':
+          #    data =  '[' + data + ']'
+          hacklist = json.loads(data)  # Handle file if not encoded
+     else:
+         hacklist = json.loads(base64.b64decode(data))
+     data = None
+     return hacklist
+
+
 def get_hackdict(skipdups=False):
      hacklist = get_hacklist_data()
      hackdict = {}
@@ -193,6 +238,29 @@ def save_hacklist_data(newhacklist,filename=None,docompress=True):
      listfile.close()
      os.replace(filename + ".new", filename)
      #listfile.write( base64.encodebytes( json.dumps(newhacklist) ) )
+
+def save_note_dict(newdict,filename=None,docompress=True):
+     frn = Fernet(rhmd_key(rhad_path(docreate=True)))
+     comp = Compressor()
+     comp.use_lzma()
+
+     if not(type(newhacklist) == type({})):
+         raise TypeError('newdict wrong type')
+     if filename == None:
+         filename = rhad_path(docreate=True)
+     #for x in range(len(newhacklist)):
+     #    if not('authors' in newhacklist[x]) and 'author' in newhacklist[x]:
+     #        newhacklist[x]['authors'] = newhacklist[x]['author']
+     listfile = open(filename+".new", 'w')
+     if docompress:
+        listfile.write( '*' + ( bytearray(frn.encrypt(comp.compress(json.dumps(newdict)))) ).decode() )
+     else:
+        listfile.write( base64.encodebytes( bytearray(json.dumps(newdict),'utf8') ).decode() )
+
+     listfile.close()
+     os.replace(filename + ".new", filename)
+     #listfile.write( base64.encodebytes( json.dumps(newhacklist) ) )
+
 
 def reduced_hacklist(hacklist, addxdata=False):
     for u in range(len(hacklist)):
