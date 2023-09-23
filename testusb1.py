@@ -14,6 +14,7 @@ import code
 import IPython
 import nest_asyncio
 import pdb
+
 nest_asyncio.apply()
 #IPython.embed()
 
@@ -24,29 +25,68 @@ class mysnes(py2snes.snes):
     itemboxvalues = { 'super' : b'\x01', 'fire' : b'\x02', 'star' : b'\x03', 'cape': b'\x04',
                       'blueyoshi': b'\x05',  'grayyoshi': b'\x06'  }
 
+    switchpalaceflags_addr = { 'green' : 0x1F27,  'yellow' : 0x1F28,  'blue' : 0x1F29, 'red': 0x1F2A }    
+    switchpalaceflags_values = { 'off' : 0x00,  'on' : 0x01 }
+    async def setswitchpalace(self, name, value = b'\x01' ):
+        addr = switchpalaceflags_addr[name + 0xF50000]
+        await self.PutAddress( [  (addr, value) ] )
+
+    async def setspring(self):
+       await self.PutAddress( [ (0xF51EEB, 0) ] )
+    async def setautumn(self):
+       await self.PutAddress( [ (0xF51EEB, 0) ] )
+
+    async def setgamemode(self, value) :
+       # 0=reset b=ow f=enter level
+       await self.PutAddress( [ (0xF50100, value) ])
+
+    async def setleveloverride(self, value=b'\x03'):
+       await self.PutAddress( [ (0xF50109, value)] )
+
+    async def groundshake(self, value=b'\x70'):
+       await self.PutAddress( [ (0xF51887, value) ] )
+
+    async def give3up(self, value=b'\x03'):
+       await self.PutAddress( [ (0xF5e18e4, value) ] )
+
+    async def morton(self):
+        b1 = 0xF50000
+        await self.PutAddress( [ (b1 + 0x1F11, b'\x00'), 
+                                 (b1 + 0x1f17, b'\xd8'), 
+                                 (b1 + 0x1f18, b'\x00'),
+                                 (b1 + 0x1f19, b'\xc8'), 
+                                 (b1 + 0x1f1a, b'\x00'),
+                                 (b1 + 0x0100, b'\x0b') ]  )
+    async def setbrightness(self, value=b'\x0f') :
+         b1 =0xF50000
+         await self.PutAddress([ (b1 + 0x0dae, value) ])
+
     async def moretime(self):
          await self.PutAddress([  (0xF50F31, b"\x09") ])
     async def firepower(self):
          await self.PutAddress([ ( 0xF50019, b'\x03' ) ])
-    async def capepower(snes):
+    async def capepower(self):
          await self.PutAddress([ ( 0xF50019, b'\x02' ) ])
-    async def starpower(snes):
+    async def starpower(self):
          await self.PutAddress([ ( 0xF51490, b'\x7e' ) ])
-    async def lives99(snes):
+    async def lives99(self):
          await self.PutAddress([ ( 0xF50DBE, b'\x62' ) ])
-    async def coins99(snes):
+    async def coins99(self):
          await self.PutAddress( [ (0xF50DBF, b'\x62' ) ])
-    async def blueswitch(snes, value=b'\x7e'):
+    async def blueswitch(self, value=b'\x7e'):
          await self.PutAddress( [ (0xF514AD, value) ] )
-    async def silverswitch(snes, value=b'\x7e'):
+    async def silverswitch(self, value=b'\x7e'):
          await self.PutAddress( [ (0xF514AE, value) ] )
-    async def setitembox(snes, value=b'\x00' ):
+    async def setitembox(self, value=b'\x00' ):
          await self.PutAddress( [ (0xF50DC2, value) ] )
-    async def setwater(snes):
-         await self.PutAddress( [ (0xF50085, b'\x01') ] )
-    async def setkeyhole(snes, value=b'\x01'):
+    async def setwater(self, value=b'\x01'):
+         await self.PutAddress( [ (0xF50085, value) ] )
+    async def setslippery(self, value=b'\x01'):
+         await self.PutAddress( [ (0xF50086, value) ] )
+
+    async def setkeyhole(self, value=b'\x01'):
          await self.PutAddress( [ (0xF51434, value) ] )
-    async def setonoff(snes, value=b'\x01'):
+    async def setonoff(self, value=b'\x01'):
          await self.PutAddress( [ (0xF514AF, value) ] )
 
      #14AF onoffstatus

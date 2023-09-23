@@ -23,6 +23,7 @@ OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r"assets/frame0")
 
 hackdict = loadsmwrh.get_hackdict(skipdups=True)
+notedict = loadsmwrh.get_note_dict()
 #tree_items = []
 detached_items = []
 
@@ -151,7 +152,7 @@ tvStyle.configure("Treeview.Heading", font=(None,14), background="darkgray")
 #tvStyle.configure("Treeview.cell", font=(None,20))
 #tvStyle.map('Treeview', background=[('selected', 'red')])
 
-tva = Treeview(dataframe1, columns=['id','name','type','author','length'], show='headings')
+tva = Treeview(dataframe1, columns=['id','name','type','author','length','done'], show='headings')
 tva.heading('id', text='Id')
 tva.column('id', width=100, anchor=tk.W)
 
@@ -166,6 +167,9 @@ tva.column('author', width=100, anchor=tk.W)
 
 tva.heading('length', text='Length')
 tva.column('length', width=50, anchor=tk.W)
+
+tva.heading('done', text='Done')
+tva.column('done', width=25, anchor=tk.W)
 
 canvas.rowconfigure(0,weight=1)
 canvas.rowconfigure(1,weight=1)
@@ -195,11 +199,16 @@ ipos = 0
 for hek in hackdict.keys():
  ipos = ipos + 1
  he = hackdict[hek]
+ doneval = ''
+ if hek in notedict:
+     if 'done' in notedict[hek]:
+         doneval = str( notedict[hek]['done']  )
  ti = (    tva.insert('', tk.END, values=[  str(he['id']),
                he['name'],
                he['type'],
                he['authors'],
                he['length'],
+               doneval,
                he['tags'],
                he['description'], 
                '0'

@@ -30,9 +30,11 @@ async def sendtosnes_function_async(args):
                 snes = py2snes.snes()
                 await snes.connect(address=ohash['wsaddress'])
                 print('Socket open, Attaching..')
+                await snes.Name('pb_sendtosnes')
                 devices = await snes.DeviceList()
-                await snes.Attach(devices[0])
-                print('Attach result:')
+                print('devices=' + str(devices))
+                #await snes.Attach(devices[0])
+                print('Attach result:' + str(await snes.Attach(devices[0])))
                 print(await snes.Info())
                 print('Uploading file')
 
