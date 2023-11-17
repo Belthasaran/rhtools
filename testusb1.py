@@ -23,7 +23,7 @@ class mysnes(py2snes.snes):
     powerupvalues = { 'fire' : b'\x03', 'cape': b'\x02', 'super': b'\x01', 'normal': b'\x00'  }
 
     itemboxvalues = { 'super' : b'\x01', 'fire' : b'\x02', 'star' : b'\x03', 'cape': b'\x04',
-                      'blueyoshi': b'\x05',  'grayyoshi': b'\x06'  }
+                      'blueyoshi': b'\x05',  'grayyoshi': b'\x06', 'orb': b'\xd7'  }
 
     switchpalaceflags_addr = { 'green' : 0x1F27,  'yellow' : 0x1F28,  'blue' : 0x1F29, 'red': 0x1F2A }    
     switchpalaceflags_values = { 'off' : 0x00,  'on' : 0x01 }
@@ -83,9 +83,16 @@ class mysnes(py2snes.snes):
          await self.PutAddress( [ (0xF50085, value) ] )
     async def setslippery(self, value=b'\x01'):
          await self.PutAddress( [ (0xF50086, value) ] )
+    async def setpballoon(self):
+         await self.PutAddress( [ (0xF5009e,b'\x8D'), 
+              (0xF514C8, b'\x0B'), (0xF513F3,b'\x09'),
+              (0xF5167A, b'\x9A'), (0xF51686,b'\x29'),
+              (0xF51DF9, b'\x1e') ] )
 
     async def setkeyhole(self, value=b'\x01'):
          await self.PutAddress( [ (0xF51434, value) ] )
+    async def setendlevel(self, value=b'\xFF'):  # Set to FF or 28?
+         await self.PutAddress( [ (0xF51493, value) ] )
     async def setonoff(self, value=b'\x01'):
          await self.PutAddress( [ (0xF514AF, value) ] )
 

@@ -465,6 +465,7 @@ def get_patch_raw_blob(hackid, rdv):
      idstr = str(hackid)
      idstra = idstr[0:2]
      idstrb = idstr[0:1]
+     idstrc = idstr[0:5]
      mat = False
 
      if rdv == None:
@@ -495,6 +496,9 @@ def get_patch_raw_blob(hackid, rdv):
                  mat = True
              if re.match('.*_pblob.*_' + idstrb +'[_\.].*', kn): 
                  mat = True
+             if re.match('.*_pblob.*_' + idstrc +'[_\.].*', kn):
+                 mat = True
+
              if mat:
                  #rdv['kn'] = kn
                  #rdv['publicUrl'] =  uu["publicUrl"]
