@@ -491,6 +491,12 @@ def get_patch_raw_blob(hackid, rdv):
                  kn == 'blobs/' + hackinfo["patchblob1_name"]) :
                  mat = True
 
+             if 'setids' in hackinfo:
+                  for setidv in hackinfo['setids']:
+                       if kn == setidv:
+                           #print(str(kn))
+                           mat = True
+
              #s_pblob_32_31_sm_cc.zip  # 
              if re.match('.*_pblob.*_' + idstra +'[_\.].*', kn): 
                  mat = True
