@@ -322,10 +322,16 @@ def get_hack_info(hackid,merged=False):
 
 
 def get_psets(hinfo=None):
-    f = open("psets.dat", "r")
-    data = f.read()
-    f.close()
-    globalsets = json.loads(base64.b64decode(data))
+    globalsets = []
+    try:
+        f = open("psets.dat", "r")
+        data = f.read()
+        f.close()
+        globalsets = json.loads(base64.b64decode(data))
+    except Exception as xerr:
+        if hinfo == None or not('psets' in hinfo):
+            raise xerr
+        pass
     extrasets = []
     if (hinfo and "psets" in hinfo and hinfo["psets"] and 
        type(hinfo["psets"]) == type([])): 
