@@ -336,6 +336,9 @@ def get_psets(hinfo=None):
     if (hinfo and "psets" in hinfo and hinfo["psets"] and 
        type(hinfo["psets"]) == type([])): 
          extrasets = hinfo["psets"]
+    elif (hinfo and "psets" in hinfo and hinfo["psets"] and
+          type(hinfo["psets"]) == type("")):
+          extrasets = json.loads(base64.b64decode( hinfo["psets"]  ))
     return globalsets + extrasets
 
 
