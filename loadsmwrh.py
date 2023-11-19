@@ -321,11 +321,16 @@ def get_hack_info(hackid,merged=False):
      return None
 
 
-def get_psets():
+def get_psets(hinfo=None):
     f = open("psets.dat", "r")
     data = f.read()
     f.close()
-    return json.loads(base64.b64decode(data))
+    globalsets = json.loads(base64.b64decode(data))
+    extrasets = []
+    if (hinfo and "psets" in hinfo and hinfo["psets"] and 
+       type(hinfo["psets"]) == type([])): 
+         extrasets = hinfo["psets"]
+    return globalsets + extrasets
 
 
 def get_patch_blob(hackid, blobinfo=None):
@@ -481,7 +486,7 @@ def get_patch_raw_blob(hackid, rdv):
      if not os.path.exists( os.path.join("blobs", pblob_name)  ):
          print('Blob not cached.. searching')
          found = False
-         for uu in get_psets():
+         for uu in get_psets(hackinfo):
              mat = False
              kn = uu["key"]
              #blobs/setpblob_pblob_12_0.zip
