@@ -35,12 +35,7 @@
     "setids": [
         "blobs/setpblob_pblob_gpw3_gpw_gp.zip"
     ],
-    "psets" : [{   
-        "ipfs" :"bafybeihpcz6bfdl7v6sf2idp33yendbnn35z2n2qbnpxbigbwznav3gqdm",
-        "key": "blobs/setpblob_pblob_gpw3_gpw_gp.zip",
-        "hash": "QmWSrAEKrzgnBxe2mHrq1AHf9LvbJ8kfSDBn94saZzSLW4",
-        "publicUrl": "https://smwdbi.iparpa.com/331769d1-65ec-45fd-8276-e55bd4a428d5-bucket/blobs/setpblob_pblob_gpw3_gpw_gp.zip"
-    }],
+    "psets" : "Clt7CiAgICAgICAgImlwZnMiIDoiYmFmeWJlaWhwY3o2YmZkbDd2NnNmMmlkcDMzeWVuZGJubjM1ejJuMnFibnB4YmlnYnd6bmF2M2dxZG0iLAogICAgICAgICJrZXkiOiAiYmxvYnMvc2V0cGJsb2JfcGJsb2JfZ3B3M19ncHdfZ3AuemlwIiwKICAgICAgICAiaGFzaCI6ICJRbVdTckFFS3J6Z25CeGUybUhycTFBSGY5THZiSjhrZlNEQm45NHNhWnpTTFc0IiwKICAgICAgICAicHVibGljVXJsIjogImh0dHBzOi8vc213ZGJpLmlwYXJwYS5jb20vMzMxNzY5ZDEtNjVlYy00NWZkLTgyNzYtZTU1YmQ0YTQyOGQ1LWJ1Y2tldC9ibG9icy9zZXRwYmxvYl9wYmxvYl9ncHczX2dwd19ncC56aXAiCiAgICB9XQo=",
     "versions" : [
         { "revision" : "1.0",  "patchblob_name" : "pblob_gpw3_1691b3f0d6" }
     ],
