@@ -93,7 +93,12 @@ def fix_hentry(data):
         nhurl = data['name_href']
         data['download_url'] = nhurl
     if not('author' in data) and 'authors' in data:
-        data['author'] = ', '.join( [y['name'] for y in  data['authors']] )
+        if type(data['authors']) == type(""):
+            data['author'] = data['authors']
+        else:
+            data['authors_list'] = data['authors']
+            data['author'] = ', '.join( [y['name'] for y in  data['authors']] )
+            data['authors'] = data['author']
     if 'fields' in data:
         dataf = data['fields']
         for topfield in ['demo', 'featured', 'length', 'difficulty', 'description']:
