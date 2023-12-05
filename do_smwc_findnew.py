@@ -5,6 +5,7 @@ import json
 import time
 import loadsmwrh
 import requests
+import io
 from os.path import exists
 import zipfile
 #4959:31956
@@ -50,7 +51,7 @@ for x in hacklist :
 
         if req.status_code == 200:
             try:
-                zipfile.ZipFile(req.content)
+                zipfile.ZipFile(io.BytesIO(req.content))
             except zipfile.BadZipFile: 
                 sys.stderr.write('ERR: HTTP Response for URL ' + url + ' is not a Zip file' + "\n")
                 failed = True
