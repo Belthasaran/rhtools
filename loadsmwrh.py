@@ -23,6 +23,10 @@ def rhmd_key(fpath):
 
 def rhad_key(fpath):
     return 'JtSYvgCpAX4Hz_J63g-5dmDKbJp_Dl2GnKL_yuhoEck='
+
+def resmd_key(fpath):
+    return 'JtSYvgCpAX4Hz_J63g-5dmDKbJp_Dl2GnKL_yuhoEck='
+
     
 
 def hacklist_path():
@@ -44,6 +48,23 @@ def rhmd_path():
     return "rhmd_dist.dat"
 
 
+def resmd_path():
+    if 'RESMD_FILE' in os.environ:
+        return os.environ['RESMD_FILE']
+    if os.path.exists("resmd.dat"):
+        return "resmd.dat"
+    if os.path.exists("resmd_dist.dat"):
+        return "resmd_dist.dat"
+    if os.path.exists("resmd_sample2.dat"):
+        return "resmd_sample2.dat"
+    if os.path.exists("resmd_sample.dat"):
+        return "resmd_sample.dat"
+    if not os.path.exists("resmd_dist.dat"):
+        raise Exception('No resmd DAT file found..  Did you forget to extract rhtools-sampledata-20xx.tar.gz ?')
+    return "resmd_dist.dat"
+
+
+
 def rhad_path(docreate=False):
     if 'RHAD_FILE' in os.environ:
         return os.environ['RHAD_FILE']
@@ -62,6 +83,27 @@ def rhad_path(docreate=False):
 
 
 cachepnums = {}
+
+
+def fix_hentry(data):
+    data = dict(data)
+    if not('name_href' in data) and 'download_url' in data:
+        data['name_href'] = data['download_url']
+    if not('download_url' in data) and 'name_href' in data:
+        nhurl = data['name_href']
+        data['download_url'] = nhurl
+    if not('author' in data) and 'authors' in data:
+        data['author'] = ', '.join( [y['name'] for y in  data['authors']] )
+    if 'fields' in data:
+        dataf = data['fields']
+        for topfield in ['demo', 'featured', 'length', 'difficulty', 'description']:
+            if topfield in dataf:
+                data[topfield] = dataf[topfield]
+                del data['fields'][topfield]
+        if len(data['fields']) == 0:
+            del data['fields']
+    return data
+
 
 def get_pnum(hackid):
     result = None
@@ -153,17 +195,10 @@ def get_userauth_data():
 def get_core_meta():
      uad = get_userauth_data()
 
-def get_hacklist_data(filename=None):
-     if not(filename):
-         filename = rhmd_path()
-     dekey = base64.urlsafe_b64decode( bytes(rhmd_key(filename), 'ascii') )
-     frn = Fernet( rhmd_key(filename)  )
-
-     if filename == None:
-         listfile = open(rhmd_path(), 'r')
-     else:
-         listfile = open(filename, 'r')
+def get_gen_list_data(filename,frn):
+     listfile = open(filename, 'r')
      data = listfile.read()
+     hacklist = None
      if data[0]=='*':
         comp = Compressor()
         comp.use_lzma()
@@ -176,6 +211,22 @@ def get_hacklist_data(filename=None):
          hacklist = json.loads(base64.b64decode(data))
      data = None
      return hacklist
+
+
+def get_hacklist_data(filename=None):
+     if not(filename):
+         filename = rhmd_path()
+     dekey = base64.urlsafe_b64decode( bytes(rhmd_key(filename), 'ascii') )
+     frn = Fernet( rhmd_key(filename)  )
+     return get_gen_list_data(filename,frn)
+
+def get_reslist_data(filename=None):
+     if not(filename):
+         filename = resmd_path()
+     dekey = base64.urlsafe_b64decode( bytes(resmd_key(filename), 'ascii') )
+     frn = Fernet( resmd_key(filename)  )
+     return get_gen_list_data(filename,frn)
+
 
 def get_note_dict(filename=None):
      if not(filename):
@@ -211,9 +262,24 @@ def get_hackdict(skipdups=False):
          hackdict[ hacklist[u]['id']] = hacklist[u]
      return hackdict
 
+def get_resdict(skipdups=False):
+     reslist = get_reslist_data()
+     resdict = {}
+     for u in range(len(reslist)):
+         if reslist[u]['id'] in resdict.keys() and not skipdups:
+            raise Exception('Oops: duplicate resource ids in list')
+         resdict[ reslist[u]['id']] = reslist[u]
+     return resdict
+
 def find_hacklist_index(hacklist, idval):
     for x in range(len(hacklist)):
         if hacklist[x]['id'] == str(idval):
+             return x
+    return None
+
+def find_reslist_index(xlist, idval):
+    for x in range(len(xlist)):
+        if xlist[x]['id'] == str(idval):
              return x
     return None
 
@@ -238,6 +304,30 @@ def save_hacklist_data(newhacklist,filename=None,docompress=True):
      listfile.close()
      os.replace(filename + ".new", filename)
      #listfile.write( base64.encodebytes( json.dumps(newhacklist) ) )
+
+
+def save_reslist_data(newhacklist,filename=None,docompress=True):
+     frn = Fernet(resmd_key(resmd_path()))
+     comp = Compressor()
+     comp.use_lzma()
+
+     if not(type(newhacklist) == type([])):
+         raise TypeError('newhacklist wrong type')
+     if filename == None:
+         filename = resmd_path()
+     for x in range(len(newhacklist)):
+         if not('authors' in newhacklist[x]) and 'author' in newhacklist[x]:
+             newhacklist[x]['authors'] = newhacklist[x]['author']
+     listfile = open(filename+".new", 'w')
+     if docompress:
+        listfile.write( '*' + ( bytearray(frn.encrypt(comp.compress(json.dumps(newhacklist)))) ).decode() )
+     else:
+        listfile.write( base64.encodebytes( bytearray(json.dumps(newhacklist),'utf8') ).decode() )
+
+     listfile.close()
+     os.replace(filename + ".new", filename)
+     #listfile.write( base64.encodebytes( json.dumps(newhacklist) ) )
+
 
 def save_note_dict(newdict,filename=None,docompress=True):
      frn = Fernet(rhmd_key(rhad_path(docreate=True)))
@@ -321,6 +411,43 @@ def get_hack_info(hackid,merged=False):
      return None
 
 
+def get_resource_info(resid,merged=False):
+     idstr = str(resid)
+     reslist = get_reslist_data()
+     for x in reslist:
+         if str(x["id"]) == idstr:
+             if merged:
+                 x1 = dict(x)
+                 if 'xdata' in x1:
+                     for v in x1['xdata'].keys():
+                        x1[v] = x1['xdata'][v]
+                 if not('xdata' in x1):
+                     if os.path.exists('resmd_cache.dat'):
+                         hl2 = get_reslist_data(filename='resmd_cache.dat')
+                         hli = find_reslist_index(hl2, resid)
+                         if not(hli == None):
+                             if resid == 'meta':
+                                 if not('cachets' in hl2[hli]):
+                                     hl2[hli] = {}
+                                     hli = None
+                                 elif int(hl2[hli['cachets']])+600 <int(time.time()) :
+                                     hl2[hli] = {}
+                                     hli = None
+                             if ('cachets' in hl2[hli] and
+                                 int(hl2[hli]['cachets'])+86400*10 < int(time.time()) ):
+                                 hli = None
+                         if not(hli == None):
+                             x1['xdata'] = hl2[hli]['xdata']
+                             for w in hl2[hli]:
+                                 if re.match('patchblob.*', w):
+                                     x1[w] = hl2[hli][w]
+                 return x1
+             else:
+                 return x
+     return None
+
+
+
 def get_psets(hinfo=None):
     globalsets = []
     try:
@@ -340,6 +467,40 @@ def get_psets(hinfo=None):
           type(hinfo["psets"]) == type("")):
           extrasets = json.loads(base64.b64decode( hinfo["psets"]  ))
     return globalsets + extrasets
+
+def get_resource_blob(hackid, blobinfo=None):
+    idstr = str(hackid)
+    rawblob = get_patch_raw_blob(hackid, blobinfo, 'resblob')
+    hackinfo = get_hack_info(hackid, True)
+    #print(json.dumps(hackinfo, indent=4))
+    print('Expected res_sha224 = ' + str(hackinfo["res_sha224"]))
+    print('sha224(rawblob) = ' + hashlib.sha224(rawblob).hexdigest())
+    if hashlib.sha224(rawblob).hexdigest() == hackinfo["res_sha224"]:
+        comp = Compressor()
+        comp.use_lzma()
+        decomp_blob = comp.decompress(rawblob)
+
+        key = base64.urlsafe_b64decode( bytes(hackinfo["resblob_key"], 'ascii') )
+        if not(key == "" or key == "none"):
+            frn = Fernet(key)
+            decrypted_blob  = frn.decrypt(decomp_blob)
+            comp = Compressor() 
+            comp.use_lzma()
+            decoded_blob = comp.decompress(decrypted_blob)
+        else:
+            decrypted_blob = decomp_blob
+            decoded_blob = decomp_blob
+
+        #frn_sha224 = hashlib.sha224(comp_frndata).hexdigest()
+        print('Expected pat_sha224 = ' + hackinfo["pat_sha224"]  )
+        print('sha224(decoded_blob) = ' + hashlib.sha224(decoded_blob).hexdigest())
+        if hashlib.sha224(decoded_blob).hexdigest() ==  hackinfo["res_sha224"]:
+            return decoded_blob
+        print('Error: Decoded patch does not match expected file checksum - possible data corruption.')
+        return None
+
+    print('[*] Error: Possible file corruption: Sha224 data checksum of received file does not match')
+    return None
 
 
 def get_patch_blob(hackid, blobinfo=None):
@@ -475,7 +636,7 @@ def complete_hack_metadata(hackinfo):
      return hackinfo
      pass
 
-def get_patch_raw_blob(hackid, rdv):
+def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
      idstr = str(hackid)
      idstra = idstr[0:2]
      idstrb = idstr[0:1]
@@ -488,10 +649,10 @@ def get_patch_raw_blob(hackid, rdv):
      hackinfo = get_hack_info(hackid,True)
      hackinfo = complete_hack_metadata(hackinfo)
           
-     if not('patchblob1_name' in hackinfo):
+     if not(f'{blobprefix}_name' in hackinfo):
          return None
      #print(str(hackinfo))
-     pblob_name = hackinfo["patchblob1_name"]
+     pblob_name = hackinfo[f"{blobprefix}_name"]
      if not os.path.exists( os.path.join("blobs", pblob_name)  ):
          print('Blob not cached.. searching')
          found = False
@@ -501,8 +662,8 @@ def get_patch_raw_blob(hackid, rdv):
              #blobs/setpblob_pblob_12_0.zip
              prefix = kn.replace('.zip','')
 
-             if (kn == hackinfo["patchblob1_name"]  or
-                 kn == 'blobs/' + hackinfo["patchblob1_name"]) :
+             if (kn == hackinfo[f"{blobprefix}_name"]  or
+                 kn == 'blobs/' + hackinfo[f"{blobprefix}_name"]) :
                  mat = True
 
              if 'setids' in hackinfo:
@@ -544,20 +705,20 @@ def get_patch_raw_blob(hackid, rdv):
                             for info in zip.infolist():
                                 if info.filename == pblob_name:
                                     data = zip.read(info)
-                                    rdv['patchblob1_kn'] = kn
-                                    rdv['patchblob1_url'] = uu['publicUrl']
-                                    rdv["patchblob1_ipfs_hash"] = uu['ipfs']
-                                    rdv["patchblob1_ipfs_url"] = 'https://ipfs.fleek.co/ipfs/' + uu['ipfs']
+                                    rdv[f'{blobprefix}_kn'] = kn
+                                    rdv[f'{blobprefix}_url'] = uu['publicUrl']
+                                    rdv[f"{blobprefix}_ipfs_hash"] = uu['ipfs']
+                                    rdv[f"{blobprefix}_ipfs_url"] = 'https://ipfs.fleek.co/ipfs/' + uu['ipfs']
                                     found = True
                                     return data
                             pass
                         pass
                      else:
                          pass
-                         rdv['patchblob1_kn'] = uu['key']
-                         rdv['patchblob1_url'] = uu['publicUrl']
-                         rdv["patchblob1_ipfs_hash"] = uu['ipfs']
-                         rdv["patchblob1_ipfs_url"] = 'https://ipfs.fleek.co/ipfs/' + uu['ipfs']
+                         rdv[f'{blobprefix}_kn'] = uu['key']
+                         rdv[f'{blobprefix}_url'] = uu['publicUrl']
+                         rdv[f"{blobprefix}_ipfs_hash"] = uu['ipfs']
+                         rdv[f"{blobprefix}_ipfs_url"] = 'https://ipfs.fleek.co/ipfs/' + uu['ipfs']
                      pass
                      #os.replace(kn + ".new", kn)
 
