@@ -1,4 +1,15 @@
 #!/usr/bin/python
+#
+# This program queries SMWC for the complete list of all games
+# and creates the index file   fetch_rhlist_smwc.json
+#
+# This saved Index file can then be used by do_smwc_findnew.py to
+# automate the download of "new hacks"  not yet stored in zips/
+#
+# And by the Twitch Chatbot module to search for SMW romhacks /
+# display hack info. 
+# ( Chat command: !rhinfo <keywords> ) - Search for SMW hacks URL by Name, author, or id
+#
 
 import requests
 import json
