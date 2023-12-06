@@ -49,7 +49,7 @@ while nexturl and nexturl[0:len(urlprefix)] == urlprefix and len(urlprefix) > 10
     pagerequest = requests.get ( pageurl )
 
     if pagerequest.status_code == 200:
-        time.sleep(random.random()*3)
+        time.sleep(3 + int(random.random()*7))
         try:
             j1 = json.loads(pagerequest.text)
             if type(j1["data"]) == type([]) and len(j1["data"]) > 0 :
