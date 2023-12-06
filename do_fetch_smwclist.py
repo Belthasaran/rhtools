@@ -36,7 +36,7 @@ pagenum = 0
 urlprefix = base64.b64decode('aHR0cHM6Ly93d3cuc213Y2VudHJhbC5uZXQv').decode()
 sys.stderr.write("Begin operation\n")
 
-while nexturl and nexturl[0:len(urlprefix)] == urlprefix:
+while nexturl and nexturl[0:len(urlprefix)] == urlprefix and len(urlprefix) > 10:
     pageurl = nexturl
     pagenum = pagenum + 1
     nexturl = None
