@@ -7,8 +7,8 @@
     "ips_sha1": "6a4eaee6446f1c38cb7b53c6138898eab183eac4",
     "ips_sha224": "7a31cf8ed902fe75216550d035f1b52718dd57222ba207cbda906e3b",
     "author_href": "",
-    "author": "CC",
-    "authors": "CC",
+    "author": "CrowdControl",
+    "authors": "CrowdControl",
     "patch_description": "Enabling patch to Vanilla SMW game for CrowdControl",
     "patch_variants": {
         "vanilla" : {
