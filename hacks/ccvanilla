@@ -2,16 +2,25 @@
     "id": "ccvanilla",
     "name": "CC (SMW Vanilla)",
     "url": "",
-    "bps_download_url": "https://cc-modfiles.nyc3.digitaloceanspaces.com/Patches/SuperMarioWorld.Vanilla.ips",
-    "bps_sha1": "6a4eaee6446f1c38cb7b53c6138898eab183eac4",
-    "bps_sha224": "7a31cf8ed902fe75216550d035f1b52718dd57222ba207cbda906e3b",
+    "download_url": "error://invalid/The+BPS+Of+This+Hack+Requires+Manual+Blob+Creation.json",
+    "ips_download_url": "https://cc-modfiles.nyc3.digitaloceanspaces.com/Patches/SuperMarioWorld.Vanilla.ips",
+    "ips_sha1": "6a4eaee6446f1c38cb7b53c6138898eab183eac4",
+    "ips_sha224": "7a31cf8ed902fe75216550d035f1b52718dd57222ba207cbda906e3b",
     "author_href": "",
     "author": "CC",
     "authors": "CC",
-    "patch_description": "BPS game patch to be layered on top of Vanilla SMW for CC support",
-    "patch_targets": [
-        "vanilla"
-    ],
+    "patch_description": "Enabling patch to Vanilla SMW game for CrowdControl",
+    "patch_variants": {
+        "vanilla" : {
+             "version"             : "1.0",
+             "target_romname"      : "SMW",
+             "sha224_before_patch" : "fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08",
+             "sha224_after_patch"  : "a86df2881c47f77cfca32a5b7f85c94d8d6475bb3b76aff492b5c253",
+             "patchblob_name"      : "pblob_ccvanilla_e05d0597bc",
+             "patchblob_key"       :  "d0syVW5ZT0QzMnlVQ1FKbU9DWDVyb2g2bnN3SDExUXM4WEhBZTdCX1I5RT0=",
+             "patchblob_sha224"    : "e05d0597bc72f8fe18171cbcc6effd74dfc2a6797473c5601492c545"
+        }
+    },
     "time": 1604901600,
     "added": "2020-11-09",
     "modified": "2020-11-09",
@@ -20,7 +29,7 @@
     "featured": "No",
     "length": "unknown",
     "type": "Other",
-    "description": "Patch Header in Core metadata",
+    "description": "Patch Header in Core metadata\nEnabling patch to Vanilla SMW game for CrowdControl",
     "tags_href": "",
     "tags": [
         "patch",
