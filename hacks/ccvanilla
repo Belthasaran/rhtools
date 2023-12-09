@@ -15,14 +15,7 @@
     "time": 1604901600,
     "added": "2020-11-09",
     "modified": "2020-11-09",
-    "psets": [
-        {
-        "ipfs" : "bafybeic3ldx4o4xfpncpmi4fyslqokqd3pg6q7bmni27mpwxdolg5f5wqq",
-        "key": "blobs/s_pblob_35_ccv_30_21_982_50_0000.zip",
-        "hash": "QmUVETz2yKJRjmfNWgcwPUZ2qCtWKr4MuUAxRwZiLh6DVM",
-        "publicUrl": "https://smwdbi.iparpa.com/331769d1-65ec-45fd-8276-e55bd4a428d5-bucket/blobs/s_pblob_35_ccv_30_21_982_50_0000.zip"
-         }
-    ],
+    "psets": "WwogICAgICAgIHsKICAgICAgICAiaXBmcyIgOiAiYmFmeWJlaWMzbGR4NG80eGZwbmNwbWk0ZnlzbHFva3FkM3BnNnE3Ym1uaTI3bXB3eGRvbGc1ZjV3cXEiLAogICAgICAgICJrZXkiOiAiYmxvYnMvc19wYmxvYl8zNV9jY3ZfMzBfMjFfOTgyXzUwXzAwMDAuemlwIiwKICAgICAgICAiaGFzaCI6ICJRbVVWRVR6MnlLSlJqbWZOV2djd1BVWjJxQ3RXS3I0TXVVQXhSd1ppTGg2RFZNIiwKICAgICAgICAicHVibGljVXJsIjogImh0dHBzOi8vc213ZGJpLmlwYXJwYS5jb20vMzMxNzY5ZDEtNjVlYy00NWZkLTgyNzYtZTU1YmQ0YTQyOGQ1LWJ1Y2tldC9ibG9icy9zX3BibG9iXzM1X2Njdl8zMF8yMV85ODJfNTBfMDAwMC56aXAiCiAgICAgICAgIH0KICAgIF0K",
     "demo": "No",
     "featured": "No",
     "length": "unknown",
