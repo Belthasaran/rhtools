@@ -1,51 +1,55 @@
-    {
-        "id": "ccvanilla",
-        "name": "CC (SMW Vanilla)",
-        "url" : "https://crowdcontrol.live/guides/SuperMarioWorld/",
-        "bps_download_url": "https://cc-modfiles.nyc3.digitaloceanspaces.com/Patches/SuperMarioWorld.Vanilla.ips",
-        "bps_sha1" : "cfc01fbac71f99c7b09e8c7e28b601acec538638",
-        "bps_sha224" : "2d6256b933f6fc2a2c97a6509d36e652b5afc15501d80edae803bc89",
-        "author_href": "",
-        "author": "CC",
-        "authors": "CC",
-        "patch_description" : "BPS game patch to be layered on top of Vanilla SMW for CC support",
-        "patch_targets" : ["vanilla"],
-        "time": 1604901600,
-        "added": "2020-11-09",
-        "modified": "2020-11-09",
-        "psets": [
-             {
-	    "description" : "Blob mirror for patches.  Sets number 31, 32, sm, and cc.",		
-             "ipfs": "bafybeifyvidw266qsd2ayw4insfmgjhkeczyaaocqfxqvwvizgkxvijo6a",
-              "key": "blobs/s_pblob_32_31_sm_cc.zip",
-              "hash": "QmUby6qDyrbKC4gz4kVxV1d3xi23B2NqHVwANnkFDHXvKC",
-              "publicUrl": "https://smwdbi.iparpa.com/331769d1-65ec-45fd-8276-e55bd4a428d5-bucket/blobs/s_pblob_32_31_sm_cc.zip"
-               }
-         ],
-        "demo": "No",
-        "featured": "No",
-        "length": "unknown",
-        "type": "Other",
-        "description": "Patch Header in Core metadata",
-        "tags_href": "",
-        "tags": [ "patch", "modded", "asm"],
-        "comments_href": "#comments",
-        "comments": "0 ",
-        "rating": [ "0.0" ],
-        "url": "",
-        "patch": "patch/gl5sfCyC1SpuJyWD3rykYnXM8Q_GA-Sn",
-        "pat_sha224": "7a31cf8ed902fe75216550d035f1b52718dd57222ba207cbda906e3b",
-        "pat_sha1": "6a4eaee6446f1c38cb7b53c6138898eab183eac4",
-        "pat_shake_128": "gl5sfCyC1SpuJyWD3rykYnXM8Q_GA-Sn",
-        "result_sha224": "a86df2881c47f77cfca32a5b7f85c94d8d6475bb3b76aff492b5c253",
-        "result_sha1": "141b9c5968c7c60def44b4fb742ceab96a5b17e5",
-        "result_shake1": "0MCRsKMMme9dytX5b9M9f5wBn9XhhqcA",
-        "rom": "rom/ccvanilla_0MCRsKMMme9dytX5b9M9f5wBn9XhhqcA.sfc",
-        "patchblob1_name": "pblob_ccvanilla_2ccf06cc44",
-        "patchblob1_key": "aVVyZlR6OUM4QjhNYzhkSVVkWEtSd051MjF5anlKaXY0UFVsRFBEdE5Gcz0=",
-        "patchblob1_sha224": "2ccf06cc44a921ba9d9d1738465fa7624bfc0ea58b9896ae195394d6",
-        "romblob_salt": "RrtSC33P3wVx2GKQ_6Xm7Q==",
-        "romblob_name": "rblob_ccvanilla_59866f1878"
-    }
-
-
+{
+    "id": "ccvanilla",
+    "name": "CC (SMW Vanilla)",
+    "url": "",
+    "bps_download_url": "https://cc-modfiles.nyc3.digitaloceanspaces.com/Patches/SuperMarioWorld.Vanilla.ips",
+    "bps_sha1": "6a4eaee6446f1c38cb7b53c6138898eab183eac4",
+    "bps_sha224": "7a31cf8ed902fe75216550d035f1b52718dd57222ba207cbda906e3b",
+    "author_href": "",
+    "author": "CC",
+    "authors": "CC",
+    "patch_description": "BPS game patch to be layered on top of Vanilla SMW for CC support",
+    "patch_targets": [
+        "vanilla"
+    ],
+    "time": 1604901600,
+    "added": "2020-11-09",
+    "modified": "2020-11-09",
+    "psets": [
+        {
+        "ipfs" : "bafybeic3ldx4o4xfpncpmi4fyslqokqd3pg6q7bmni27mpwxdolg5f5wqq",
+        "key": "blobs/s_pblob_35_ccv_30_21_982_50_0000.zip",
+        "hash": "QmUVETz2yKJRjmfNWgcwPUZ2qCtWKr4MuUAxRwZiLh6DVM",
+        "publicUrl": "https://smwdbi.iparpa.com/331769d1-65ec-45fd-8276-e55bd4a428d5-bucket/blobs/s_pblob_35_ccv_30_21_982_50_0000.zip"
+         }
+    ],
+    "demo": "No",
+    "featured": "No",
+    "length": "unknown",
+    "type": "Other",
+    "description": "Patch Header in Core metadata",
+    "tags_href": "",
+    "tags": [
+        "patch",
+        "modded",
+        "asm"
+    ],
+    "comments_href": "#comments",
+    "comments": "0 ",
+    "rating": [
+        "0.0"
+    ],
+    "patch": "patch/Hmg6JQrOtkYsdknorDaWY7CXPhBF1rrb",
+    "pat_sha224": "caf4b515589f871b98c0cc30250fbde9399e1f4508d23f6d34ac11ce",
+    "pat_sha1": "f1429cb13673e791607f0e2362847bc4b8706447",
+    "pat_shake_128": "Hmg6JQrOtkYsdknorDaWY7CXPhBF1rrb",
+    "result_sha224": "a86df2881c47f77cfca32a5b7f85c94d8d6475bb3b76aff492b5c253",
+    "result_sha1": "141b9c5968c7c60def44b4fb742ceab96a5b17e5",
+    "result_shake1": "0MCRsKMMme9dytX5b9M9f5wBn9XhhqcA",
+    "rom": "rom/ccvanilla_0MCRsKMMme9dytX5b9M9f5wBn9XhhqcA.sfc",
+    "patchblob1_name": "pblob_ccvanilla_e05d0597bc",
+    "patchblob1_key": "d0syVW5ZT0QzMnlVQ1FKbU9DWDVyb2g2bnN3SDExUXM4WEhBZTdCX1I5RT0=",
+    "patchblob1_sha224": "e05d0597bc72f8fe18171cbcc6effd74dfc2a6797473c5601492c545",
+    "romblob_salt": "4Jo_pNPEFAWzjOSKGmwoYg==",
+    "romblob_name": "rblob_ccvanilla_ae5ac6b04a"
+}
