@@ -1,7 +1,3 @@
-#
-# Downloads and patches a  _Random_  SMW Game
-# referenced in SMWC or the BPS Blob database of the specified difficulty or type.
-#
 import os
 import time
 import json
@@ -10,6 +6,9 @@ import sys
 import re
 import loadsmwrh
 import pb_sendtosnes
+
+if os.path.exists('cur_makepage.py'):
+    import cur_makepage
 
 import pb_repatch
 typenames = {}
@@ -76,7 +75,8 @@ if len(selection) >= 1 :
         f1.close()
         try:
              cur_makepage.mkpage_function(['makepage'])
-        except:
+        except Exception as xerr:
+             print(f'Makepage ERR: f{xerr}')
              pass
 
 else:
