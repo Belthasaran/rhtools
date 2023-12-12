@@ -10,12 +10,37 @@ import base64
 import time
 from pathlib import Path
 from compress import Compressor
+from datetime import datetime
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from zipfile import ZipFile
+
+def hinfoMatch(hinfo,varText,ipos, iposmaximum=2000):
+       match = False
+       lenvt = len(varText)
+       if len(varText) < 4 and ipos <= iposmaximum:
+           match = True
+       if lenvt >= 4 and re.search(varText.lower(), hinfo["name"].lower(), re.I):
+           match = True
+       if lenvt >= 4 and re.search(varText.lower(), hinfo["type"].lower(), re.I):
+           match = True
+       if lenvt >= 4 and re.search(varText.lower(), hinfo["authors"].lower(), re.I):
+           match = True
+       if lenvt >= 3 and re.search(varText.lower(), hinfo["id"].lower(), re.I):
+           match = True
+       if lenvt >= 4 and re.search(varText.lower(), hinfo["description"].lower(), re.I):
+           match = True 
+       if lenvt >= 5 and re.search(varText.lower(), hinfo["added"].lower(), re.I):
+           match = True
+       if lenvt >= 4 and hinfo["tags"]:
+           for tagt in hinfo["tags"]:
+               if re.search(varText.lower(), tagt.lower(), re.I):
+                   match = True
+       return match
+
 
 def rhmd_key(fpath):
     # used for sample data
@@ -87,6 +112,13 @@ cachepnums = {}
 
 def fix_hentry(data):
     data = dict(data)
+    if not('added' in data):
+        if 'time' in data:
+            timeval = int(data['time'])
+            data['added'] = datetime.fromtimestamp(timeval).strftime("%Y-%m-%d %I:%M:%S %p")
+            #data['added'] = 
+    if 'difficulty' in data and not('type' in data):
+        data['type'] = data['difficulty']
     if not('name_href' in data) and 'download_url' in data:
         data['name_href'] = data['download_url']
     if not('download_url' in data) and 'name_href' in data:
@@ -300,6 +332,9 @@ def save_hacklist_data(newhacklist,filename=None,docompress=True):
      for x in range(len(newhacklist)):
          if not('authors' in newhacklist[x]) and 'author' in newhacklist[x]:
              newhacklist[x]['authors'] = newhacklist[x]['author']
+         if 'difficulty' in newhacklist[x] and not('type' in newhacklist[x]):
+             newhacklist[x]['type'] = newhacklist[x]['difficulty']
+
      listfile = open(filename+".new", 'w')
      if docompress:
         listfile.write( '*' + ( bytearray(frn.encrypt(comp.compress(json.dumps(newhacklist)))) ).decode() )
