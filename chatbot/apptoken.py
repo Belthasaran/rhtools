@@ -2,9 +2,20 @@
 # Requires Python language Version 3.x
 
 # Quick and dirty Twitch API Token credential management
+#
 # The Client_Id and Client_Secret  are used to create an Application Token.
 # Twitch expires Application Tokens after 60 days, so we need to have a check
 # to ensure validity and autogenerate a new token if the saved one is no longer valid.
+#
+#
+# Example usage:
+#       import apptoken
+
+#       [client_id, client_secret, apptoken=  apptoken.get_tokens(filename='/path/to/tokens/file', frnkeyd='ferney key here')
+#
+# Alternative, get_tokens() can be called without parameters:
+# the user should be directed to set environment variable TWSECFILE to the filename
+# and  TXDKEYZ0 to the Fernet key used to encrypt credentials.
 #  
 import requests
 import json
