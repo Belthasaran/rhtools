@@ -61,7 +61,7 @@ This program is incomplete and a work in progress.
       # python3 pb_sendtosnes.py rom/blah.sfc
 
        This requires an Emulator be installed Or  Usb2snes AND
-       The QUSB2SNES  sendtosd2snes.exe tool.
+       QUSB2SNES   -- See the installation instructions for notes about setting the WebSocket addres URL wsaddress in the  rhtools_options.dat JSON file
 
       This requires Editing the llaunch_rand.sh  script
       according to your local Needs.
@@ -98,6 +98,16 @@ Linux users can extract the archive and then copy  bin/flips and bin/asar   To  
   tar zxvf flips-rhtool-0.1_2023.tar.gz
   sudo cp bin/flips /usr/local/bin
   sudo cp bin/asar /usr/local/bin
+
+  Create a rhtools_options.dat  containing the  WebSocket address of your Qusb2SNES computer
+
+  For example:
+
+    {"launcher1": "./llaunch_rand.sh %file", "launcher2": "default", "wsaddress" : "ws://windowsPC.local:8080"}
+
+  Where windowsPC.local is the name of the Windows PC running QUSB2snes.
+  (Note that QUSB2snes and Windows Firewall need to be configured to accept connections on that port from the computer running the RHTools console)
+
 
 ## Linux
 
