@@ -98,7 +98,7 @@ class mysnes(py2snes.snes):
     async def setonoff(self, value=b'\x01'):
          await self.PutAddress( [ (0xF514AF, value) ] )
 
-    async dev setnumevents(self, value):
+    async def setnumevents(self, value):
          await self.PutAddress( [ (0xF51F2E, value)] )
     async def getnumevents(self):
          await self.GetAddresss( 0xF51F2E, 1 )
