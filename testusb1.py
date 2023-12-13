@@ -61,6 +61,8 @@ class mysnes(py2snes.snes):
          b1 =0xF50000
          await self.PutAddress([ (b1 + 0x0dae, value) ])
 
+    async def saveprompt(self,value=b'\x01'):
+        await self.PutAddress( [ (0xF513CA, value) ] )
     async def moretime(self):
          await self.PutAddress([  (0xF50F31, b"\x09") ])
     async def firepower(self):
@@ -95,6 +97,11 @@ class mysnes(py2snes.snes):
          await self.PutAddress( [ (0xF51493, value) ] )
     async def setonoff(self, value=b'\x01'):
          await self.PutAddress( [ (0xF514AF, value) ] )
+
+    async dev setnumevents(self, value):
+         await self.PutAddress( [ (0xF51F2E, value] )
+    async def getnumevents(self):
+         await self.GetAddresss( 0xF51F2E, 1 )
 
      #14AF onoffstatus
 
