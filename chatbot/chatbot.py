@@ -111,8 +111,8 @@ class Bot(commands.Bot):
         self.readTokens = apptoken.get_tokens()
         self.readTokensTS = time.time()
         self.cachettl = 86400
-        self.logger = logging.getLogger("sweetwater")
-        self.logging = logging.getLogger("sweetwater")
+        self.logger = logging.getLogger("swtbot")
+        self.logging = logging.getLogger("swtbot")
         self.client = base.Client("localhost", serde=JsonSerde())
         self.client2 = base.Client("localhost")
         self.chandata = None
