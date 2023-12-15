@@ -506,6 +506,10 @@ def get_psets(hinfo=None):
     elif (hinfo and "psets" in hinfo and hinfo["psets"] and
           type(hinfo["psets"]) == type("")):
           extrasets = json.loads(base64.b64decode( hinfo["psets"]  ))
+    for i in range(len(globalsets)):
+        globalsets[i]['direct'] = 0
+    for i in range(len(extrasets)):
+        extrasets[i]['direct'] = 1
     return globalsets + extrasets
 
 def get_resource_blob(hackid, blobinfo=None):
@@ -703,7 +707,8 @@ def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
              prefix = kn.replace('.zip','')
 
              if (kn == hackinfo[f"{blobprefix}_name"]  or
-                 kn == 'blobs/' + hackinfo[f"{blobprefix}_name"]) :
+                 kn == 'blobs/' + hackinfo[f"{blobprefix}_name"] or
+                 ('direct' in uu and int(uu['direct']) == 1)) :
                  mat = True
 
              if 'setids' in hackinfo:
