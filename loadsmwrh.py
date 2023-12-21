@@ -374,7 +374,7 @@ def save_note_dict(newdict,filename=None,docompress=True):
      comp = Compressor()
      comp.use_lzma()
 
-     if not(type(newhacklist) == type({})):
+     if not(type(newdict) == type({})):
          raise TypeError('newdict wrong type')
      if filename == None:
          filename = rhad_path(docreate=True)

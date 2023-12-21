@@ -20,6 +20,7 @@ import time
 import random
 import base64
 import loadsmwrh
+import platform
 
 # Number of seconds extra to wait between requests to server
 time_between_requests = 10
@@ -46,7 +47,8 @@ while nexturl and nexturl[0:len(urlprefix)] == urlprefix and len(urlprefix) > 10
          sys.stderr.write("Just a second...\n")
          time.sleep(1)
     sys.stderr.write(f"Requesting page number {pagenum}\n")
-    pagerequest = requests.get ( pageurl )
+    pagerequest = requests.get ( pageurl, None, headers={
+           'User-Agent' : f'rhtools-search-rhlist/1.0 ({platform.platform()}; Python/{platform.python_version()})' } )
 
     if pagerequest.status_code == 200:
         time.sleep(3 + int(random.random()*7))

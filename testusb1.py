@@ -65,6 +65,10 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF513CA, value) ] )
     async def moretime(self):
          await self.PutAddress([  (0xF50F31, b"\x09") ])
+    async def powerdown(self):
+         await self.PutAddress([ ( 0xF50019, b'\x00' ) ])
+    async def setpowerup(self, value=b'\x01'):
+         await self.PutAddress([ ( 0xF50019, value ) ])
     async def firepower(self):
          await self.PutAddress([ ( 0xF50019, b'\x03' ) ])
     async def capepower(self):

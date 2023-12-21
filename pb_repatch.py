@@ -6,6 +6,8 @@ import os
 import json
 import sys
 import loadsmwrh
+import requests
+import platform
 
 def repatch_function(args):
     if not loadsmwrh.path_rerequisites():
@@ -112,6 +114,24 @@ def repatch_function(args):
     #            f2.write( json.dumps(hackinfo) + "\n" )
     #            f2.close()
     #            os.replace(os.path.join("hacks", hackinfo["id"])  + ".new", os.path.join("hacks", hackinfo["id"])  + "")
+    hacknotes = []
+    try:
+        hacknotes = loadsmwrh.get_note_dict()
+        if not( hackinfo["id"] in hacknotes ):
+             hacknotes[ hackinfo["id"] ] = {}
+        if not( 'downloaded' in hacknotes[ hackinfo["id"]  ] ) or not( hacknotes[ hackinfo["id"] ]["downloaded"]  ):
+            url = hackinfo["name_href"]
+            if (re.match('^\/\/.*', url)):
+                url = 'http:' + url
+            print('Sending HEAD request: ' + url)
+            req = requests.head(url, headers = { 'User-Agent' : f'rhtools-pb_repatch/1.0 ({platform.platform()}; Python/{platform.python_version()})' })
+            hacknotes[ hackinfo["id"] ]["downloaded"] = int(time.time())
+            loadsmwrh.save_note_dict(hacknotes)
+            print(f'Result: {req.status_code} {req.reason} - {req.headers}')
+    except Exception as xerr:
+        print(str(xerr))
+        pass
+
 
     print('Patch was successful!  ROM Location:')
     print(os.path.join('rom', romfilename))
