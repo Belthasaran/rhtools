@@ -136,11 +136,11 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF60007, value) ] )
 
     async def inlevel(self):
-        game_unpaused = (await snes.GetAddress(0xF513D4,1)) == b'\x00'
-        noanimation = (await snes.GetAddress(0xF50071,1)) == b'\x00'
-        no_endlevel_keyhole = (await snes.GetAddress(0xF51434,1)) == b'\x00'
-        no_endlevel_timer = (await snes.GetAddress(0xF51493,1)) == b'\x00'
-        normal_level = (await snes.GetAddress(0xF50D9B,1)) == b'\x00'
+        game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
+        noanimation = (await self.GetAddress(0xF50071,1)) == b'\x00'
+        no_endlevel_keyhole = (await self.GetAddress(0xF51434,1)) == b'\x00'
+        no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
+        normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
         return game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
 
      #14AF onoffstatus
