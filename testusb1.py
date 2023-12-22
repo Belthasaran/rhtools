@@ -124,7 +124,7 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF60002, value) ])
 
     async def c_window(self, value=b'\1'):
-        await self.PutAddress( [ 0xF60004, value) ] )
+        await self.PutAddress( [ (0xF60004, value) ] )
 
     async def c_speed(self, value=b'\1'):
         await self.PutAddress( [ (0xF60001, value) ] )
