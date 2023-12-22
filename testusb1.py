@@ -107,6 +107,34 @@ class mysnes(py2snes.snes):
     async def getnumevents(self):
          await self.GetAddresss( 0xF51F2E, 1 )
 
+    #c.vanilla addresses#
+    async def c_idpad(self, value=b'\1'):
+        await self.PutAddresS( [ (0xF61980, value) ] )
+
+    async def c_water(self, value=b'\1'):
+        await self.PutAddress( [ (0xF50085, value) ] )
+
+    async def c_disappearing(self, value=b'\1'):
+        await self.PutAddress( [ (0xF60000, value) ] )
+
+    async def c_munchers( self, value=b'\1'):
+        await self.PutAddress( [ (0xF60003, value) ] )
+
+    async def c_duplicating(self, value=b'\1'):
+        await self.PutAddress( [ (0xF60002, value) ])
+
+    async def c_window(self, value=b'\1'):
+        await self.PutAddress( [ 0xF60004, value) ] )
+
+    async def c_speed(self, value=b'\1'):
+        await self.PutAddress( [ (0xF60001, value) ] )
+
+    async def c_sticky(self, value=b'\1'):
+        await self.PutAddress( [ (0xF60005, value) ] )
+
+    async def c_balloon(self, value=b'\1'):
+        await self.PutAddress( [ (0xF60007, value) ] )
+
      #14AF onoffstatus
 
 

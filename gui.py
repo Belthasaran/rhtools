@@ -12,6 +12,7 @@ import pb_repatch
 import pb_sendtosnes
 import pb_lvlrand
 import re
+import time
 
 # from tkinter import *
 # Explicit imports to satisfy Flake8
@@ -38,6 +39,11 @@ def tva_selection_changed(root, tva, button_7, x):
         button_7.configure(state=tk.DISABLED)
     else:
         button_7.configure(state=tk.NORMAL)
+
+    if not('values' in item) or len(item['values']) < 1:
+        button_4.configure(state=tk.DISABLED)
+    else:
+        button_4.configure(state=tk.NORMAL)
     root.update()
     pass
 
@@ -48,6 +54,24 @@ def btn_randomhack_any(root,tva):
     #ohash = loadsmwrh.get_local_options()
     pass
 
+def button_mark_done(root,tva,label_status):
+    current = tva.focus()
+    item = tva.item(current)
+    notedict = loadsmwrh.get_note_dict()
+    if not('values' in item) or len(item['values'])<1:
+       tkinter.messagebox.showerror(message='Please choose a hack from the list')
+       return
+    hidval = str(item['values'][0])
+    if not(hidval in notedict):
+        notedict[hidval] = {}
+    if not('done' in notedict[hidval]) or not(notedict[hidval]["done"]):
+        label_status.configure(text=f'Marked {hidval} as done.')
+        notedict[hidval]["done"] = "Done"
+        notedict[hidval]["done_at"] = int(time.time())
+    else:
+       label_status.configure(text=f'Unmarked {hidval}')
+       del notedict[hidval]["done"]
+    pass
   
 def button_play_hack(root,tva,label_status):
    current = tva.focus()
@@ -278,6 +302,8 @@ def doesMatch(hinfo,varText,ipos):
            match = True
        if lenvt >= 4 and re.search(varText.lower(), hinfo["description"].lower(), re.I):
            match = True
+       if lenvt >= 5 and re.search(varText.lower(), hinfo["added"].lower(), re.I):
+           match = True
        if lenvt >= 4 and hinfo["tags"]:
            for tagt in hinfo["tags"]:
                if re.search(varText.lower(), tagt.lower(), re.I):
@@ -442,7 +468,7 @@ button_4 = Button(actionframe,
     state=tk.DISABLED,
     borderwidth=1,
     highlightthickness=1,
-    command=lambda: print("button_4 clicked"),
+    command=lambda: button_mark_done(window,tva,label_xnum)
     #relief="flat"
 )
 #button_4.place(
