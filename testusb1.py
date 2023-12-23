@@ -25,6 +25,64 @@ class mysnes(py2snes.snes):
     itemboxvalues = { 'super' : b'\x01', 'fire' : b'\x02', 'star' : b'\x03', 'cape': b'\x04',
                       'blueyoshi': b'\x05',  'grayyoshi': b'\x06', 'orb': b'\xd7'  }
 
+    # 0x7E1DF9 - 1DFC values
+    _1dfcvalues = {
+            'nothing' : b'\x00',
+            'coin' : b'\x01',
+            'hitblock': b'\x02',
+            'vineblock': b'\x03',
+            'spinjump': b'\x04',
+            '1up': b'\x05',
+            'fireball': b'\x06',
+            'breakblock' : b'\x07',
+            'springboard': b'\x08',
+            'boom': b'\x09',  # b.bill / thwomp landing
+            'egghatch': b'\x0a',
+            'itembox': b'\x0b',
+            'itemfalls': b'\x0c',
+            'sameas0xc': b'\x0d',
+            'screenscroll': b'\x0e',
+            'door': b'\x0f',
+            #x10 same as x09
+            'drumroll': b'\x11', #(looped)
+            'drumrollend': b'\x12',
+            'loseyoshi': b'\x13',
+            #x14 unused
+             'tilerevealed': b'\x15',
+             'castlecollapsed': b'\x16',
+             'firespit': b'\x17',
+             'thunder': b'\x18',
+             'chuck_clap': b'\x19',
+             'castle_destruction_b': b'\x1a',
+             'castle_destruction_fuse': b'\x1b',
+             'ow_palace_stomp': b'\x1c',
+             'timerunningout': b'\x1d', # Running out of time (combine with the one in $1DF9, does not speed up tempo)
+             'chuck_whistle' : b'\x1e',
+             'yoshi_mount': b'\x1f',
+             'koopaling_lands_in_lava': b'\x20',
+             'yoshi_tongue': b'\x21',
+             'messagebox': b'\x22',
+             'ow_mariomove' : b'\x23',  # Mario moves onto level tile
+             'pswitch_timeout': b'\x24', #p-switch time running out
+             'yoshi_stomp': b'\x25',
+             'swooper': b'\x26',
+             'podoboo': b'\x27',
+             'enemy_stunned': b'\x28',
+             'correct': b'\x29',
+             'wrong': b'\x2a',
+             'firework_whistle': b'\x2b',
+             'firework_bang': b'\x2c',
+             'podoboo-m100' : b'\x2d',
+             'podoboo-m71' : b'\x2e',
+             'podoboo-m43' : b'\x2f',
+             'podoboo-m14' : b'\x30',
+             'podoboo-p14' : b'\x31',
+             'podoboo-p43' : b'\x32',
+             'podoboo-p71' : b'\x33',
+             'podoboo-p100' : b'\x34'
+              #35+	Mirror of $1DF9's sound effects, starting at the "Hit head" SFX
+            }
+
     switchpalaceflags_addr = { 'green' : 0x1F27,  'yellow' : 0x1F28,  'blue' : 0x1F29, 'red': 0x1F2A }    
     switchpalaceflags_values = { 'off' : 0x00,  'on' : 0x01 }
     async def setswitchpalace(self, name, value = b'\x01' ):
@@ -114,7 +172,7 @@ class mysnes(py2snes.snes):
          # x04 dpad and buttons mixed up
         await self.PutAddress( [ (0xF61980, value) ] )
 
-    await def c_magicsound(self, value=b'\x00'):
+    async def c_magicsound(self, value=b'\x00'):
         await self.PutAddress( [(0xF51DF9, b'\x10')] )
 
     async def c_resetgame(self, value=b'\x00'):
@@ -127,7 +185,7 @@ class mysnes(py2snes.snes):
 
     async def c_spawnthwomp(self, value=b'\x01'):
         #F60725=>spawns
-        await snes.PutAddress([(0xF60006, b'\x01'), (0xF60725, b'\x01'])
+        await snes.PutAddress([(0xF60006, b'\x01'), (0xF60725, b'\x01')])
 
     async def c_kaizoblock(self, value=b'\x01'):
         await snes.PutAddress([(0xF60729,b'\x01')])
@@ -171,13 +229,13 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF518B9, value), (0xF51DFC, value2) ] )
 
     async def c_addlives(self, value=b'\x01', value2=b'\x05'):       # To increment lives gradually by n,  set 0xF518E4 to n
-        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+        await self.PutAddress( [ (0xF518E4, value), (0xF51DFC, value2) ] )
 
     async def c_5up(self, value=b'\x03', value2=b'\x05'):
-        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+        await self.PutAddress( [ (0xF518E4, value), (0xF51DFC, value2) ] )
 
     async def c_5up(self, value=b'\x05', value2=b'\x05'):
-        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+        await self.PutAddress( [ (0xF518E4, value), (0xF51DFC, value2) ] )
 
     async def c_lippery(self, value=b'\x01'):
          await self.PutAddress( [ (0xF50086, value) ] )
@@ -205,7 +263,7 @@ class mysnes(py2snes.snes):
     # (0xF50DC2, b'\xc2')
     # (0xF51DFC, b'\x1f') 
 
-    await def c_yellow_yoshi(self);
+    async def c_yellow_yoshi(self):
         await self.PutAddress( [(0xf61981, b'\x04'), (0xF50DC2, b'\xc2'), (0xF51DFC, b'\x1f') ])
 
     async def c_speed(self, value=b'\1'): # bx01 activates
