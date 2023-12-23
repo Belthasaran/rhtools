@@ -216,14 +216,14 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [(0xF50100, value)] )
 
     async def c_pixelate(self, value=b'\x02'):
-        await snes.PutAddress([(0xF60723,b'\x01')])
+        await self.PutAddress([(0xF60723,b'\x01')])
 
     async def c_spawnthwomp(self, value=b'\x01'):
         #F60725=>spawns
-        await snes.PutAddress([(0xF60006, b'\x01'), (0xF60725, b'\x01')])
+        await self.PutAddress([(0xF60006, b'\x01'), (0xF60725, b'\x01')])
 
     async def c_kaizoblock(self, value=b'\x01'):
-        await snes.PutAddress([(0xF60729,b'\x01')])
+        await self.PutAddress([(0xF60729,b'\x01')])
 
     async def c_fishgen(self, value=b'\7'): # \a
         await self.PutAddress( [ (0xF518B9, value) ] )
