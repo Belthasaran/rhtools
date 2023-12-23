@@ -107,9 +107,18 @@ class mysnes(py2snes.snes):
     async def getnumevents(self):
          await self.GetAddresss( 0xF51F2E, 1 )
 
-    #c.vanilla addresses#
+    #c.vanilla addresses# found to work
     async def c_idpad(self, value=b'\1'):
-        await self.PutAddresS( [ (0xF61980, value) ] )
+        await self.PutAddress( [ (0xF61980, value) ] )
+
+    async def c_fishgen(self, value=b'\7'): # \a
+        await self.PutAddress( [ (0xF518B9, value) ] )
+
+    async def c_bulletbillgen(self, value=b'\x0b'):  # Set F51889 to 0x0b
+        await self.PutAddress( [ (0xF518B9, value) ] )
+
+    async def c_addlives(self, value=b'\x01'):       # To increment lives gradually by n,  set 0xF518E4 to n
+        await self.PutAddress( [ (0xF518E4, value) ] )
 
     async def c_water(self, value=b'\1'):
         await self.PutAddress( [ (0xF50085, value) ] )
