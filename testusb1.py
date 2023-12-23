@@ -170,9 +170,9 @@ class mysnes(py2snes.snes):
          hundreds = int(curtime / 100)
          tens = int((int(curtime) - hundreds*100)/10)
          ones = (int(curtime) - hundreds*100 - tens*10)  % 10
-         await self.PutAddress([ (0xF50F31, bytes(hundreds) ),
-                                 (0xF50F32, bytes(tens) ),
-                                 (0xF50F33, bytes(ones) )])
+         await self.PutAddress([ (0xF50F31, bytes([hundreds]) ),
+                                 (0xF50F32, bytes([tens]) ),
+                                 (0xF50F33, bytes([ones]) )])
 
     async def addtime(self,seconds):
          seconds = 0
@@ -184,9 +184,9 @@ class mysnes(py2snes.snes):
          hundreds = int(curtime / 100) 
          tens = int((int(curtime) - hundreds*100)/10)
          ones = (int(curtime) - hundreds*100 - tens*10)  % 10
-         await self.PutAddress([ (0xF50F31, bytes(hundreds) ),
-                                 (0xF50F32, bytes(tens) ),
-                                 (0xF50F33, bytes(ones) )])
+         await self.PutAddress([ (0xF50F31, bytes([hundreds]) ),
+                                 (0xF50F32, bytes([tens]) ),
+                                 (0xF50F33, bytes([ones]) )])
 
 
 
