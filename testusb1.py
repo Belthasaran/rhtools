@@ -215,7 +215,7 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF50dc2, value) ] )
 
     async def sfx_mountyoshi(self, value=b'\x1f'):
-        await self.PutAddress( [ 0xF51DFC, value])
+        await self.PutAddress( [ (0xF51DFC, value)])
 
     async def c_blueswitch(self, value=b'\xb0', value2='\x0e'):
          await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value) ] )
