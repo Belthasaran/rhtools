@@ -73,13 +73,13 @@ class mysnes(py2snes.snes):
          await self.PutAddress([ ( 0xF50019, b'\x03' ) ])
     async def capepower(self):
          await self.PutAddress([ ( 0xF50019, b'\x02' ) ])
-    async def starpower(self):
-         await self.PutAddress([ ( 0xF51490, b'\x7e' ) ])
+    async def starpower(self): #x7e -> xff
+         await self.PutAddress([ ( 0xF51490, b'\xff' ) ])
     async def lives99(self):
          await self.PutAddress([ ( 0xF50DBE, b'\x62' ) ])
     async def coins99(self):
          await self.PutAddress( [ (0xF50DBF, b'\x62' ) ])
-    async def blueswitch(self, value=b'\x7e'):
+    async def blueswitch(self, value=b'\xb0'):  #\x7e
          await self.PutAddress( [ (0xF514AD, value) ] )
     async def silverswitch(self, value=b'\x7e'):
          await self.PutAddress( [ (0xF514AE, value) ] )
@@ -108,17 +108,79 @@ class mysnes(py2snes.snes):
          await self.GetAddresss( 0xF51F2E, 1 )
 
     #c.vanilla addresses# found to work
-    async def c_idpad(self, value=b'\1'):
+    async def c_invertcontrols(self, value=b'\x02'): 
+         # x01 invert dpand
+         # x02 invert buttons
+         # x04 dpad and buttons mixed up
         await self.PutAddress( [ (0xF61980, value) ] )
+
+    await def c_magicsound(self, value=b'\x00'):
+        await self.PutAddress( [(0xF51DF9, b'\x10')] )
+
+    async def c_resetgame(self, value=b'\x00'):
+        await self.PutAddress( [(0xF50100, value)] )
+    async def c_exitlevel(self, value=b'\x0b'):
+        await self.PutAddress( [(0xF50100, value)] )
+
+    async def c_pixelate(self, value=b'\x02'):
+        await snes.PutAddress([(0xF60723,b'\x01')])
+
+    async def c_spawnthwomp(self, value=b'\x01'):
+        #F60725=>spawns
+        await snes.PutAddress([(0xF60006, b'\x01'), (0xF60725, b'\x01'])
+
+    async def c_kaizoblock(self, value=b'\x01'):
+        await snes.PutAddress([(0xF60729,b'\x01')])
 
     async def c_fishgen(self, value=b'\7'): # \a
         await self.PutAddress( [ (0xF518B9, value) ] )
 
-    async def c_bulletbillgen(self, value=b'\x0b'):  # Set F51889 to 0x0b
-        await self.PutAddress( [ (0xF518B9, value) ] )
+    async def c_item_empty(self, value=b'\x00'):
+        await self.PutAddress( [ (0xF50dc2, value) ] )
 
-    async def c_addlives(self, value=b'\x01'):       # To increment lives gradually by n,  set 0xF518E4 to n
-        await self.PutAddress( [ (0xF518E4, value) ] )
+    async def c_item_mushroom(self, value=b'\x01'):
+        await self.PutAddress( [ (0xF50dc2, value) ] )
+
+    async def c_item_flower(self, value=b'\x02'):
+        await self.PutAddress( [ (0xF50dc2, value) ] )
+
+    async def c_item_starman(self, value=b'\x03'):
+        await self.PutAddress( [ (0xF50dc2, value) ] )
+
+    async def c_starman(self):
+         await self.PutAddress([ ( 0xF51490, b'\xff' ) ])
+
+    async def c_item_capefeather(self, value=b'\x04'):
+        await self.PutAddress( [ (0xF50dc2, value) ] )
+
+    async def c_item_blueyoshi(self, value=b'\xc2'): #(0xf50dc2, b'\xc2')
+        await self.PutAddress( [ (0xF50dc2, value) ] )
+
+    async def sfx_mountyoshi(self, value=b'\x1f'):
+        await self.PutAddress( [ 0xF51DFC, value])
+
+    async def c_blueswitch(self, value=b'\xb0', value2='\x0e'):
+         await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value) ] )
+
+    async def c_silverswitch(self, value=b'\xb0', value2='\x0e'):
+             # F60728 => turns enemies into coins on x01
+         await self.PutAddress( [ (0xF514AE, value), (0xF51DFB, value), (0xF60728, b'\x01') ] )
+
+
+    async def c_bulletbillgen(self, value=b'\x0b', value2=b'\x09'):  # Set F51889 to 0x0b
+        await self.PutAddress( [ (0xF518B9, value), (0xF51DFC, value2) ] )
+
+    async def c_addlives(self, value=b'\x01', value2=b'\x05'):       # To increment lives gradually by n,  set 0xF518E4 to n
+        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+
+    async def c_5up(self, value=b'\x03', value2=b'\x05'):
+        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+
+    async def c_5up(self, value=b'\x05', value2=b'\x05'):
+        await self.PutAddress( [ (0xF518E4, value), 0xF51DFC, value2) ] )
+
+    async def c_lippery(self, value=b'\x01'):
+         await self.PutAddress( [ (0xF50086, value) ] )
 
     async def c_water(self, value=b'\1'):
         await self.PutAddress( [ (0xF50085, value) ] )
@@ -134,23 +196,41 @@ class mysnes(py2snes.snes):
 
     async def c_window(self, value=b'\1'):
         await self.PutAddress( [ (0xF60004, value) ] )
+ 
+    # (0xf61981, b'\x06')
+    # (0xf50dc2, b'\xc2'), (0xf51dfc, b'\x1f')
+    # write 1f to 0xf51dfc
 
-    async def c_speed(self, value=b'\1'):
+    # (0xf61981, b'\x04')
+    # (0xF50DC2, b'\xc2')
+    # (0xF51DFC, b'\x1f') 
+
+    await def c_yellow_yoshi(self);
+        await self.PutAddress( [(0xf61981, b'\x04'), (0xF50DC2, b'\xc2'), (0xF51DFC, b'\x1f') ])
+
+    async def c_speed(self, value=b'\1'): # bx01 activates
         await self.PutAddress( [ (0xF60001, value) ] )
 
-    async def c_sticky(self, value=b'\1'):
+    async def sfx_item_reservebox(self, value=b'\x0b'): # c_1dfc_write0b
+        await self.PutAddress( [ (0xF51DFC, value) ] )
+
+    async def c_stickyfloor(self, value=b'\1'):
         await self.PutAddress( [ (0xF60005, value) ] )
+
+    async def sfx_springboard(self, value=b'\x08'):
+        await self.PutAddress( [ (0xF51DFC, value) ])
 
     async def c_balloon(self, value=b'\1'):
         await self.PutAddress( [ (0xF60007, value) ] )
 
     async def inlevel(self):
+        run_game = ((await self.GetAddress(0xF50010,1)) == b'\x00')
         game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
         noanimation = (await self.GetAddress(0xF50071,1)) == b'\x00'
         no_endlevel_keyhole = (await self.GetAddress(0xF51434,1)) == b'\x00'
         no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
         normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
-        return game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
+        return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
 
      #14AF onoffstatus
 
