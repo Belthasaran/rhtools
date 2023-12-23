@@ -165,6 +165,33 @@ class mysnes(py2snes.snes):
     async def getnumevents(self):
          await self.GetAddresss( 0xF51F2E, 1 )
 
+    async def settime(Seconds):
+         curtime = seconds
+         hundreds = int(curtime / 100)
+         tens = int((int(curtime) - hundreds*100)/10)
+         ones = (int(curtime) - hundreds*100 - tens*10)  % 10
+         await self.PutAddress([ (0xF50F31, bytes(hundreds) ),
+                                 (0xF50F32, bytes(tens) ),
+                                 (0xF50F33, bytes(ones) )])
+
+    async def addtime(seconds):
+         seconds = 0
+         hundreds = await self.GetAddress(0xF50F31, 1)
+         tens = await self.GetAddress(0xF50F32, 1)
+         ones = await self.GetAddress(0xF50F33, 1)
+         curtime = hundreds[0] * 100  + tens[0] * 10 + ones[0] 
+         curtime = curtime + seconds
+         hundreds = int(curtime / 100) 
+         tens = int((int(curtime) - hundreds*100)/10)
+         ones = (int(curtime) - hundreds*100 - tens*10)  % 10
+         await self.PutAddress([ (0xF50F31, bytes(hundreds) ),
+                                 (0xF50F32, bytes(tens) ),
+                                 (0xF50F33, bytes(ones) )])
+
+
+
+         await self.PutAddress([  (0xF50F31, b"\x09") ])
+
     #c.vanilla addresses# found to work
     async def c_invertcontrols(self, value=b'\x02'): 
          # x01 invert dpand
@@ -218,11 +245,11 @@ class mysnes(py2snes.snes):
         await self.PutAddress( [ (0xF51DFC, value)])
 
     async def c_blueswitch(self, value=b'\xb0', value2='\x0e'):
-         await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value) ] )
+         await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value2) ] )
 
     async def c_silverswitch(self, value=b'\xb0', value2='\x0e'):
              # F60728 => turns enemies into coins on x01
-         await self.PutAddress( [ (0xF514AE, value), (0xF51DFB, value), (0xF60728, b'\x01') ] )
+         await self.PutAddress( [ (0xF514AE, value), (0xF51DFB, value2), (0xF60728, b'\x01') ] )
 
 
     async def c_bulletbillgen(self, value=b'\x0b', value2=b'\x09'):  # Set F51889 to 0x0b
