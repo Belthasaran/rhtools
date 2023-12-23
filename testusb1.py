@@ -163,7 +163,8 @@ class mysnes(py2snes.snes):
     async def setnumevents(self, value):
          await self.PutAddress( [ (0xF51F2E, value)] )
     async def getnumevents(self):
-         await self.GetAddresss( 0xF51F2E, 1 )
+         evnum =  await self.GetAddresss( 0xF51F2E, 1 )
+         return evnum
 
     async def gettime(self):
         hundreds = await self.GetAddress(0xF50F31, 1)
