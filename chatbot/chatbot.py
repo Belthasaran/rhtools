@@ -22,6 +22,7 @@ import crm114
 import unidecode
 import asyncio
 import path
+import random
 import asyncio
 import ccinteract
 
@@ -1082,6 +1083,31 @@ class Bot(commands.Bot):
     async def chaos_loop_1(self, arg: str):
         print(f'Ok - Loop 1')
         self.chm_state = 0
+        self.effectlist_s = self.effectlist
+        random.shuffle(self.effectlist_s)
+        self.effectlist_v = []
+        for i in range(4):
+            entry = { 'text' :  f'{i+1}. { self.effectlist_s[i]["name"] }', 'p' : 0, 'd' : dict(self.effectlist_s[i])}
+            try:
+                if 'ccobject' in entry['d'] and 'quantity' in entry['d']['ccobject']:
+                    minimum_qty = entry['d']['ccobject']['quantity']['min']
+                    maximum_qty = entry['d']['ccobject']['quantity']['max']
+                    delta = maximum_qty - minimum_qty
+                    xoff = int(random.randint(0,int(delta * 0.10)))
+                    entry['quantity'] = xoff + minimum_qty
+                    entry['text'] = entry['text'] + f' (x{entry["quantity"]})'
+            except Exception as xerr1:
+                self.logger.error('ERR: ' + str(xerr1))
+                traceback.print_exc()
+                pass
+
+            self.effectlist_v = self.effectlist_v + [entry]
+        entry = { 'text' : '5. Random', 'p': 0, 'd' : None }
+        self.effectlist_v = self.effectlist_v + [entry]
+        with open("chmode_effect_choices_temp.json", 'w') as soutfile:
+            soutfile.write(json.dumps(self.effectlist_v, indent=4))
+
+
 
 
 
@@ -1096,7 +1122,7 @@ class Bot(commands.Bot):
             with open("cc_session_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.ccsession))
             self.cc_game_session_id = self.ccsession["gameSessionID"]
-            self.cc_menuinfo = self.ccinteract.getSessionMenu(game_session_id)
+            self.cc_menuinfo = self.ccinteract.getSessionMenu(self.cc_game_session_id)
             with open("cc_menu_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_menuinfo))
             self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
@@ -1104,14 +1130,19 @@ class Bot(commands.Bot):
                 soutfile.write(json.dumps(self.cc_effects))
             self.effectlist = []
             for cce in self.cc_effects:
-                ccx = dict(cce)
-                ccx['type'] = 'crowdcontrol'
-                self.effectlist = self.effectlist + [ccx]
-
-
+                myeffectinfo = dict({})
+                for ak in ['name', 'effectID', 'description']:
+                    myeffectinfo[ak] = cce[ak]
+                myeffectinfo['type'] = 'crowdcontrol'
+                myeffectinfo['ccobject'] = dict(cce)
+                self.effectlist = self.effectlist + [myeffectinfo]
+            with open("avail_effects_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.effectlist))
 
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - Could not query active session')
+            traceback.print_exc()
+            return
         self.chaos_loop_1.start('Test')
         await ctx.send(f'@{ctx.author.name}, Okay.')
 
