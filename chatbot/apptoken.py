@@ -96,7 +96,7 @@ def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
                     skipnext=0
                     continue
                 if not(filedata[i]) or filedata[i] == '':
-                    print('SK')
+                    #print('SK')
                     skipnext=1
                     continue
                 ###

@@ -316,6 +316,27 @@ class mysnes(py2snes.snes):
     async def c_balloon(self, value=b'\1'):
         await self.PutAddress( [ (0xF60007, value) ] )
 
+    async def sfx_midway(self):
+        await snes.PutAddress([(0xF51DF9, b'\x05')])
+
+    async def c_midway(self, value=b'\x01'):
+        if snes.inlevel():
+            if value == b'\x01':
+                await snes.PutAddress([(0xF513CE, b'\x01'), (0xF51DF9, b'\x05')])
+            else:
+                await snes.PutAddress([(0xF513CE, value), (0xF51DF9, b'\x10')])
+
+    async def setmarioYpos(self, value=b'\x00'):
+        await self.PutAddress([(0xF50096, b'\x00')])
+
+    async def a_endmario(self):
+        i = 60
+        while (await self.inlevel()) == False and i > 1:
+            i = i - 1
+        await self.settime(2)
+        await self.PutAddress([(0xF50096, b'\xf0')])
+
+
     async def inlevel(self):
         run_game = ((await self.GetAddress(0xF50010,1)) == b'\x00')
         game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
