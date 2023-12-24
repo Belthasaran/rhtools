@@ -1,0 +1,102 @@
+<html>
+ <script src="jquery-3.7.1.min.js"></script>
+ <script>
+	 $("#chmodediv").hide()
+	 ws=new WebSocket('ws://127.0.0.1:1889/')
+
+	 function escapeHTML(html) {
+			    var text = document.createTextNode(html);
+                            var p = document.createElement('p');
+                            p.appendChild(text);
+                            return p.innerHTML;
+		  }
+
+         String.prototype.toHHMMSS = function () {
+			  var sec_num = parseInt(this, 10);
+			  var hours   = Math.floor(sec_num / 3600);
+			  var minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+			  var seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+			  if (hours   < 10) {hours   = "0"+hours;}
+			  if (minutes < 10) {minutes = "0"+minutes;}
+			  if (seconds < 10) {seconds = "0"+seconds;}
+			  return hours+':'+minutes+':'+seconds;
+		  }
+
+	 ws.addEventListener('message', function(event) {
+			  data = JSON.parse(event.data)
+			  //console.log("R <- " + JSON.stringify(event.data))
+			  console.log("R <- event.data")
+data["effectlist_v"]=[{"text": "[1] Duplicating Tiles", "p": 0, "d": {"name": "Duplicating Tiles", "effectID": "spread", "description": "It's like a virus of tile blocks. Whatever tiles are on the screen, could be replaced by other tiles.", "type": "crowdcontrol", "ccobject": {"effectID": "spread", "type": "game", "name": "Duplicating Tiles", "description": "It's like a virus of tile blocks. Whatever tiles are on the screen, could be replaced by other tiles.", "price": 250, "duration": 30}}}, {"text": "[2] Remove Time (x57)", "p": 0, "d": {"name": "Remove Time", "effectID": "timedown", "description": "Provides an increased challenge for players by removing hope.", "type": "crowdcontrol", "ccobject": {"effectID": "timedown", "type": "game", "name": "Remove Time", "description": "Provides an increased challenge for players by removing hope.", "price": 5, "quantity": {"min": 1, "max": 999}}}, "quantity": 57}];
+			  data['chmode'] = 1;
+			  data['chmode_stage'] = 2;
+			  data['chmode_timeleft'] = 60;
+			  event.data = JSON.stringify(data);
+
+			  $("#xya").text(" ")
+			  if (data.chmode == 0 && 0) {
+					   $("#chmodediv").hide()
+			   } else {
+					    maxpval = 0;
+					    textval = "";
+
+					    if(data['chmode_stage'] == 1) {
+					       textval += "Effect in  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+					       textval += "<br>";
+					     }
+					    if(data['chmode_stage'] == 2) {
+                                               textval += "Cooldown for " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+                                               textval += "<br>";
+                                             }
+
+
+					       for(ei of data["effectlist_v"]) {
+					   	    	         if(ei["p"] > maxpval) {
+							    		      maxpval = ei["p"];
+							          }
+					       }
+
+					    for(ei of data["effectlist_v"]) {
+							     eitext = ei["text"]
+							     ptext = ""
+							     if(data["chmode_stage"] == 2 && eitext.indexOf(" ") > 1) {
+								    firstSpace = eitext.indexOf(" ");
+									      eitext = eitext.substr(firstSpace)
+
+								      }
+							     if((ei["p"] == maxpval && data['chmode_stage']<2 ) || ei["chosen"] == 1) {
+								boldo = "<b>";
+							      boldc = "</b>";
+							      } else {
+							       	 boldo="";
+								boldc="";
+							       }
+
+					             if(ptext != "0") {
+					                 ptext = "[" + escapeHTML(ei["p"]) + "]"
+						     }
+						     textval = textval  + boldo + escapeHTML(eitext) + "&nbsp;&nbsp;&nbsp;&nbsp " + ptext + boldc + "<br>\n";
+					     }
+				    }
+			  $("#chmodediv").html(textval)
+			  $("#chmodediv").show()
+		  })
+
+	 function wsOnOpen(event) {
+			  query = { "query" : "chmode" }
+			  ws.send( JSON.stringify(query) )
+			  console.log("S ->" + JSON.stringify(query))
+			  setTimeout(wsOnOpen, 5000);
+	  }
+	 ws.addEventListener('open', wsOnOpen)
+	 ws.addEventListener('close', function() { location.reload();  })
+
+ </script>
+ <body>
+	 <div id="chmodediv">
+	 </div>
+	 <div id="xya">O</div>
+
+ </body>
+</html>
+

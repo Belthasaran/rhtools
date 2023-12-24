@@ -708,6 +708,20 @@ class Bot(commands.Bot):
             self.logger.debug('lookup tb: ' + str( traceback.format_exc()  ))
         return mcloaduo
 
+    async def checkfor_votes(self, message):
+        try:
+            basetext = message.content
+            if re.match('^\d+$', message.content) and self.chmode == 1 and self.chmode_stage == 1:
+                if (message.author.name.lower() in self.effectlist_voters):
+                    return ## that user already voted
+                voteval = int(message.content)
+                self.effectlist_v[voteval-1]["p"] = self.effectlist_v[voteval-1]["p"]+1
+                self.effectlist_voters[message.author.name.lower()] = 1
+                pass
+        except Exception as xerr1:
+            pass
+        pass
+
     async def event_message(self, message):
         #            chobj = ( self.chandata[chid]  )
         chobj = None
@@ -852,12 +866,14 @@ class Bot(commands.Bot):
 
         if plev > 10 :
             self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to mod+" )
+            await self.checkfor_votes(message)
             await self.handle_commands(message)
             return
 
         # Not triggering actions against premium accounts, Unless the text hits the main phase filter
         if plev > 0 and wordsearchresult == None :
             self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
+            await self.checkfor_votes(message)
             await self.handle_commands(message)
             return
 
@@ -884,6 +900,7 @@ class Bot(commands.Bot):
                 #
                 if int(useroptobj['level']) >= 10 :
                     self.logger.debug('User ' + str(message.author.name) + ' is on the allow list, skipping')
+                    await self.checkfor_votes(message)
                     await self.handle_commands(message)
                     return
 
@@ -933,6 +950,7 @@ class Bot(commands.Bot):
         if plev > 0 : 
             self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
             if wasblocked == False:
+                await self.checkfor_votes(message)
                 await self.handle_commands(message)
             return
 
@@ -1113,6 +1131,7 @@ class Bot(commands.Bot):
         #print(str(message.tags))
         #print(message.content)
         if wasblocked == False:
+            await self.checkfor_votes(message)
             await self.handle_commands(message)
 
     @routines.routine(seconds=5.0)
@@ -1129,9 +1148,20 @@ class Bot(commands.Bot):
             for ee in self.effectlist_v:
                 if int(ee["p"]) > maxpval:
                     maxpval = int(ee["p"])
-            self.effectlist_v = list(filter(lambda u: int(u["p"]) >= maxpval, self.effectlist_v))
+            effectlist_vf = list(filter(lambda u: int(u["p"]) >= maxpval, self.effectlist_v))
+            self.effectlist_voters = {}
 
-            chosenElement = random.randint(0, len(self.effectlist_v) - 1 )
+            chosenElement = random.randint(0, len(effectlist_vf) - 1 )
+            if effectlist_vf[chosenElement].name == "random":
+                ival = chosenElement+1
+                effectlist_vf = list(filter(lambda u: not(u["name"]=="random") , self.effectlist_v))
+                chosenElement2 = random.randint(0, len(effectlist_vf) - 1 )
+                self.effectlist_v = [ effectlist_vf[chosenElement2]  ]
+                self.effectlist_v[0]['text'] = f'[{ival}] { self.effectlist_s[i]["name"] }'
+                self.effectlist_v[0]['chosen'] = 1
+                self.effectlist_v[0]['p'] = 0
+                chosenElement = 0
+
             self.effectlist_v[chosenElement]['chosen'] = 1
             chosenEffect = self.effectlist_v[chosenElement]
             self.chmode_stage = 2
@@ -1140,6 +1170,7 @@ class Bot(commands.Bot):
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
             if chosenEffect['type'] == 'crowdcontrol':
+                print(f'Requesting effect activation: {chosenEffect["name"]}')
                 self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['ccobject'], effectAmount  )
 
         if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
@@ -1168,7 +1199,7 @@ class Bot(commands.Bot):
                     traceback.print_exc()
                     pass
                 self.effectlist_v = self.effectlist_v + [entry]
-            entry = { 'text' : '5. Random', 'p': 0, 'd' : None }
+            entry = { 'text' : '[5] Random', 'name' : 'random', 'p': 0, 'd' : None }
             self.effectlist_v = self.effectlist_v + [entry]
             self.chmode_timeleft = 120
             self.chmode_stage = 1
