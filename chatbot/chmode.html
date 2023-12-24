@@ -35,7 +35,9 @@ data["effectlist_v"]=[{"text": "[1] Duplicating Tiles", "p": 0, "d": {"name": "D
 
 			  $("#xya").text(" ")
 			  if (data.chmode == 0 && 0) {
-					   $("#chmodediv").hide()
+					  // $("#chmodediv").hide()
+					   $("#chmodediv").html("Websocket ws://127.1.0.10:11889<br>Connected: Standing by")
+
 			   } else {
 					    maxpval = 0;
 					    textval = "";
@@ -104,6 +106,8 @@ data["effectlist_v"]=[{"text": "[1] Duplicating Tiles", "p": 0, "d": {"name": "D
 </style>
  <body>
 	 <div id="chmodediv">
+		 Attempting to connect<br>
+		 ws://127.1.0.10:11889
 	 </div>
 	 <div id="xya">O</div>
 
