@@ -25,6 +25,9 @@ import path
 import random
 import asyncio
 import ccinteract
+import websockets
+#from websockets.server import serve
+
 
 botmoduledir = path.Path(__file__).abspath()
 sys.path.append(botmoduledir.parent.parent)
@@ -76,7 +79,11 @@ class Bot(commands.Bot):
         self.filterExpr = ''
         self.filterjson = None
         self.wordFilterRE = None
+        self.chmode =0 
+        self.chmode_stage = 0
+        self.chmode_timeleft = 0
         self.ccinteract = ccinteract.CrowdInteract()
+        self.effectlist_v = []
 
         self.spamfilterItems = []
         self.spamfilterWords = []
@@ -137,8 +144,15 @@ class Bot(commands.Bot):
                          client_secret=bci["twitch"]["client_secret"],
                         api_token=bci["twitch"]["initial_token"] )
         try:
-            coro = asyncio.start_server(self.handle_echo, '127.0.0.1', 1888, loop=self.loop)
+            coro = asyncio.start_server(self.handle_echo, '127.0.0.1', 1888) #, loop=self.loop)
             server = self.loop.run_until_complete(coro)
+            self.logger.debug('Started port 1888 socket')
+            #
+            coro2 = websockets.serve(self.handle_wslistener, '0.0.0.0', 1889)
+            serve2 = self.loop.run_until_complete(coro2)
+            self.logger.debug('Started 1889 ws')
+            #coro2 = 
+
         except Exception as ex1:
             self.logger.debug("ExZ:" + str(ex1))
             pass
@@ -195,6 +209,28 @@ class Bot(commands.Bot):
             return #
         self.logger.debug("raw_event: " + str(data))
         #print(data)
+
+    async def handle_wslistener(self, websocket, pa):
+        while True:
+            message = await websocket.recv()
+            answer = { 'status' : 'error' }
+            try:
+                data = json.loads(message)
+                if data['query'] == 'chmode' :
+                    answer['chmode'] = self.chmode
+                    answer['chmode_stage'] = self.chmode_stage
+                    answer['chmode_timeleft'] = self.chmode_timeleft
+                    answer['chmode_active'] = 0
+                    answer['status'] = 'ok'
+                    if self.chmode == 0 :
+                        answer['effectlist_v'] = []
+                    elif self.chmode == 1 :
+                        answer['effectlist_v'] = self.effectlist_v
+            except Exception as xerr:
+                answer = { 'status' : 'error',  'note' : str(xerr) }
+            await websocket.send(json.dumps(answer))
+
+
 
     async def handle_echo(self, reader, writer):
         data = await reader.read(100)
@@ -1079,33 +1115,66 @@ class Bot(commands.Bot):
         if wasblocked == False:
             await self.handle_commands(message)
 
-    @routines.routine(seconds=60.0)
+    @routines.routine(seconds=5.0)
     async def chaos_loop_1(self, arg: str):
         print(f'Ok - Loop 1')
-        self.chm_state = 0
-        self.effectlist_s = self.effectlist
-        random.shuffle(self.effectlist_s)
-        self.effectlist_v = []
-        for i in range(4):
-            entry = { 'text' :  f'{i+1}. { self.effectlist_s[i]["name"] }', 'p' : 0, 'd' : dict(self.effectlist_s[i])}
-            try:
-                if 'ccobject' in entry['d'] and 'quantity' in entry['d']['ccobject']:
-                    minimum_qty = entry['d']['ccobject']['quantity']['min']
-                    maximum_qty = entry['d']['ccobject']['quantity']['max']
-                    delta = maximum_qty - minimum_qty
-                    xoff = int(random.randint(0,int(delta * 0.10)))
-                    entry['quantity'] = xoff + minimum_qty
-                    entry['text'] = entry['text'] + f' (x{entry["quantity"]})'
-            except Exception as xerr1:
-                self.logger.error('ERR: ' + str(xerr1))
-                traceback.print_exc()
-                pass
+        if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft == 0:
+            self.chmode_stage = 0
+        if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft > 0:
+            self.chmode_timeleft = self.chmode_timeleft - 5
+            if self.chmode_timeleft < 0:
+                self.chmode_timeleft = 0
+        if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft == 0:
+            maxpval = 0
+            for ee in self.effectlist_v:
+                if int(ee["p"]) > maxpval:
+                    maxpval = int(ee["p"])
+            self.effectlist_v = list(filter(lambda u: int(u["p"]) >= maxpval, self.effectlist_v))
 
+            chosenElement = random.randint(0, len(self.effectlist_v) - 1 )
+            self.effectlist_v[chosenElement]['chosen'] = 1
+            chosenEffect = self.effectlist_v[chosenElement]
+            self.chmode_stage = 2
+            self.chmode_timeleft = 120
+            effectAmount = 1
+            if 'amount' in chosenEffect:
+                effectAmount = chosenEffect['amount']
+            if chosenEffect['type'] == 'crowdcontrol':
+                self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['ccobject'], effectAmount  )
+
+        if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
+            print(f'Chmode 1 Stage 1:  Time_Left: {self.chmode_timeleft}')
+            self.chmode_timeleft = self.chmode_timeleft - 5
+            if self.chmode_timeleft < 0:
+                self.chmode_timeleft = 0
+
+        if self.chmode == 0 or self.chmode_stage == 0:
+            self.chmode = 0
+            self.effectlist_s = self.effectlist
+            random.shuffle(self.effectlist_s)
+            self.effectlist_v = []
+            for i in range(4):
+                entry = { 'text' :  f'{i+1}. { self.effectlist_s[i]["name"] }', 'chosen' : 0, 'p' : 0, 'd' : dict(self.effectlist_s[i])}
+                try:
+                    if 'ccobject' in entry['d'] and 'quantity' in entry['d']['ccobject']:
+                        minimum_qty = entry['d']['ccobject']['quantity']['min']
+                        maximum_qty = entry['d']['ccobject']['quantity']['max']
+                        delta = maximum_qty - minimum_qty
+                        xoff = int(random.randint(0,int(delta * 0.10)))
+                        entry['amount'] = xoff + minimum_qty
+                        entry['text'] = entry['text'] + f' (x{entry["amount"]})'
+                except Exception as xerr1:
+                    self.logger.error('ERR: ' + str(xerr1))
+                    traceback.print_exc()
+                    pass
+                self.effectlist_v = self.effectlist_v + [entry]
+            entry = { 'text' : '5. Random', 'p': 0, 'd' : None }
             self.effectlist_v = self.effectlist_v + [entry]
-        entry = { 'text' : '5. Random', 'p': 0, 'd' : None }
-        self.effectlist_v = self.effectlist_v + [entry]
-        with open("chmode_effect_choices_temp.json", 'w') as soutfile:
-            soutfile.write(json.dumps(self.effectlist_v, indent=4))
+            self.chmode_timeleft = 120
+            self.chmode_stage = 1
+            self.chmode = 1
+            with open("chmode_effect_choices_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.effectlist_v, indent=4))
 
 
 
@@ -1136,6 +1205,10 @@ class Bot(commands.Bot):
                 myeffectinfo['type'] = 'crowdcontrol'
                 myeffectinfo['ccobject'] = dict(cce)
                 self.effectlist = self.effectlist + [myeffectinfo]
+            if self.ccsession['gamePackID'] == 'SuperMarioWorld':
+                pass
+                ####
+                ####
             with open("avail_effects_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.effectlist))
 
@@ -1143,6 +1216,8 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Could not query active session')
             traceback.print_exc()
             return
+        self.chmode = 0
+        self.chmode_stage = 0
         self.chaos_loop_1.start('Test')
         await ctx.send(f'@{ctx.author.name}, Okay.')
 
@@ -1150,8 +1225,9 @@ class Bot(commands.Bot):
 
 
     # Command help
-    @commands.command(name='swhelp')
+    #@commands.command(name='swhelp')
     async def do_help_command(self, ctx):
+        return ## Temporary no longer available
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
@@ -1190,9 +1266,10 @@ class Bot(commands.Bot):
             return 20
         return 0
 
-    @commands.command(name='swjoin')
+    #@commands.command(name='swjoin')
     async def do_swjoin(self,ctx):
-        # Command not yet implemented
+        # Command no longer implemented ### not yet implemented
+        return 0
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
             if privlev < 20:
@@ -1244,8 +1321,9 @@ class Bot(commands.Bot):
         except Exception as err:
             pass
 
-    @commands.command(name='swtomsg')
+    #@commands.command(name='swtomsg')
     async def do_timeout_msg(self,ctx):
+        return ##  Command no longer implemented: Twitch API changes
         #self.msgbuffers[chname][0][0] + 120 < time.time()
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1303,8 +1381,9 @@ class Bot(commands.Bot):
             pass
         pass
 
-    @commands.command(name='swbanallmsg')
+    #@commands.command(name='swbanallmsg')
     async def do_ban_msg(self,ctx):
+        return ## Command no longer implemented, Twitch API changes
         #self.msgbuffers[chname][0][0] + 120 < time.time()
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1333,7 +1412,7 @@ class Bot(commands.Bot):
             self.logger.error('banmsg error: ' + str(err))
             pass
 
-    @commands.command(name='swunnuke')
+    #@commands.command(name='swunnuke')
     async def do_unnuke_cl(self,ctx):
         try: 
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1347,8 +1426,9 @@ class Bot(commands.Bot):
         except Exception as err:
             self.logger.error('Error in command unnuke: ' + str(err))
 
-    @commands.command(name='swnuketext')
+    #@commands.command(name='swnuketext')
     async def do_nuke_text(self,ctx):
+        return ## Command no longer implemented, Twitch API changes
         #self.msgbuffers[chname][0][0] + 120 < time.time()
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1386,8 +1466,9 @@ class Bot(commands.Bot):
             self.logger.error('nuketext error: ' + str(err))
             pass
 
-    @commands.command(name='swnukename')
+    #@commands.command(name='swnukename')
     async def do_nuke_name(self,ctx):
+        return ## Command no longer implemented, Twitch API Changes
         #self.msgbuffers[chname][0][0] + 120 < time.time()
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1428,8 +1509,9 @@ class Bot(commands.Bot):
 
 
 
-    @commands.command(name='swpart')
+    #@commands.command(name='swpart')
     async def do_swpart(self,ctx):
+        return ## Command no longer implemented
         # Command not yet implemented
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1654,8 +1736,9 @@ class Bot(commands.Bot):
             pass
 
 
-    @commands.command(name='swcheck')
+    #@commands.command(name='swcheck')
     async def do_load_chatters(self,ctx):
+        return ## Command no longer implemented, Twitch API changes
         try:
             requiredTimeVal = 0
             if await self.cmd_privilege_level(ctx.message.author) < 100:
@@ -1782,8 +1865,9 @@ class Bot(commands.Bot):
 
 
 
-    @commands.command(name='require')
+    #@commands.command(name='require')
     async def age_setmin(self,ctx):
+        return ## Command no longer implemented, Twitch API changes
         try:
             requiredTimeVal = 0
             if await self.cmd_privilege_level(ctx.message.author) < 20:
