@@ -4,6 +4,7 @@ import traceback
 
 from twitchio.ext import commands
 from twitchio.ext import pubsub
+from twitchio.ext import routines
 import twitchio
 import yaml
 import json
@@ -21,10 +22,13 @@ import crm114
 import unidecode
 import asyncio
 import path
+import asyncio
+import ccinteract
 
 botmoduledir = path.Path(__file__).abspath()
 sys.path.append(botmoduledir.parent.parent)
 import loadsmwrh
+import cmd_xmario
 
 os.chdir(os.environ['BOTDIR'])
 
@@ -71,6 +75,7 @@ class Bot(commands.Bot):
         self.filterExpr = ''
         self.filterjson = None
         self.wordFilterRE = None
+        self.ccinteract = ccinteract.CrowdInteract()
 
         self.spamfilterItems = []
         self.spamfilterWords = []
@@ -158,15 +163,23 @@ class Bot(commands.Bot):
 
     #@commands.event()
     #@commands.Bot.event(commands.Bot)
-    async def event_pubsub_bits(event: pubsub.PubSubBitsMessage):
+    async def event_pubsub_bits(self, event: pubsub.PubSubBitsMessage):
         self.logger.debug("event_pubsub_bits[0]: " + str(event))
         pass
 
-    #@commands.event()
-    #@commands.Bot.event(commands.Bot)
-    #@Bot.pubsub.event()
-    async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
+    async def event_pubsub_channel_points(self, event: pubsub.PubSubChannelPointsMessage):
         self.logger.debug("event_pubsub_channel_points[0]: " + str(event))
+        self.logger.debug(f" channel_id={event.channel_id}  id={event.id}  input={event.input}   reward={event.reward} status={event.status} timestamp={event.timestamp} user={event.user} ")
+        self.logger.debug(f" User ID{event.user.id} NAME{event.user.name} Redeemed Reward ({event.reward.title}) in {event.channel_id}")
+        # 2023-12-24 04:56:14,775  channel_id=nn id=n-n-n input=None reward=<CustomReward id=a-b-c-d title=text cost=10>
+        # status=FULFILLED timestamp=2023-12-24 10:56:14.665624+00:00 user=<PartialUser id=yyyy, name=uid> 
+
+        if event.reward.title=='Candy':
+            pidnum = os.fork()
+            if pidnum == 0:
+                asyncio.run(cmd_xmario.snes_xmario([]))
+                sys.exit(0)
+
         pass
 
     #@bot.event
@@ -488,9 +501,11 @@ class Bot(commands.Bot):
         botchid = int(botconfig["twitch"]["botchid"])
 
 
-        print('Loading pubsub_token ->  pubsub.' + str(botchid))
-        pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(botchid)  )
-        #pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(ownerchid)  )
+        print('Loading pubsub_token ->  pubsub.' + str(ownerchid))
+        #pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(botchid)  )
+        pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(ownerchid)  )
+        if not(pubsub_token) or pubsub_token == '':
+            self.logger.debug('ERR: pubsub_token is empty')
 
         #botconfig["twitch"]["pubsub_token"]
 
@@ -1062,6 +1077,46 @@ class Bot(commands.Bot):
         #print(message.content)
         if wasblocked == False:
             await self.handle_commands(message)
+
+    @routines.routine(seconds=60.0)
+    async def chaos_loop_1(self, arg: str):
+        print(f'Ok - Loop 1')
+        self.chm_state = 0
+
+
+
+
+    @commands.command(name='chstart')
+    async def do_chstart_command(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 10:
+            await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
+            return
+        try:
+            self.ccsession = self.ccinteract.getSessionInfo()
+            with open("cc_session_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.ccsession))
+            self.cc_game_session_id = self.ccsession["gameSessionID"]
+            self.cc_menuinfo = self.ccinteract.getSessionMenu(game_session_id)
+            with open("cc_menu_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.cc_menuinfo))
+            self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+            with open("cc_effects_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.cc_effects))
+            self.effectlist = []
+            for cce in self.cc_effects:
+                ccx = dict(cce)
+                ccx['type'] = 'crowdcontrol'
+                self.effectlist = self.effectlist + [ccx]
+
+
+
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.author.name} - Could not query active session')
+        self.chaos_loop_1.start('Test')
+        await ctx.send(f'@{ctx.author.name}, Okay.')
+
+
+
 
     # Command help
     @commands.command(name='swhelp')
@@ -1800,13 +1855,32 @@ bot.pubsub = pubsub.PubSubPool(bot)
 
 @bot.event()
 async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
-    return bot.event_pubsub_channel_points(event)
+    bot.logger.debug("event_CHANNELPOINTS:" + str(event))
+    return await bot.event_pubsub_channel_points(event)
     #self.logger.debug("event_pubsub_channel_points[0]: " + str(event))
     #pass
 
 @bot.event()
 async def event_pubsub_bits(event: pubsub.PubSubBitsMessage):
-    return bot.event_pubsub_bits(event)
+    bot.logger.debug("event_BITS:" + str(event))
+    return await bot.event_pubsub_bits(event)
+
+@bot.event()
+async def event_pubsub_subscription(event):
+    bot.logger.debug("event_SUBSCRIPTION:" + str(event))
+
+@bot.event()
+async def event_pubsub_moderation(event):
+    bot.logger.debug("event_MODERATION:" + str(event))
+
+
+
+#@bot.pubsub.listen('channel-points-cheer')
+#async def on_cheer(message):
+#    print(f'{message.user.name} cheered {message.amount} points!')
+
+#@bot.event()
+#
 
 bot.run()
 
