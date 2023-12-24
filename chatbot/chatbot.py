@@ -3,6 +3,8 @@ import sys
 import traceback
 
 from twitchio.ext import commands
+from twitchio.ext import pubsub
+import twitchio
 import yaml
 import json
 import re
@@ -153,6 +155,19 @@ class Bot(commands.Bot):
     async def event_raw_pubsub(self, data):
         self.logger.debug("event_raw_pubsub: " + str(data))
         return
+
+    #@commands.event()
+    #@commands.Bot.event(commands.Bot)
+    async def event_pubsub_bits(event: pubsub.PubSubBitsMessage):
+        self.logger.debug("event_pubsub_bits[0]: " + str(event))
+        pass
+
+    #@commands.event()
+    #@commands.Bot.event(commands.Bot)
+    #@Bot.pubsub.event()
+    async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
+        self.logger.debug("event_pubsub_channel_points[0]: " + str(event))
+        pass
 
     #@bot.event
     async def event_raw_data(self,data):
@@ -469,10 +484,26 @@ class Bot(commands.Bot):
         joinList = [ self.chandata[g]['channame']  for g in joinIdList]
         self.logger.debug("Joining channels "+str( joinList ))
 
-        pubsub_topics = [ 'chat_moderator_actions.'+str(channelId) for channelId in joinIdList]
+        ownerchid = int(botconfig["twitch"]["ownerchid"])
+        botchid = int(botconfig["twitch"]["botchid"])
+
+
+        print('Loading pubsub_token ->  pubsub.' + str(botchid))
+        pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(botchid)  )
+        #pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(ownerchid)  )
+
+        #botconfig["twitch"]["pubsub_token"]
+
+        #pubsub_topics = [ 'chat_moderator_actions.'+str(channelId) for channelId in joinIdList]
+        pubsub_topics = []
+        pubsub_topics = pubsub_topics + [ pubsub.channel_points( pubsub_token )[ ownerchid  ] ]
+        #pubsub_topics = pubsub_topics + [ pubsub.bits( pubsub_token )[ ownerchid ] ]
+        #pubsub_topics = pubsub_topics + [ pubsub.moderation_user_action(pubsub_token)[ownerchid][botchid] ]
+        pubsub_token = None
         self.logger.debug('Pubsub, subscribing to topics: ' + str( pubsub_topics  ))
         try: 
-            self.tw_pubsub_nonce = None
+            #self.tw_pubsub_nonce = None
+            self.tw_pubsub_nonce = await self.pubsub.subscribe_topics(pubsub_topics)
             #self.tw_pubsub_nonce  = await self.pubsub_subscribe( self.readTokens[2], *pubsub_topics )
             #self.tw_pubsub_nonce  = await self.pubsub_subscribe( self.botconfig["twitch"]["pubsub_token"] , *pubsub_topics )
 
@@ -492,14 +523,15 @@ class Bot(commands.Bot):
             #    self.logger.debug('Skipping channel '+str(chobj['channame']) + ' joinchannel=0')
             #    continue
             ###[gone] chatters = await self.get_chatters( chobj['channame'] )
-            chatters = []
+            chatters = [] #XXX
+            chatters = None #XXX
 
             userinfo = None
-            if len(chatters.all) > 1 :
+            if chatters and len(chatters.all) > 1 :
                 #self.logger.debug('ChattersV: ' + str(chatters.all))
                 userinfo = await self.load_userinfo(chatters.all[0:98])
 
-            if len(chatters.all)>99:
+            if chatters and len(chatters.all)>99:
                 self.logger.debug('More than 99 chatters in '+str(chobj['channame'])+' loading more')
                 m = 0
                 while (len(chatters.all[m:])>99):
@@ -1742,6 +1774,7 @@ class Bot(commands.Bot):
             self.logger.error("ERR: load_chandata: " + str(exv0))
 
 
+
 ##############
 setupfilename = 'botsetup.yaml'
 if 'BOTCONFIG' in os.environ:
@@ -1763,6 +1796,18 @@ db = mysql.connect(
 
 logging.basicConfig(format='%(asctime)-15s %(clientip)s %(user)-8s %(message)s')
 bot = Bot(botconfig)
+bot.pubsub = pubsub.PubSubPool(bot)
+
+@bot.event()
+async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
+    return bot.event_pubsub_channel_points(event)
+    #self.logger.debug("event_pubsub_channel_points[0]: " + str(event))
+    #pass
+
+@bot.event()
+async def event_pubsub_bits(event: pubsub.PubSubBitsMessage):
+    return bot.event_pubsub_bits(event)
+
 bot.run()
 
 

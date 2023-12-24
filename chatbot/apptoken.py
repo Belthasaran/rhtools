@@ -22,10 +22,99 @@ import json
 import csv
 import os
 import time
+import base64
+import traceback
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+def save_token_secrets(dict, filename=None,frnkeyd=None):
+    if frnkeyd == None and 'TXDKEYZ0' in os.environ:
+        frnkeyd = os.environ['TXDKEYZ0']
+    if filename == None and  not('TWSECFILE' in os.environ):
+        raise Exception("TW Secrets path unspecified")
+    if filename == None:
+        filename = os.environ['TWSECFILE']
+    else:
+        filename = str(filename)
+    
+    frnkey = None
+    if frnkeyd:
+        frnkey = Fernet(frnkeyd)
+
+    client_id = ''
+    client_secret = ''
+    app_token = ''
+
+    if 'client_id' in dict:
+        client_id = dict['client_id']
+    if 'client_secret' in dict:
+        client_secret = dict['client_secret']
+    if 'app_token' in dict:
+        app_token = dict['app_token']
+
+    with open(str(filename) + ".new", 'w') as soutfile:
+        buffer = ''
+        for ik in dict.keys():
+            if  ik in ['client_id', 'client_secret', 'app_token']:
+                continue
+            buffer = buffer + base64.urlsafe_b64encode( bytes(ik,'utf8') ).decode('utf8') + "\n"
+            buffer = buffer + base64.urlsafe_b64encode( bytes(dict[ik],'utf8') ).decode('utf8') + "\n"
+        soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer + "\n", 'utf8')).decode('utf8') ))
+        os.rename(str(filename) + ".new", filename)
+    return 1
+
+def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
+    if frnkeyd == None and 'TXDKEYZ0' in os.environ:
+        frnkeyd = os.environ['TXDKEYZ0']
+    if filename == None and  not('TWSECFILE' in os.environ):
+        raise Exception("TW Secrets path unspecified")
+    if filename == None:
+        filename = os.environ['TWSECFILE']
+    else:
+        filename = str(filename)
+
+    frnkey = None
+    if frnkeyd:
+        frnkey = Fernet(frnkeyd)
+
+    dict={}
+    client_id=""
+    client_secret=""
+    app_token=""
+    skipnext=0
+    try:
+        with open(filename, 'r') as secretfile:
+            filedata = (frnkey.decrypt( bytes(secretfile.read(),'utf8') )).decode('utf8').split('\n')
+            #print(str(filedata))
+            dict['client_id'] = filedata[0]
+            dict['client_secret'] = filedata[1]
+            dict['app_token'] = filedata[2]
+            for i in range(3,len(filedata),2):
+                if skipnext:
+                    skipnext=0
+                    continue
+                if not(filedata[i]) or filedata[i] == '':
+                    print('SK')
+                    skipnext=1
+                    continue
+                ###
+                key_s = base64.urlsafe_b64decode(filedata[i]).decode('utf8')
+                value_s = base64.urlsafe_b64decode(filedata[i+1]).decode('utf8')
+                dict[key_s] = value_s
+                key_s = None
+                value_s = None
+        if not(onekey):
+            return dict
+        if onekey in dict:
+            return dict[onekey]
+        return None
+    except Exception as exc1:
+        print("Unable to read Twitch API secrets from twsecrets: " + str(exc1))
+        traceback.print_exc()
+        return None
+
 
 def get_tokens(filename=None,frnkeyd=None):
     if frnkeyd == None and 'TXDKEYZ0' in os.environ:
@@ -45,11 +134,10 @@ def get_tokens(filename=None,frnkeyd=None):
     client_secret=""
     app_token=""
     try:
-        with open(filename, 'r') as secretfile:
-            filedata = (frnkey.decrypt( bytes(secretfile.read(),'utf8') )).decode('utf8').split('\n')
-            client_id = filedata[0]
-            client_secret = filedata[1]
-            app_token = filedata[2]
+        dict = get_token_secrets(filename,frnkeyd)
+        client_id = dict['client_id']
+        client_secret = dict['client_secret']
+        app_token = dict['app_token']
     except Exception as exc1:
         print("Unable to read Twitch API secrets from twsecrets: " + str(exc1))
         return None
@@ -76,8 +164,17 @@ def get_tokens(filename=None,frnkeyd=None):
             atoken = j["access_token"]
             app_token = atoken
             with open(str(filename) + ".new", 'w') as soutfile:
-                soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n", 'utf8'))))
+                buffer = ''
+                for ik in dict.keys():
+                    if  ik in ['client_id', 'client_secret', 'app_token']:
+                        continue
+                    buffer = buffer + base64.urlsafe_b64encode( ik ) + "\n"
+                    buffer = buffer + base64.urlsafe_b64encode( dict[ik] ) + "\n"
+                soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer, 'utf8'))))
             os.rename(str(filename) + ".new", filename)
     return [client_id, client_secret, app_token]
 
+
+
+# https://id.twitch.tv/oauth2/authorize?client_id=%%CID%%&response_type=code&state=%%STATEHASH%%&redirect_uri=http://localhost&scope=channel%3Abot+user%3Abot+chat%3Aread+user%3Aread%3Achat+channel%3Amoderate+channel%3Aread%3Aredemptions
 
