@@ -107,6 +107,29 @@ class mysnes(py2snes.snes):
     async def give3up(self, value=b'\x03'):
        await self.PutAddress( [ (0xF5e18e4, value) ] )
 
+    async def get_ow_location(self):
+        b1 = 0xF50000
+        addrlist = [ 0x1F10, 0x1f17, 0x1f18, 0x1f19, 0x1f1a ]
+
+        values = {}
+        for ai in addrlist:
+            values[ai] = await self.GetAddress(b1 + ai, 1)
+        return list(values.items())
+
+    async def ow_yoshi_house(self):
+        await self.PutAddress([(16064273, b'\x01'), (16064279, b'h'),
+            (16064280, b'\x00'), (16064281, b'x'), (16064282, b'\x00'),
+            (16056576, b'\x0b')])
+
+    async def iggy(self):
+        b1 = 0xF50000
+        await self.PutAddress( [ (b1 + 0x1F11, b'\x01'),
+                                 (b1 + 0x1f17, b'\x98'),
+                                 (b1 + 0x1f18, b'\x00'),
+                                 (b1 + 0x1f19, b'\x28'),
+                                 (b1 + 0x1f1a, b'\x00'),
+                                 (b1 + 0x0100, b'\x0b') ]  )
+
     async def morton(self):
         b1 = 0xF50000
         await self.PutAddress( [ (b1 + 0x1F11, b'\x00'), 
