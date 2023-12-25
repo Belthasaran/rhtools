@@ -25,38 +25,29 @@ class SmallMarioEffect(SmwEffectRunner):
     #    return await self.inlevel()
     def __init__(self,amount=1,duration=60,retries=300,tick_interval=1):
         super().__init__(amount,duration,retries,tick_interval)
+        # Timed-effect: Little Mario
+        #   For the duration of affect: Mario shrinks and continuously loses
+        #   any mushroom, cape, or flower status.
         self.name = "Little mario (1-minute)"
         self.game = "SuperMarioWorld"
         self.description = "Make mario little"
         self.effectId = "shrinkMario"
-        #self._duration = duration
-        #self._amount = amount
-        #self._retries = retries
-        #self._tick_interval = tick_interval
-
-    async def ready(self):
+    async def ready(self):    # ready(): Effect pre-requisites
         return await self.inlevel() and  not(await self.GetAddress(0xF50019,1) == b'\x00')
-
-    async def sfx_powerdown(self):
+    async def isactive(self): # isactive(): Pause countdown if game is paused or player no longer in a level.
+        return await self.inlevel()
+    async def sfx_powerdown(self): # Sound affect
         await self.PutAddress([(0xF51DF9, b'\x04')])
-
-    async def initiate(self):
-        amount = self._amount
-        duration = self._duration
-        print(f'SmallMarioEffect.Initiate({amount},{duration})')
-
-        # Start the action
+    async def initiate(self):  # initiate() -> Initially apply affect
+        print(f'SmallMarioEffect.Initiate({self._amount},{self._duration})')
         await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
-
-    async def refresh(self): 
+    async def refresh(self):   # refresh() -> Actions to repeat every tick to preserve effect
         print('ShrinkMario.refresh time_left='+str(self.time_left))
-        # Refresh
         if not(await self.GetAddress(0xF50019,1) == b'\x00') and await self.inlevel():
             await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
         pass
-
-    async def finalize(self):
-        # Cleanup actions
+    async def finalize(self):   # finalize() -> Actions to take to remove effect
+        # This affect ends on its own when refresh() is no longer called every tick
         pass
 
     async def settime(self,seconds):

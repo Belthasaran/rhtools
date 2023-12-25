@@ -84,7 +84,7 @@ class SmwEffectRunner(py2snes.snes):
         tick_interval = self._tick_interval
         if self.time_left > 0 :
             await asyncio.sleep(tick_interval)
-            if await self.isactive(amount,duration):
+            if await self.isactive():
                 # Time is deducted while active
                self.time_left = self.time_left - tick_interval
         if self.time_left < 0 :
