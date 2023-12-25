@@ -66,6 +66,10 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.ccsession = None
+        self.cc_game_session_id = None
+        self.cc_menuinfo = None
+        self.cc_effects = None
         self.cltext = crm114.Classifier('/home/swtbot/textdata', ['good','spam','toxic'])
         self.msgbuffers = {}
         self.chatters_ts = {}
@@ -1211,6 +1215,19 @@ class Bot(commands.Bot):
 
 
 
+    async def smweffects_local(self):
+        []
+
+    #@commands.command(name='smwstart')
+    #async def do_smwstart_command(self,ctx):
+    #    if await self.cmd_privilege_level(ctx.message.author) < 10:
+    #        await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
+    #        return
+    #    self.effectlist = []
+    #    self.effectlist = self.effectlist + self.smweffects_local()
+    #    self.chmode = 0
+    #    self.chmode_stage = 0
+    #    self.chaos_loop_1.start('Test')
 
 
 
