@@ -84,7 +84,7 @@ async def effect_runner(args):
     print(f"snes_xmario: {ohash}")
 
     #snes = py2snes.snes()
-    snes = SmallMarioEffect()
+    snes = SmallMarioEffect(retries=300,duration=60,tick_interval=1)
     await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
     devices = await snes.DeviceList()
     print('Devices =' + str(devices))
@@ -94,7 +94,7 @@ async def effect_runner(args):
     print('usb2snes information:')
     print(await snes.Info())
     #image = args[1]
-    result = await snes.run(retries=300,duration=60,tick_interval=1)
+    result = await snes.run()
     print('Result = ' + str(result))
     return snes
 
