@@ -540,7 +540,9 @@ class Bot(commands.Bot):
 
         print('Loading pubsub_token ->  pubsub.' + str(ownerchid))
         #pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(botchid)  )
-        pubsub_token = apptoken.get_token_secrets( onekey = 'pubsub.' + str(ownerchid)  )
+
+        apptoken.check_db_token(f'pubsub.{ownerchid}', f'pubsub_refresh.{ownerchid}')
+        pubsub_token = apptoken.get_token_secrets( onekey = f'pubsub.{ownerchid}'  )
         if not(pubsub_token) or pubsub_token == '':
             self.logger.debug('ERR: pubsub_token is empty')
 

@@ -115,6 +115,36 @@ def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
         traceback.print_exc()
         return None
 
+def check_db_token(tokenkey, refreshtokenkey, clientidkey='client_id', clientsecretkey='client_secret'):
+    token = get_token_secrets(onekey=tokenkey)
+    refreshtoken = get_token_secrets(onekey=refreshtokenkey)
+    client_id = get_token_secrets(onekey=clientidkey)
+    client_secret = get_token_secrets(onekey=clientsecretkey)
+    #
+    validateRequest = requests.get('https://id.twitch.tv/oauth2/validate', headers = {'Client-ID' : client_id,  'Authorization' : 'OAuth ' +token})
+    validToken = 0
+    if validateRequest.status_code == 200 :
+        validToken = 1
+    if validToken == 0 :
+        #tokenRequest = requests.post('https://id.twitch.tv/oauth2/token?client_id=' + client_id +'&client_secret=' + client_secret + '&grant_type=client_credentials')
+        tokenRequestBody = {
+                'client_id' : client_id,
+                'client_secret': client_secret,
+                'grant_type': 'refresh_token',
+                'refresh_token': refreshtoken # urllib.parse.quote(refreshtoken)
+                }
+        tokenRequest = requests.post('https://id.twitch.tv/oauth2/token', params=tokenRequestBody)
+                #?client_id=' + client_id +'&client_secret=' + client_secret + '&grant_type=client_credentials')
+        if tokenRequest.status_code == 200:
+            j = json.loads(tokenRequest.text)
+            newtoken = j["access_token"]
+            newfreshtoken = j["refresh_token"]
+            secrets = get_token_secrets()
+            secrets[tokenkey]=newtoken
+            secrets[refreshtokenkey]=newfreshtoken
+            save_token_secrets(secrets)
+    pass
+
 
 def get_tokens(filename=None,frnkeyd=None):
     if frnkeyd == None and 'TXDKEYZ0' in os.environ:
