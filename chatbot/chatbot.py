@@ -26,6 +26,10 @@ import random
 import asyncio
 import ccinteract
 import websockets
+
+from smw_e_shrink import SmallMarioEffect
+from smw_e_takeitem import TakeItemEffect
+
 #from websockets.server import serve
 
 
