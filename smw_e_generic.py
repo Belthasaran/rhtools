@@ -26,23 +26,31 @@ class SmwEffectRunner(py2snes.snes):
         smw.description = "Unspecified"
         smw.effectID = "smwGenericEffect"
 
-    async def run(self,amount=1,duration=0):
-       i = 60
+    async def run(self,amount=1,duration=0,retries=60):
+       i = retries
        while (await self.ready(amount,duration)) == False and i > 1:
            print(f"Not ready, Retry    {i}")
            i = i - 1
            time.sleep(0.25)
        pass
+       #await self.mutex_lock(amount,duration)
        await self.initiate(amount,duration)
+       #await self.mutex_unlock(amount,duration)
        self.is_running = 1
        self.time_left = duration
        while self.time_left > 0 :
            await self.tick(amount,duration,0.5)
-           asyncio.sleep(0.5)
+           await asyncio.sleep(0.5)
        await self.finalize(amount,duration)
 
     async def ready(self,amount,duration):
         return await self.inlevel()
+
+    async def mutex_lock(self,amount,duration):
+        pass
+
+    async def mutex_unlock(self,amount,duration):
+        pass
 
     async def initiate(self,amount,duration):
         # Start the action
@@ -58,9 +66,11 @@ class SmwEffectRunner(py2snes.snes):
         pass
 
     async def tick(self,amount,duration,tick_interval=0.5):
-        if self.time_left > 1 :
-            asyncio.sleep(tick_interval)
+        if self.time_left > 0 :
+            await asyncio.sleep(tick_interval)
             self.time_left = self.time_left - tick_interval
+        if self.time_left < 0 :
+            self.time_left = 0
         if self.time_left >= 0:
             await self.refresh(amount,duration)
         # Refresh status
