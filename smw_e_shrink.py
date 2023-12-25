@@ -18,32 +18,41 @@ import pdb
 nest_asyncio.apply()
 #IPython.embed()
 
-class TakeItemEffect(SmwEffectRunner):
+class SmallMarioEffect(SmwEffectRunner):
     #async def run(self,amount=1,duration=0):
     #    self.super.run(amount,duration)
     #async def ready(self):
     #    return await self.inlevel()
-    def __init__(self,amount=1,duration=0,retries=300,tick_interval=1):
+    def __init__(self,amount=1,duration=60,retries=300,tick_interval=1):
         super().__init__(amount,duration,retries,tick_interval)
-        self.name = "Remove item from item box"
+        self.name = "Little mario (1-minute)"
         self.game = "SuperMarioWorld"
-        self.description = "Remove item from item box"
-        self.effectId = "takeItem"
+        self.description = "Make mario little"
+        self.effectId = "shrinkMario"
         #self._duration = duration
         #self._amount = amount
         #self._retries = retries
         #self._tick_interval = tick_interval
 
+    async def ready(self):
+        return await self.inlevel() and  not(await self.GetAddress(0xF50019,1) == b'\x00')
+
+    async def sfx_powerdown(self):
+        await self.PutAddress([(0xF51DF9, b'\x04')])
 
     async def initiate(self):
         amount = self._amount
         duration = self._duration
-        print(f'TakeItemEffect.Initiate({amount},{duration})')
-        # Start the action
-        await self.PutAddress([(0xF51DFC, b'\x00'), (0xF50dc2, b'\x00')])
+        print(f'SmallMarioEffect.Initiate({amount},{duration})')
 
-    async def refresh(self):
+        # Start the action
+        await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
+
+    async def refresh(self): 
+        print('ShrinkMario.refresh time_left='+str(self.time_left))
         # Refresh
+        if not(await self.GetAddress(0xF50019,1) == b'\x00') and await self.inlevel():
+            await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
         pass
 
     async def finalize(self):
@@ -75,7 +84,7 @@ async def effect_runner(args):
     print(f"snes_xmario: {ohash}")
 
     #snes = py2snes.snes()
-    snes = TakeItemEffect()
+    snes = SmallMarioEffect()
     await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
     devices = await snes.DeviceList()
     print('Devices =' + str(devices))
@@ -85,7 +94,7 @@ async def effect_runner(args):
     print('usb2snes information:')
     print(await snes.Info())
     #image = args[1]
-    result = await snes.run()
+    result = await snes.run(retries=300,duration=60,tick_interval=1)
     print('Result = ' + str(result))
     return snes
 
