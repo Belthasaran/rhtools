@@ -99,6 +99,7 @@ class Bot(commands.Bot):
         self.chmode_stage = 0
         self.chmode_timeleft = 0
         self.ccinteract = ccinteract.CrowdInteract()
+        self.effectlist = []
         self.effectlist_v = []
 
         self.spamfilterItems = []
@@ -1161,13 +1162,14 @@ class Bot(commands.Bot):
             await self.checkfor_votes(message)
             await self.handle_commands(message)
 
-    @routines.routine(seconds=5.0)
+    @routines.routine(seconds=2.0)
     async def chaos_loop_1(self, arg: str):
+        self.chaos_loop_interval = 1 # 2
         print(f'Ok - Loop 1')
         if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft == 0:
             self.chmode_stage = 0
         if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft > 0:
-            self.chmode_timeleft = self.chmode_timeleft - 5
+            self.chmode_timeleft = self.chmode_timeleft - self.chaos_loop_interval
             if self.chmode_timeleft < 0:
                 self.chmode_timeleft = 0
         if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft == 0:
@@ -1179,7 +1181,7 @@ class Bot(commands.Bot):
             self.effectlist_voters = {}
 
             chosenElement = random.randint(0, len(effectlist_vf) - 1 )
-            if effectlist_vf[chosenElement].name == "random":
+            if effectlist_vf[chosenElement]["d"]["name"] == "random":
                 ival = chosenElement+1
                 effectlist_vf = list(filter(lambda u: not(u["name"]=="random") , self.effectlist_v))
                 chosenElement2 = random.randint(0, len(effectlist_vf) - 1 )
@@ -1192,17 +1194,20 @@ class Bot(commands.Bot):
             self.effectlist_v[chosenElement]['chosen'] = 1
             chosenEffect = self.effectlist_v[chosenElement]
             self.chmode_stage = 2
-            self.chmode_timeleft = 120
+            self.chmode_timeleft = 120 # 120
+            if 'chmode_interval1' in botconfig['crowdcontrol']:
+                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
             effectAmount = 1
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
-            if chosenEffect['type'] == 'crowdcontrol':
-                print(f'Requesting effect activation: {chosenEffect["name"]}')
-                self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['ccobject'], effectAmount  )
+            print(f":: chosenEffect : " + json.dumps(chosenEffect))
+            if chosenEffect['d']['type'] == 'crowdcontrol':
+                print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
+                self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
 
         if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
             print(f'Chmode 1 Stage 1:  Time_Left: {self.chmode_timeleft}')
-            self.chmode_timeleft = self.chmode_timeleft - 5
+            self.chmode_timeleft = self.chmode_timeleft - self.chaos_loop_interval
             if self.chmode_timeleft < 0:
                 self.chmode_timeleft = 0
 
@@ -1226,9 +1231,12 @@ class Bot(commands.Bot):
                     traceback.print_exc()
                     pass
                 self.effectlist_v = self.effectlist_v + [entry]
-            entry = { 'text' : '[5] Random', 'name' : 'random', 'p': 0, 'd' : None }
+            entry = { 'text' : '[5] Random', 'd' : { 'name' : 'random'}, 'p': 0, 'd' : None }
             self.effectlist_v = self.effectlist_v + [entry]
-            self.chmode_timeleft = 120
+            self.chmode_timeleft = 15 # 120
+            if 'chmode_interval2' in botconfig['crowdcontrol']:
+                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
+
             self.chmode_stage = 1
             self.chmode = 1
             with open("chmode_effect_choices_temp.json", 'w') as soutfile:
