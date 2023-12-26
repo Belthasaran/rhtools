@@ -155,11 +155,12 @@ class Bot(commands.Bot):
         self.logger.info("Swtbot starting up")
         self.controlchannels = bci["twitch"]["controlchannels"]
         self.loop = asyncio.get_event_loop()
-        u = super().__init__(token=bci["twitch"]["token"], client_id=bci["twitch"]["client_id"], 
+        u = super().__init__(token=apptoken.get_token_secrets(onekey="bot-chat-token"),
+                client_id=apptoken.get_token_secrets(onekey='bot-client_id'),
                 nick=bci["twitch"]["nick"], prefix='!', loop=self.loop,
                          initial_channels=bci["twitch"]["basechans"],
-                         client_secret=bci["twitch"]["client_secret"],
-                        api_token=bci["twitch"]["initial_token"] )
+                         client_secret=apptoken.get_token_secrets(onekey="bot-client-secret"),
+                        api_token=apptoken.get_token_secrets(onekey="bot-api-token"))
         try:
             coro = asyncio.start_server(self.handle_echo, '127.0.0.1', 1888) #, loop=self.loop)
             server = self.loop.run_until_complete(coro)
