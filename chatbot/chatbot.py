@@ -1233,7 +1233,7 @@ class Bot(commands.Bot):
                 self.effectlist_v = self.effectlist_v + [entry]
             entry = { 'text' : '[5] Random', 'd' : { 'name' : 'random'}, 'p': 0, 'd' : None }
             self.effectlist_v = self.effectlist_v + [entry]
-            self.chmode_timeleft = 15 # 120
+            self.chmode_timeleft = 30 # 120
             if 'chmode_interval2' in botconfig['crowdcontrol']:
                 self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
 
