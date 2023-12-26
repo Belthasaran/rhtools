@@ -1183,7 +1183,7 @@ class Bot(commands.Bot):
             chosenElement = random.randint(0, len(effectlist_vf) - 1 )
             if effectlist_vf[chosenElement]["d"]["name"] == "random":
                 ival = chosenElement+1
-                effectlist_vf = list(filter(lambda u: not(u["name"]=="random") , self.effectlist_v))
+                effectlist_vf = list(filter(lambda u: not(u["d"]["name"]=="random") , self.effectlist_v))
                 chosenElement2 = random.randint(0, len(effectlist_vf) - 1 )
                 self.effectlist_v = [ effectlist_vf[chosenElement2]  ]
                 self.effectlist_v[0]['text'] = f'[{ival}] { self.effectlist_s[i]["name"] }'
