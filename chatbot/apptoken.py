@@ -30,6 +30,15 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 def save_token_secrets(dict, filename=None,frnkeyd=None):
+    """
+    dict - Dictionary containing the   secret  key-data pairs
+
+    Optional from function parameters or system environment:
+    filename - The file to store secrets at
+    frnkeyd - The fernet key used for encryption
+
+    If optional values are not set, then the corresponding environment variables must be present.
+    """
     if frnkeyd == None and 'TXDKEYZ0' in os.environ:
         frnkeyd = os.environ['TXDKEYZ0']
     if filename == None and  not('TWSECFILE' in os.environ):
@@ -66,6 +75,18 @@ def save_token_secrets(dict, filename=None,frnkeyd=None):
     return 1
 
 def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
+    """
+    Retrieve a secret from the secrets storage
+
+    Optional:
+    filename - Path to file storing the secrets
+    frnkeyd - Fernet key used to encrypt the secrets storage
+    onekey -  Name of the database key to retrieve
+
+    If onekey is specified, then the Return result is the contents of the database key.
+
+    If onekey input is None, then the Return result is a dictionary of the stored secrets.
+    """
     if frnkeyd == None and 'TXDKEYZ0' in os.environ:
         frnkeyd = os.environ['TXDKEYZ0']
     if filename == None and  not('TWSECFILE' in os.environ):
@@ -116,6 +137,18 @@ def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
         return None
 
 def check_db_token(tokenkey, refreshtokenkey, clientidkey='client_id', clientsecretkey='client_secret'):
+    """
+    Checks if the token named 'tokenkey' in the secrets storage is still valid, and if not, then attempt to Refresh the token.
+
+    Inputs:
+
+    tokenkey - The database key name for the token to be checked
+    refreshtokenkey - The database key that the refresh token is stored at
+
+    Optional:
+    clientidkey - The database key the client_id is stored at
+    clientsecretkey - The database key the client_secret is stored at
+    """
     token = get_token_secrets(onekey=tokenkey)
     refreshtoken = get_token_secrets(onekey=refreshtokenkey)
     client_id = get_token_secrets(onekey=clientidkey)
@@ -147,6 +180,13 @@ def check_db_token(tokenkey, refreshtokenkey, clientidkey='client_id', clientsec
 
 
 def get_tokens(filename=None,frnkeyd=None):
+    """
+    Retrieve primary Twitch credentials from secrets storage Including the App token
+
+    Attempts to automatically refresh  app_token if expired or invalid.
+
+    Returns an array containing   [ client_id, client_secret, app_token ]
+    """
     if frnkeyd == None and 'TXDKEYZ0' in os.environ:
         frnkeyd = os.environ['TXDKEYZ0']
     if filename == None and  not('TWSECFILE' in os.environ):
