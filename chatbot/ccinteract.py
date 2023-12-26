@@ -10,8 +10,47 @@ import re
 import json
 import random
 import time
+import logging
 
 class CrowdInteract():
+    """
+    Attempts to interact with Crowd Control website to create self-imposed effects.
+
+    Pre-requisites:
+       Have the crowd control app setup and working.
+
+       Have an active crowd control Pro subscription first, or it probably won't work.
+       (The anonymous effects, & other aspects of this script,
+       I believe require this.)
+
+       Be  logged in to their website through your interact link.
+
+       Have a game session already active, that you are the owner of (Start session in the app)
+
+    Other pre-requisites:
+       You'll need to extract secrets from your web browser.
+       And store these values in your secrets storage:
+
+       ccuid
+       cc_auth_token
+
+       Presuming you already ran cmd_addtoken.py SETUP
+       to create encrypted secrets storage, and set the
+       environment variables in your session:
+
+       # python3 cmd_addtoken.py
+       Enter key string:ccuid
+       Enter vlaue string:(ENTER VALUE HERE)
+
+       # python3 cmd_addtoken.py
+       Enter key string:cc-auth-token
+       Enter vlaue string:(ENTER VALUE HERE)
+
+    """
+    def __init__(self,logger=None):
+        if not(logger):
+            self.logger = logging.getLogger("ccinteract.py")
+
     def getRequestHeaders(self, cc_auth_token):
         headers = {
                 'authority': 'trpc.crowdcontrol.live',
@@ -31,20 +70,24 @@ class CrowdInteract():
               f'input=%7B%22ccUID%22%3A%22{ccuid_urlencoded}%22%7D'
         response = requests.get(url, None, headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
-                         print('getSessionInfo - 200 OK Response')
+                         self.logger.info('getSessionInfo - 200 OK Response')
                          #print(f'Content = {response.content}')
                          try:
                              sessionInfo = json.loads(response.content)['result']['data']['session']
-                             if sessionInfo and len(sessionInfo['owner']['subscriptions']) > 0:
+
+                             # Make sure our query result is a session that the current ccUID owns, etc
+                             if (sessionInfo and len(sessionInfo['owner']['subscriptions']) > 0 and
+                                     sessionInfo['owner']['ccUID'] == sessionInfo['ccUID'] and 
+                                     ccuid_raw == sessionInfo['owner']['ccUID']):
                                  return sessionInfo
                              else:
-                                 print(f'Sorry, could not find a game session')
+                                 self.logger.error(f'ccinteract: Sorry, could not find a game session')
                                  return None
                          except Exception as xerr:
-                             print(f'Sorry, could not find active game session')
+                             self.logger.error(f'ccinteract: Sorry, could not find active game session')
                              return None
         else:
-            print(f'getSessionInfo fail status={response.status_code} {response.text}')
+            self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
             return None
     def getSessionMenu(self, game_session_id):
         cc_auth_token = apptoken.get_token_secrets(onekey='cc-auth-token')
@@ -56,11 +99,11 @@ class CrowdInteract():
                 f'input=%7B%22gameSessionID%22%3A%22{game_session_id_urlencoded}%22%7D'
         response = requests.get(url, None, headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
-                         print('getSessionInfo success')
-                         print(f'Content = {response.content}')
+            self.logger.info('ccinteract:getSessionInfo success')
+                         self.logger.debug(f'Content = {response.content}')
                          return json.loads(response.content)['result']['data']['menu']
         else:
-            print(f'getSessionInfo fail status={response.status_code} {response.text}')
+            self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
             return None
 
     def requestEffect(self,game_session_id, effectObject, effectQuantity=1):
@@ -90,11 +133,11 @@ class CrowdInteract():
                 json = requestObject, 
                 headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
-                         print('getSessionInfo success')
-                         print(f'Content = {response.content}')
-                         return json.loads(response.content)['result']['data']['effectRequest']
+            self.logger.info('ccinteract:getSessionInfo success')
+            self.lgoger.debug(f'Content = {response.content}')
+            return json.loads(response.content)['result']['data']['effectRequest']
         else:
-            print(f'getSessionInfo fail status={response.status_code} {response.text}')
+            self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
             return None
 
 #

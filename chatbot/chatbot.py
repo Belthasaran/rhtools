@@ -78,6 +78,8 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.logger = logging.getLogger("swtbot")
+        self.logging = logging.getLogger("swtbot")
         self.ccsession = None
         self.cc_game_session_id = None
         self.cc_menuinfo = None
@@ -98,7 +100,7 @@ class Bot(commands.Bot):
         self.chmode =0 
         self.chmode_stage = 0
         self.chmode_timeleft = 0
-        self.ccinteract = ccinteract.CrowdInteract()
+        self.ccinteract = ccinteract.CrowdInteract(logger=self.logger)
         self.effectlist = []
         self.effectlist_v = []
 
@@ -143,8 +145,6 @@ class Bot(commands.Bot):
         self.readTokens = apptoken.get_tokens()
         self.readTokensTS = time.time()
         self.cachettl = 86400
-        self.logger = logging.getLogger("swtbot")
-        self.logging = logging.getLogger("swtbot")
         self.client = base.Client("localhost", serde=JsonSerde())
         self.client2 = base.Client("localhost")
         self.chandata = None

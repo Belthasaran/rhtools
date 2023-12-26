@@ -12,3 +12,5 @@ log.txt
 log_b.txt
 exclude.dat
 SMWDisC.txt
+fetch_rhlist_smwc.json
+fetch_rhlist_smwc.json.old
