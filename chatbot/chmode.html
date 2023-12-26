@@ -79,12 +79,12 @@
 					                 ptext = "[" + escapeHTML(ei["p"]) + "]"
 						     }
 						     textval = textval  + boldo + escapeHTML(eitext) + "&nbsp;&nbsp;&nbsp;&nbsp " + ptext + boldc + "<br>\n";
+						 }
 						     textval = textval + "<br>";
 						    if (("interact_link" in data) && data["interact_link"]) {
 						         textval += "CrowdControl<br>";
 						         textval += "Interact Link: " + data["interact_link"];
 						     }
-						 }
 					  }
 			  $("#chmodediv").html(textval);
 			  $("#chmodediv").show();
