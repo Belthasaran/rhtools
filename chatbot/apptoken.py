@@ -29,7 +29,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-def save_token_secrets(dict, filename=None,frnkeyd=None):
+def save_token_secrets(dict, filename=None,frnkeyd=None,storename=''):
     """
     dict - Dictionary containing the   secret  key-data pairs
 
@@ -39,12 +39,12 @@ def save_token_secrets(dict, filename=None,frnkeyd=None):
 
     If optional values are not set, then the corresponding environment variables must be present.
     """
-    if frnkeyd == None and 'TXDKEYZ0' in os.environ:
-        frnkeyd = os.environ['TXDKEYZ0']
-    if filename == None and  not('TWSECFILE' in os.environ):
+    if frnkeyd == None and f'TXDKEYZ0{storename}' in os.environ:
+        frnkeyd = os.environ[f'TXDKEYZ0{storename}']
+    if filename == None and  not(f'TWSECFILE{storename}' in os.environ):
         raise Exception("TW Secrets path unspecified")
     if filename == None:
-        filename = os.environ['TWSECFILE']
+        filename = os.environ[f'TWSECFILE{storename}']
     else:
         filename = str(filename)
     
@@ -63,18 +63,25 @@ def save_token_secrets(dict, filename=None,frnkeyd=None):
     if 'app_token' in dict:
         app_token = dict['app_token']
 
-    with open(str(filename) + ".new", 'w') as soutfile:
-        buffer = ''
-        for ik in dict.keys():
-            if  ik in ['client_id', 'client_secret', 'app_token']:
-                continue
-            buffer = buffer + base64.urlsafe_b64encode( bytes(ik,'utf8') ).decode('utf8') + "\n"
-            buffer = buffer + base64.urlsafe_b64encode( bytes(dict[ik],'utf8') ).decode('utf8') + "\n"
-        soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer + "\n", 'utf8')).decode('utf8') ))
+    original_umask = os.umask(0o077)
+    try:
+        with open(str(filename) + ".new", 'w') as soutfile:
+            buffer = ''
+            for ik in dict.keys():
+                if  ik in ['client_id', 'client_secret', 'app_token']:
+                    continue
+                buffer = buffer + base64.urlsafe_b64encode( bytes(ik,'utf8') ).decode('utf8') + "\n"
+                buffer = buffer + base64.urlsafe_b64encode( bytes(dict[ik],'utf8') ).decode('utf8') + "\n"
+            soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer + "\n", 'utf8')).decode('utf8') ))
+        os.umask(original_umask)
         os.rename(str(filename) + ".new", filename)
+    finally:
+        os.umask(original_umask)
+    #except Exception as xerr:
+    #    raise self.exc_info[1], None, self.exc_info[2]
     return 1
 
-def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
+def get_token_secrets(filename=None,frnkeyd=None,onekey=None,storename=''):
     """
     Retrieve a secret from the secrets storage
 
@@ -87,12 +94,12 @@ def get_token_secrets(filename=None,frnkeyd=None,onekey=None):
 
     If onekey input is None, then the Return result is a dictionary of the stored secrets.
     """
-    if frnkeyd == None and 'TXDKEYZ0' in os.environ:
-        frnkeyd = os.environ['TXDKEYZ0']
-    if filename == None and  not('TWSECFILE' in os.environ):
+    if frnkeyd == None and f'TXDKEYZ0{storename}' in os.environ:
+        frnkeyd = os.environ[f'TXDKEYZ0{storename}']
+    if filename == None and  not(f'TWSECFILE{storename}' in os.environ):
         raise Exception("TW Secrets path unspecified")
     if filename == None:
-        filename = os.environ['TWSECFILE']
+        filename = os.environ[f'TWSECFILE{storename}']
     else:
         filename = str(filename)
 
@@ -179,7 +186,7 @@ def check_db_token(tokenkey, refreshtokenkey, clientidkey='client_id', clientsec
     pass
 
 
-def get_tokens(filename=None,frnkeyd=None):
+def get_tokens(filename=None,frnkeyd=None,storename=''):
     """
     Retrieve primary Twitch credentials from secrets storage Including the App token
 
@@ -187,12 +194,12 @@ def get_tokens(filename=None,frnkeyd=None):
 
     Returns an array containing   [ client_id, client_secret, app_token ]
     """
-    if frnkeyd == None and 'TXDKEYZ0' in os.environ:
-        frnkeyd = os.environ['TXDKEYZ0']
-    if filename == None and  not('TWSECFILE' in os.environ):
+    if frnkeyd == None and f'TXDKEYZ0{storename}' in os.environ:
+        frnkeyd = os.environ[f'TXDKEYZ0{storename}']
+    if filename == None and  not(f'TWSECFILE{storename}' in os.environ):
         raise Exception("TW Secrets path unspecified")
     if filename == None:
-        filename = os.environ['TWSECFILE']
+        filename = os.environ[f'TWSECFILE{storename}']
     else:
         filename = str(filename)
 
@@ -233,15 +240,21 @@ def get_tokens(filename=None,frnkeyd=None):
             j = json.loads(tokenRequest.text)
             atoken = j["access_token"]
             app_token = atoken
-            with open(str(filename) + ".new", 'w') as soutfile:
-                buffer = ''
-                for ik in dict.keys():
-                    if  ik in ['client_id', 'client_secret', 'app_token']:
-                        continue
-                    buffer = buffer + base64.urlsafe_b64encode( ik ) + "\n"
-                    buffer = buffer + base64.urlsafe_b64encode( dict[ik] ) + "\n"
-                soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer, 'utf8'))))
-            os.rename(str(filename) + ".new", filename)
+            original_umask = os.umask(0o077)
+
+            try:
+                with open(str(filename) + ".new", 'w') as soutfile:
+                    buffer = ''
+                    for ik in dict.keys():
+                        if  ik in ['client_id', 'client_secret', 'app_token']:
+                            continue
+                        buffer = buffer + base64.urlsafe_b64encode( ik ) + "\n"
+                        buffer = buffer + base64.urlsafe_b64encode( dict[ik] ) + "\n"
+                    soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer, 'utf8'))))
+                os.umask(original_umask)
+                os.rename(str(filename) + ".new", filename)
+            finally:
+                os.umask(original_umask)
     return [client_id, client_secret, app_token]
 
 
