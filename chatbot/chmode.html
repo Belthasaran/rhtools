@@ -94,7 +94,7 @@
 			  query = { "query" : "chmode" };
 			  ws.send( JSON.stringify(query) );
 			  console.log("S ->" + JSON.stringify(query));
-			  setTimeout(wsOnOpen, 5000);
+			  setTimeout(wsOnOpen, 2000);
 	  }
 	 ws.addEventListener('open', wsOnOpen);
 	 ws.addEventListener('close', function() { 
