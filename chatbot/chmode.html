@@ -79,6 +79,11 @@
 					                 ptext = "[" + escapeHTML(ei["p"]) + "]"
 						     }
 						     textval = textval  + boldo + escapeHTML(eitext) + "&nbsp;&nbsp;&nbsp;&nbsp " + ptext + boldc + "<br>\n";
+						     textval = textval + "<br>";
+						     if ("interact_link" in data && data["interact_link"]) {
+						         textval += "CrowdControl<br>";
+						         textval += "Interact Link: " + data["interact_link"];
+						     }}
 					     }
 				    }
 			  $("#chmodediv").html(textval)
@@ -92,7 +97,11 @@
 			  setTimeout(wsOnOpen, 5000);
 	  }
 	 ws.addEventListener('open', wsOnOpen)
-	 ws.addEventListener('close', function() { location.reload();  })
+	 ws.addEventListener('close', function() { 
+			   $("#chmodediv").html("Websocket ws://127.1.0.10:11889<br>Error or Connection Reset: Retry in 5 seconds " +
+                                                               (Date.now()+""))
+			  setTimeout(location.reload(),5000);  
+         })
 
  </script>
 <style>
