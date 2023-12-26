@@ -83,7 +83,8 @@
 						     textval = textval + "<br>";
 						    if (("interact_link" in data) && data["interact_link"]) {
 						         textval += "CrowdControl<br>";
-						         textval += "Interact Link: " + data["interact_link"];
+								     textval += "<p>Interact Link: " + escapeHTML(data["interact_link"]) + "</p>";
+
 						     }
 					  }
 			  $("#chmodediv").html(textval);
@@ -105,6 +106,10 @@
 
  </script>
 <style>
+#chmodediv {
+	width: 600px;
+	overflow-wrap: break-word;
+}
  * {
 	 /*font-color: white;*/
 	 margin-left: 10px;
