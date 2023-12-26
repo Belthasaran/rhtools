@@ -27,18 +27,26 @@ import asyncio
 import ccinteract
 import websockets
 
-from smw_e_shrink import SmallMarioEffect
-from smw_e_takeitem import TakeItemEffect
-
-#from websockets.server import serve
-
-
 botmoduledir = path.Path(__file__).abspath()
 sys.path.append(botmoduledir.parent.parent)
 import loadsmwrh
 import cmd_xmario
 
+from smw_e_shrink import SmallMarioEffect
+from smw_e_takeitem import TakeItemEffect
+from smw_e_xmario import XMarioEffect
+
+
 os.chdir(os.environ['BOTDIR'])
+
+                #effectobj = XMarioEffect()
+                #asyncio.run(chbot_apply_affect(effectobj))
+
+async def chbot_apply_affect(gameAffect):
+    await gameAffect.connect_and_run()
+
+
+
 
 class JsonSerde(object):
     def serialize(self, key, value):
@@ -197,11 +205,19 @@ class Bot(commands.Bot):
         # 2023-12-24 04:56:14,775  channel_id=nn id=n-n-n input=None reward=<CustomReward id=a-b-c-d title=text cost=10>
         # status=FULFILLED timestamp=2023-12-24 10:56:14.665624+00:00 user=<PartialUser id=yyyy, name=uid> 
 
-        if event.reward.title=='Candy':
-            pidnum = os.fork()
-            if pidnum == 0:
-                asyncio.run(cmd_xmario.snes_xmario([]))
-                sys.exit(0)
+        if event.reward.title=='Shrink Mario':
+            #pidnum = os.fork()
+            if True: #pidnum == 0:
+                try:
+                    chan = self.get_channel(str(event.channel_id))
+                    #await chan.send(f"@{event.user.name} redeemed {event.reward.title}")
+                    #effectobj = XMarioEffect()
+                    effectobj = SmallMarioEffect(amount=1,duration=20,retries=60,tick_interval=0.5)
+                    asyncio.run(chbot_apply_affect(effectobj))
+                except Exception as xerr0:
+                    self.logger.debug("ERR: " + str(xerr0))
+                    pass
+                #os._exit(0)
 
         pass
 
@@ -229,6 +245,7 @@ class Bot(commands.Bot):
                     answer['chmode_stage'] = self.chmode_stage
                     answer['chmode_timeleft'] = self.chmode_timeleft
                     answer['chmode_active'] = 0
+                    answer['interact_link'] = botconfig['crowdcontrol']['interact_link']
                     answer['status'] = 'ok'
                     if self.chmode == 0 :
                         answer['effectlist_v'] = []

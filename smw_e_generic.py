@@ -114,6 +114,24 @@ class SmwEffectRunner(py2snes.snes):
         no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
         normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
+    async def connect_and_run(self,args=[]):
+        ohash = loadsmwrh.get_local_options()
+        print(f"snes_xmario: {ohash}")
+        #
+        #snes = SMWEffectRunner(retries=300,duration=0,tick_interval=1)
+        await self.connect(address=ohash['wsaddress']) # ws://hostname:8080
+        devices = await self.DeviceList()
+        print('Devices =' + str(devices))
+        print('Attaching')
+        await self.Attach(devices[0])
+        print('Attach done')
+        print('usb2snes information:')
+        print(await self.Info())
+        #image = args[1]
+        result = await self.run()
+        print('Result = ' + str(result))
+        return result
+
 
 
 
