@@ -31,9 +31,18 @@ class CrowdInteract():
               f'input=%7B%22ccUID%22%3A%22{ccuid_urlencoded}%22%7D'
         response = requests.get(url, None, headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
-                         print('getSessionInfo success')
-                         print(f'Content = {response.content}')
-                         return json.loads(response.content)['result']['data']['session']
+                         print('getSessionInfo - 200 OK Response')
+                         #print(f'Content = {response.content}')
+                         try:
+                             sessionInfo = json.loads(response.content)['result']['data']['session']
+                             if sessionInfo and len(sessionInfo['owner']['subscriptions']) > 0:
+                                 return sessionInfo
+                             else:
+                                 print(f'Sorry, could not find a game session')
+                                 return None
+                         except Exception as xerr:
+                             print(f'Sorry, could not find active game session')
+                             return None
         else:
             print(f'getSessionInfo fail status={response.status_code} {response.text}')
             return None
@@ -94,14 +103,20 @@ class CrowdInteract():
 
 def crowd_interact_cmd(args):
     time.sleep(10)
+
     interact = CrowdInteract()
     sessionInfo = interact.getSessionInfo()
     print('SESSION: ' + json.dumps(interact.getSessionInfo(), indent=4))
+
+    # Get the affect menu from the active session
     game_session_id = sessionInfo["gameSessionID"]
     menuinfo = interact.getSessionMenu(game_session_id)
     print('GAME MENU: ' + json.dumps(menuinfo, indent=4))
+    
+    # set availableEffects to  the list of available affects minus the ones with 'inactive' true
     availableEffects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), menuinfo['effects']))
 
+    # Shuffle the list randomly and request the first affect.
     random.shuffle(availableEffects)
     print('REQUESTEFFECT ' + json.dumps(availableEffects[0]))
     interact.requestEffect(game_session_id, availableEffects[0], 1)
