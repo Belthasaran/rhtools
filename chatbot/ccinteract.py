@@ -100,8 +100,8 @@ class CrowdInteract():
         response = requests.get(url, None, headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
             self.logger.info('ccinteract:getSessionInfo success')
-                         self.logger.debug(f'Content = {response.content}')
-                         return json.loads(response.content)['result']['data']['menu']
+            self.logger.debug(f'Content = {response.content}')
+            return json.loads(response.content)['result']['data']['menu']
         else:
             self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
             return None
