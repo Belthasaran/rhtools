@@ -44,10 +44,9 @@
 
 					    if(data['chmode_stage'] == 1) {
 					       textval += "Next random affect in  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
-					       textval += "<br>";
 					     }
 					    if(data['chmode_stage'] == 2) {
-                                               textval += "Cooldown for " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+                                               textval += "Cooldown  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
                                              }
 
 
@@ -78,9 +77,9 @@
 						     }
 						     textval = textval  + boldo + escapeHTML(eitext) + "&nbsp;&nbsp;&nbsp;&nbsp " + ptext + boldc + "<br>\n";
 						 }
-						     textval = textval + "<br>";
+						     textval = textval + "<hr>";
 						    if (("interact_link" in data) && data["interact_link"]) {
-						         textval += "Crowd Control<br>";
+								     textval += "<B>Crowd Control</B><br>";
 								     textval += "<p>" + escapeHTML(data["interact_link"]) + "</p>";
 
 						     }
@@ -114,7 +113,7 @@
 	 margin-top: 10px;
 	 color: #f6f6f6;
 	 background: black;
-	 font-size: 70px;
+	 font-size: 64px;
  }
 </style>
  <body>

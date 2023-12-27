@@ -740,7 +740,9 @@ class Bot(commands.Bot):
     async def checkfor_votes(self, message):
         try:
             basetext = message.content
+            self.logger.debug(f'check_for_votes: {message.author.name.lower()}: {message.content}')
             if re.match('^\d+$', message.content) and self.chmode == 1 and self.chmode_stage == 1:
+                self.logger.debug('Vote: {message.author.name.lower()}: {message.content}')
                 if (message.author.name.lower() in self.effectlist_voters):
                     return ## that user already voted
                 voteval = int(message.content)
@@ -748,6 +750,7 @@ class Bot(commands.Bot):
                 self.effectlist_voters[message.author.name.lower()] = 1
                 pass
         except Exception as xerr1:
+            self.logger.debug(f'checkfor_votes:Exception: {xerr1}')
             pass
         pass
 
@@ -1166,7 +1169,9 @@ class Bot(commands.Bot):
     @routines.routine(seconds=2.0)
     async def chaos_loop_1(self, arg: str):
         self.chaos_loop_interval = 1 # 2
-        print(f'Ok - Loop 1')
+        if self.chmode_timeleft % 20 == 0:
+            print(f'Ok - Loop1 chmode={self.chmode}, chmode_stage={self.chmode_stage}, time_left={self.chmode_timeleft}')
+        #print(f'Ok - Loop 1')
         if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft == 0:
             self.chmode_stage = 0
         if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft > 0:
@@ -1179,7 +1184,6 @@ class Bot(commands.Bot):
                 if int(ee["p"]) > maxpval:
                     maxpval = int(ee["p"])
             effectlist_vf = list(filter(lambda u: int(u["p"]) >= maxpval, self.effectlist_v))
-            self.effectlist_voters = {}
 
             chosenElement = random.randint(0, len(effectlist_vf) - 1 )
             if effectlist_vf[chosenElement]["d"]["name"] == "random":
@@ -1187,7 +1191,7 @@ class Bot(commands.Bot):
                 effectlist_vf = list(filter(lambda u: not(u["d"]["name"]=="random") , self.effectlist_v))
                 chosenElement2 = random.randint(0, len(effectlist_vf) - 1 )
                 self.effectlist_v = [ effectlist_vf[chosenElement2]  ]
-                self.effectlist_v[0]['text'] = f'[{ival}] { self.effectlist_s[i]["name"] }'
+                self.effectlist_v[0]['text'] = f'[{ival}] { effectlist_vf[chosenElement2]["d"]["name"] }'
                 self.effectlist_v[0]['chosen'] = 1
                 self.effectlist_v[0]['p'] = 0
                 chosenElement = 0
@@ -1196,15 +1200,18 @@ class Bot(commands.Bot):
             chosenEffect = self.effectlist_v[chosenElement]
             self.chmode_stage = 2
             self.chmode_timeleft = 120 # 120
-            if 'chmode_interval1' in botconfig['crowdcontrol']:
-                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
+            if 'chmode_interval2' in botconfig['crowdcontrol']:
+                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
             effectAmount = 1
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
             print(f":: chosenEffect : " + json.dumps(chosenEffect))
             if chosenEffect['d']['type'] == 'crowdcontrol':
                 print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
-                self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                try:
+                    self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                except Exception as xerr:
+                    self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
 
         if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
             print(f'Chmode 1 Stage 1:  Time_Left: {self.chmode_timeleft}')
@@ -1215,6 +1222,7 @@ class Bot(commands.Bot):
         if self.chmode == 0 or self.chmode_stage == 0:
             self.chmode = 0
             self.effectlist_s = self.effectlist
+            self.effectlist_voters = {}
             random.shuffle(self.effectlist_s)
             self.effectlist_v = []
             for i in range(4):
@@ -1232,11 +1240,11 @@ class Bot(commands.Bot):
                     traceback.print_exc()
                     pass
                 self.effectlist_v = self.effectlist_v + [entry]
-            entry = { 'text' : '[5] Random', 'd' : { 'name' : 'random'}, 'p': 0, 'd' : None }
+            entry = { "text" : "[5] Random", "d" : { "name" : "random"}, "p": 0 }
             self.effectlist_v = self.effectlist_v + [entry]
             self.chmode_timeleft = 30 # 120
-            if 'chmode_interval2' in botconfig['crowdcontrol']:
-                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
+            if 'chmode_interval1' in botconfig['crowdcontrol']:
+                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
 
             self.chmode_stage = 1
             self.chmode = 1

@@ -48,6 +48,7 @@ class CrowdInteract():
 
     """
     def __init__(self,logger=None):
+        self.logger = logger
         if not(logger):
             self.logger = logging.getLogger("ccinteract.py")
 
@@ -134,7 +135,7 @@ class CrowdInteract():
                 headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
             self.logger.info('ccinteract:getSessionInfo success')
-            self.lgoger.debug(f'Content = {response.content}')
+            self.logger.debug(f'Content = {response.content}')
             return json.loads(response.content)['result']['data']['effectRequest']
         else:
             self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
