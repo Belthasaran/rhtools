@@ -116,7 +116,7 @@ class CrowdInteract():
         if not('quantity' in effectObject):
             effectQuantity = 1
         else:
-            if 'min' in effectObect['quantity'] and effectQuantity < effectObject['quantity']['min']:
+            if 'min' in effectObject['quantity'] and effectQuantity < effectObject['quantity']['min']:
                 effectQuantity = effectObject['quantity']['min']
             if 'max' in effectObject['quantity'] and effectQuantity > effectObject['quantity']['max']:
                 effectQuantity = effectObject['quantity']['max']
