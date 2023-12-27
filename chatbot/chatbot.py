@@ -1196,7 +1196,7 @@ class Bot(commands.Bot):
                 self.effectlist_v[0]['p'] = 0
                 chosenElementIndex = 0
             else:
-                self.effectlist_v = [ effectlist_vf[chosenElement] ]
+                self.effectlist_v = [ effectlist_vf[chosenElementIndex] ]
                 chosenElementIndex = 0
 
             self.effectlist_v[chosenElementIndex]['chosen'] = 1
