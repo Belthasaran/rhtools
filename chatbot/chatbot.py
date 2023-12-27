@@ -1185,19 +1185,22 @@ class Bot(commands.Bot):
                     maxpval = int(ee["p"])
             effectlist_vf = list(filter(lambda u: int(u["p"]) >= maxpval, self.effectlist_v))
 
-            chosenElement = random.randint(0, len(effectlist_vf) - 1 )
-            if effectlist_vf[chosenElement]["d"]["name"] == "random":
-                ival = chosenElement+1
+            chosenElementIndex = random.randint(0, len(effectlist_vf) - 1 )
+            if effectlist_vf[chosenElementIndex]["d"]["name"] == "random":
+                ival = chosenElementIndex+1
                 effectlist_vf = list(filter(lambda u: not(u["d"]["name"]=="random") , self.effectlist_v))
                 chosenElement2 = random.randint(0, len(effectlist_vf) - 1 )
                 self.effectlist_v = [ effectlist_vf[chosenElement2]  ]
                 self.effectlist_v[0]['text'] = f'[{ival}] { effectlist_vf[chosenElement2]["d"]["name"] }'
                 self.effectlist_v[0]['chosen'] = 1
                 self.effectlist_v[0]['p'] = 0
-                chosenElement = 0
+                chosenElementIndex = 0
+            else:
+                self.effectlist_v = [ effectlist_vf[chosenElement] ]
+                chosenElementIndex = 0
 
-            self.effectlist_v[chosenElement]['chosen'] = 1
-            chosenEffect = self.effectlist_v[chosenElement]
+            self.effectlist_v[chosenElementIndex]['chosen'] = 1
+            chosenEffect = self.effectlist_v[chosenElementIndex]
             self.chmode_stage = 2
             self.chmode_timeleft = 120 # 120
             if 'chmode_interval2' in botconfig['crowdcontrol']:
