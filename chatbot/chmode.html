@@ -46,8 +46,10 @@
 					       textval += "Next random affect in  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
 					     }
 					    if(data['chmode_stage'] == 2) {
-                                               textval += "Cooldown  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+                                               textval += "Cooldown for" + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
                                              }
+
+					    textval += "<hr>"
 
 
 					       for(ei of data["effectlist_v"]) {
