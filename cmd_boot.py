@@ -22,7 +22,7 @@ class mysnes(py2snes.snes):
 
 
 
-async def snes_put(args):
+async def snes_boot(args):
     ohash = loadsmwrh.get_local_options()
 
     #snes = py2snes.snes()

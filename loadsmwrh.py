@@ -52,58 +52,68 @@ def rhad_key(fpath):
 def resmd_key(fpath):
     return 'JtSYvgCpAX4Hz_J63g-5dmDKbJp_Dl2GnKL_yuhoEck='
 
+def get_path_prefix():
+    path_prefix = ''
+    if 'RHTOOLS_PATH' in os.environ:
+        path_prefix = os.environ['RHTOOLS_PATH']
+    return path_prefix
     
 
 def hacklist_path():
-    return "data/hacklist.json"
+    path_prefix = get_path_prefix()
+    return os.path.join(path_prefix, "data/hacklist.json")
 
 def rhmd_path():
+    path_prefix = get_path_prefix()
+        
     if 'RHMD_FILE' in os.environ:
         return os.environ['RHMD_FILE']
-    if os.path.exists("rhmd.dat"):
-        return "rhmd.dat"
-    if os.path.exists("rhmd_dist.dat"):
-        return "rhmd_dist.dat"
-    if os.path.exists("rhmd_sample2.dat"):
-        return "rhmd_sample2.dat"
-    if os.path.exists("rhmd_sample.dat"):
-        return "rhmd_sample.dat"
-    if not os.path.exists("rhmd_dist.dat"):
+    if os.path.exists(os.path.join(path_prefix, "rhmd.dat")):
+        return os.path.join(path_prefix, "rhmd.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhmd_dist.dat")):
+        return os.path.join(path_prefix, "rhmd_dist.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhmd_sample2.dat")):
+        return os.path.join(path_prefix, "rhmd_sample2.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhmd_sample.dat")):
+        return os.path.join(path_prefix, "rhmd_sample.dat")
+    if not os.path.exists(os.path.join(path_prefix, "rhmd_dist.dat")):
         raise Exception('No rhmd DAT file found..  Did you forget to extract rhtools-sampledata-20xx.tar.gz ?')
-    return "rhmd_dist.dat"
+    return os.path.join(path_prefix, "rhmd_dist.dat")
 
 
 def resmd_path():
+    path_prefix = get_path_prefix()
     if 'RESMD_FILE' in os.environ:
         return os.environ['RESMD_FILE']
-    if os.path.exists("resmd.dat"):
-        return "resmd.dat"
-    if os.path.exists("resmd_dist.dat"):
-        return "resmd_dist.dat"
-    if os.path.exists("resmd_sample2.dat"):
-        return "resmd_sample2.dat"
-    if os.path.exists("resmd_sample.dat"):
-        return "resmd_sample.dat"
-    if not os.path.exists("resmd_dist.dat"):
+    if os.path.exists(os.path.join(path_prefix, "resmd.dat")):
+        return os.path.join(path_prefix, "resmd.dat")
+    if os.path.exists(os.path.join(path_prefix, "resmd_dist.dat")):
+        return os.path.join(path_prefix, "resmd_dist.dat")
+    if os.path.exists(os.path.join(path_prefix, "resmd_sample2.dat")):
+        return os.path.join(path_prefix, "resmd_sample2.dat")
+    if os.path.exists(os.path.join(path_prefix, "resmd_sample.dat")):
+        return os.path.join(path_prefix, "resmd_sample.dat")
+    if not os.path.exists(os.path.join(path_prefix, "resmd_dist.dat")):
         raise Exception('No resmd DAT file found..  Did you forget to extract rhtools-sampledata-20xx.tar.gz ?')
-    return "resmd_dist.dat"
+    return os.path.join(path_prefix, "resmd_dist.dat")
 
 
 
 def rhad_path(docreate=False):
+    path_prefix = get_path_prefix()
     if 'RHAD_FILE' in os.environ:
         return os.environ['RHAD_FILE']
-    if os.path.exists("rhad.dat") or docreate:
-        return "rhad.dat"
-    if os.path.exists("rhad_dist.dat"):
-        return "rhad_dist.dat"
-    if os.path.exists("rhad_sample2.dat"):
-        return "rhad_sample2.dat"
-    if os.path.exists("rhad_sample.dat"):
-        return "rhad_sample.dat"
-    if not os.path.exists("rhad_dist.dat"):
+    if os.path.exists(os.path.join(path_prefix, "rhad.dat")) or docreate:
+        return os.path.join(path_prefix, "rhad.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhad_dist.dat")):
+        return os.path.join(path_prefix, "rhad_dist.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhad_sample2.dat")):
+        return os.path.join(path_prefix, "rhad_sample2.dat")
+    if os.path.exists(os.path.join(path_prefix, "rhad_sample.dat")):
+        return os.path.join(path_prefix, "rhad_sample.dat")
+    if not os.path.exists(os.path.join(path_prefix, "rhad_dist.dat")):
         raise Exception('No rhad DAT file found..')
-    return "rhad_dist.dat"
+    return os.path.join(path_prefix, "rhad_dist.dat")
 
 
 
@@ -143,6 +153,7 @@ def fix_hentry(data):
 
 
 def get_pnum(hackid):
+    path_prefix = get_path_prefix()
     result = None
     found = False
     if hackid in cachepnums:
@@ -151,7 +162,7 @@ def get_pnum(hackid):
         return None
 
     try:
-       f = open('pnums.dat', 'r')
+       f = open(os.path.join(path_prefix,'pnums.dat'), 'r')
        for line in f.readlines():
            entry = line.strip().split(' ')
            cachepnums[entry[0]] = entry[1]
@@ -166,7 +177,8 @@ def has_pnum(hackid):
     return not(get_pnum(hackid) == None)
 
 def get_optfile_path():
-    return 'rhtools_options.dat'
+    path_prefix = get_path_prefix()
+    return os.path.join(path_prefix, 'rhtools_options.dat')
 
 def get_local_options():
     opthash = {}
@@ -191,12 +203,13 @@ def save_local_options(opthash):
     
 
 def path_rerequisites():
+    path_prefix = get_path_prefix()
     romerror = False
-    if not os.path.exists('smw.sfc'):
+    if not os.path.exists(os.path.join(path_prefix,'smw.sfc')):
         print('Could not find smw.sfc')
         romerror = True
 
-    romf = open('smw.sfc', 'rb')
+    romf = open(os.path.join(path_prefix,'smw.sfc'), 'rb')
     romdata = romf.read()
     romf.close()
     expected = 'fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08'
@@ -215,15 +228,16 @@ def path_rerequisites():
         print('SMW.sfc should be your legally obtained SMW ROM with file hash code sha224(smw.sfc) = fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08')
         print('Please find flips at: https://github.com/Alcaro/Flips ')
 
-    if (not os.path.exists("temp") or not os.path.exists("patch") or not os.path.exists("blobs") or not os.path.exists("rom") or
-       not os.path.exists("patch") or not os.path.exists("data")):
+    if (not os.path.exists(os.path.join(path_prefix,"temp")) or not os.path.exists(os.path.join(path_prefix,"patch")) or not os.path.exists(os.path.join(path_prefix,"blobs")) or not os.path.exists(os.path.join(path_prefix,"rom")) or
+       not os.path.exists(os.path.join(path_prefix,"patch")) or not os.path.exists(os.path.join(path_prefix,"data"))):
         print('Subfolders of start directory missing, please create folders below: ' + os.getcwd() + ' named '
               ' temp, blobs, rom, patch  and data')
         return False
     return True
 
 def get_userauth_data():
-    listfile = open('smwpicker_auth.json', 'r')
+    path_prefix = get_path_prefix()
+    listfile = open(os.path.join(path_prefix,'smwpicker_auth.json'), 'r')
     data = listfile.read()
     value = json.loads(data)
     listfile.close()
@@ -426,7 +440,7 @@ def get_hack_info(hackid,merged=False):
                      for v in x1['xdata'].keys():
                         x1[v] = x1['xdata'][v]
                  if not('xdata' in x1):
-                     if os.path.exists('rhmd_cache.dat'):
+                     if os.path.exists(os.path.join(path_prefix,'rhmd_cache.dat')):
                          hl2 = get_hacklist_data(filename='rhmd_cache.dat')
                          hli = find_hacklist_index(hl2, hackid)
                          if not(hli == None):
@@ -452,6 +466,7 @@ def get_hack_info(hackid,merged=False):
 
 
 def get_resource_info(resid,merged=False):
+     path_prefix = get_path_prefix()
      idstr = str(resid)
      reslist = get_reslist_data()
      for x in reslist:
@@ -462,8 +477,8 @@ def get_resource_info(resid,merged=False):
                      for v in x1['xdata'].keys():
                         x1[v] = x1['xdata'][v]
                  if not('xdata' in x1):
-                     if os.path.exists('resmd_cache.dat'):
-                         hl2 = get_reslist_data(filename='resmd_cache.dat')
+                     if os.path.exists(os.path.join(path_prefix,'resmd_cache.dat')):
+                         hl2 = get_reslist_data(filename=os.path.join(path_prefix,'resmd_cache.dat'))
                          hli = find_reslist_index(hl2, resid)
                          if not(hli == None):
                              if resid == 'meta':
@@ -491,7 +506,7 @@ def get_resource_info(resid,merged=False):
 def get_psets(hinfo=None):
     globalsets = []
     try:
-        f = open("psets.dat", "r")
+        f = open(os.path.join(get_path_prefix(),"psets.dat"), "r")
         data = f.read()
         f.close()
         globalsets = json.loads(base64.b64decode(data))
@@ -625,6 +640,7 @@ def get_pc_address(addr, offset=512):
     return h
 
 def complete_hack_metadata(hackinfo):
+     path_prefix = get_path_prefix()
      if not('xdata' in hackinfo) and not('patchblob1_name' in hackinfo):
           adata = get_userauth_data()
           s_userkey = str(adata["userkey"])
@@ -647,8 +663,8 @@ def complete_hack_metadata(hackinfo):
               augment = json.loads(req.content)
               if 'xdata' in augment:
                   newhld = []
-                  if os.path.exists('rhmd_cache.dat'):
-                      newhld = get_hacklist_data(filename='rhmd_cache.dat')
+                  if os.path.exists(os.path.join(path_prefix,'rhmd_cache.dat')):
+                      newhld = get_hacklist_data(filename=os.path.join(path_prefix,'rhmd_cache.dat'))
                   hackinfo['xdata'] = augment['xdata']
                   for w in augment:
                      if re.match('patchblob.*', w):
@@ -681,6 +697,7 @@ def complete_hack_metadata(hackinfo):
      pass
 
 def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
+     path_prefix = get_path_prefix()
      idstr = str(hackid)
      idstra = idstr[0:2]
      idstrb = idstr[0:1]
@@ -697,7 +714,7 @@ def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
          return None
      #print(str(hackinfo))
      pblob_name = hackinfo[f"{blobprefix}_name"]
-     if not os.path.exists( os.path.join("blobs", pblob_name)  ):
+     if not os.path.exists( os.path.join(os.path.join(path_prefix,"blobs"), pblob_name)  ):
          print('Blob not cached.. searching')
          found = False
          for uu in get_psets(hackinfo):
@@ -729,7 +746,7 @@ def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
                  #rdv['kn'] = kn
                  #rdv['publicUrl'] =  uu["publicUrl"]
                  print('get_patch_blob(' + idstr + '): Look at ' + kn)
-                 if not os.path.exists(kn):
+                 if not(os.path.exists(os.path.join(path_prefix,kn))):
                      print('Zip not stored, need to download.')
                      print('Downloading ...' + str(uu))
                      #publicUrl
@@ -744,9 +761,9 @@ def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
                          os.replace(kn + ".new", kn)
                      else:
                          print('HTTP Error:'+str(req))
-                 if os.path.exists(kn):
+                 if os.path.exists(os.path.join(path_prefix,kn)):
                      if re.match('.*.zip', kn):
-                        with ZipFile(kn, 'r') as zip:
+                        with ZipFile(os.path.join(path_prefix,kn), 'r') as zip:
                             for info in zip.infolist():
                                 if info.filename == pblob_name:
                                     data = zip.read(info)
@@ -769,8 +786,8 @@ def get_patch_raw_blob(hackid, rdv, blobprefix='patchblob1'):
 
              pass
 
-     if os.path.exists( os.path.join("blobs", pblob_name)  ):
-         f = open( os.path.join("blobs", pblob_name), "rb")
+     if os.path.exists( os.path.join(path_prefix,"blobs", pblob_name)  ):
+         f = open( os.path.join(path_prefix,"blobs", pblob_name), "rb")
          data = f.read()
          f.close()
          #rdv['patchblob1_kn'] = uu['key']

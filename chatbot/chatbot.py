@@ -31,6 +31,10 @@ botmoduledir = path.Path(__file__).abspath()
 sys.path.append(botmoduledir.parent.parent)
 import loadsmwrh
 import cmd_xmario
+import pb_repatch
+import cmd_reset
+import cmd_menu
+
 
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
@@ -749,7 +753,7 @@ class Bot(commands.Bot):
     async def checkfor_votes(self, message):
         try:
             basetext = message.content
-            self.logger.debug(f'check_for_votes: {message.author.name.lower()}: {message.content}')
+            #self.logger.debug(f'check_for_votes: {message.author.name.lower()}: {message.content}')
             if re.match('^\d+$', message.content) and self.chmode == 1 and self.chmode_stage == 1:
                 self.logger.debug('Vote: {message.author.name.lower()}: {message.content}')
                 if (message.author.name.lower() in self.effectlist_voters):
@@ -1911,18 +1915,82 @@ class Bot(commands.Bot):
         except Exception as exv0: 
             await ctx.send(f'Error: an exception occurred: ' + str(exv0) )
 
+    @commands.command(name='snesmenu')
+    async def cmd_snesmenu(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        try:
+           await cmd_reset.snes_menu()
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.author.name} - snesmenu:Error, Exception:{xerr}')
+            pass
+        await ctx.send(f'@{ctx.author.name} - snesmenu:Done')
 
-    @commands.command(name='rhinfo')
-    async def cmd_rhinfo(self,ctx):
-        hacklist = loadsmwrh.get_hacklist_data(filename='../rhmd.dat')
-        self.logger.debug('rhinfo  message:' + str(dir(ctx.message)))
+    @commands.command(name='snesreset')
+    async def cmd_snesreset(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        try:
+           await cmd_reset.snes_reset()
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.author.name} - snesreset:Error, Exception:{xerr}')
+            pass
+        await ctx.send(f'@{ctx.author.name} - snesreset:Done')
+
+
+    @commands.command(name='rhload')
+    async def cmd_rhload(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        rhnumber = 0
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!rhinfo( +(.*)|)', text)
+        paramResult = re.match(r'^!rhload( +(\d+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !rhload <text>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    rhnumber = int(text)
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !rhload <number>')
+        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+       
+        try:
+            result = pb_repatch.repatch_function(['launch1',str(rhnumber)] )
+            if result:
+                print(str(result))
+                if label_status:
+                    await ctx.send(f'@{ctx.message.author.name} - rhload:patch file applied. SNES should be loading.' )
+                sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+                if not(sendresult):
+                    await ctx.send(f'@{ctx.message.author.name} - rhload:Failed to run (please check launch options)' )
+                else:
+                    await ctx.send(f'@{ctx.message.author.name} - rhload:Action finished' )
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.message.author.name} - rhload:Exception, error message: {xerr}' )
+        #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhnumber} sendtosnes' )
+        pass
+
+
+    @commands.command(name='rhsearch')
+    async def cmd_rhsearch(self,ctx):
+        hacklist = loadsmwrh.get_hacklist_data(filename='../rhmd.dat')
+        self.logger.debug('rhsearch  message:' + str(dir(ctx.message)))
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!rhsearch( +(.*)|)', text)
         if paramResult != None:
            try:
               if paramResult.group(2) == None :
-                 await ctx.send(f'Usage: !rhinfo <text>')
+                 await ctx.send(f'Usage: !rhsearch <text>')
                  return
               else: 
                  text = paramResult.group(2).lower()
@@ -1930,14 +1998,14 @@ class Bot(commands.Bot):
                  self.logger.debug('ERR:rex1:' + str(rex1))
                  pass
         else:
-           await ctx.send(f'Usage: !rhinfo <text>')
+           await ctx.send(f'Usage: !rhsearch <text>')
            return
         ###
         hresults = []
         hnames = ''
         foundEntry = None
         extras = '()'
-        self.logger.debug('rhinfo:text=' + text)
+        self.logger.debug('rhsearch:text=' + text)
 
         for h in hacklist: 
             if 'authors' in h and re.search(r'\b' + text + r'\b', h['authors'].lower()):

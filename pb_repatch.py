@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from zipfile import ZipFile
 import re
 import hashlib
@@ -8,8 +9,12 @@ import sys
 import loadsmwrh
 import requests
 import platform
+import pb_sendtosnes
+import traceback
+import time
 
 def repatch_function(args):
+    path_prefix = loadsmwrh.get_path_prefix()
     if not loadsmwrh.path_rerequisites():
         return None
 
@@ -26,10 +31,10 @@ def repatch_function(args):
        return None
         
 
-    filename = os.path.join("temp","in.zip")
+    filename = os.path.join(path_prefix,os.path.join("temp","in.zip"))
     
     hackid = (args[1])
-    filename = os.path.join("zips", "") + str(hackid) + ".zip"
+    filename = os.path.join(path_prefix,os.path.join("zips", "")) + str(hackid) + ".zip"
     
     hackinfo  = loadsmwrh.get_hack_info( str(hackid)  )
     blobinfo  = {}
@@ -47,21 +52,21 @@ def repatch_function(args):
     sha1 = (hashlib.sha1(data).hexdigest())
     xsha224 = hashlib.sha224(data).hexdigest()
     
-    f1 = open(os.path.join("temp",  xsha224) + ".new" , "wb")
+    f1 = open(os.path.join(path_prefix, "temp",  xsha224) + ".new" , "wb")
     f1.write(data)
     f1.close()
-    os.replace(os.path.join("temp", xsha224) + ".new", os.path.join("patch", shake1))
-    hackinfo["patch"] = os.path.join("patch", shake1)
-    if not os.path.exists('smw.sfc'):
-        print('Could not find ' + os.path.join(os.getcwd(), 'smw.sfc') + ': SMW Romfile required - Unable to patch')
+    os.replace(os.path.join(path_prefix, "temp", xsha224) + ".new", os.path.join(path_prefix, "patch", shake1))
+    hackinfo["patch"] = os.path.join(path_prefix, "patch", shake1)
+    if not os.path.exists(os.path.join(path_prefix,'smw.sfc')):
+        print('Could not find ' + os.path.join(path_prefix, 'smw.sfc') + ': SMW Romfile required - Unable to patch')
         return None
     print('')
-    print('Running command: '+flips_cmd+' --apply ' + os.path.join('patch', shake1) +"  smw.sfc " + os.path.join('temp', 'result'))
-    os.system(flips_cmd+" --apply " + os.path.join('patch', shake1) +"  smw.sfc " + os.path.join('temp', 'result'))
+    print('Running command: '+flips_cmd+' --apply ' + os.path.join(path_prefix,'patch', shake1) +"  "+os.path.join(path_prefix,'smw.sfc') +" " + os.path.join(path_prefix,'temp', 'result'))
+    os.system(flips_cmd+" --apply " + os.path.join(path_prefix,'patch', shake1) +"  "+os.path.join(path_prefix,'smw.sfc') +" " + os.path.join(path_prefix,'temp', 'result'))
     ##data = bytearray()
     ##with open(os.path.join("temp", "result"), "rb") as patched:
     ##    data += patched.read(1)
-    resultf = open(os.path.join("temp", "result"), "rb")
+    resultf = open(os.path.join(path_prefix, "temp", "result"), "rb")
     data = resultf.read()
     resultf.close()
     
@@ -78,18 +83,18 @@ def repatch_function(args):
         romfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfc"
         jsonfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfcjson"
 
-    f0 = open(os.path.join("rom", romfilename) + ".new", "wb")
+    f0 = open(os.path.join(path_prefix,"rom", romfilename) + ".new", "wb")
     f0.write(data)
     f0.close()
 
-    f0 = open(os.path.join("rom", jsonfilename) + ".new", "w")
+    f0 = open(os.path.join(path_prefix,"rom", jsonfilename) + ".new", "w")
     f0.write(json.dumps(hackinfo))
     f0.close()
     print('Expected sha224(result) = ' + hackinfo["result_sha224"])
     print('Actual sha224(result) = ' + xsha224_patched)
     if xsha224_patched == hackinfo["result_sha224"]:
-        os.replace(os.path.join("rom", romfilename) + ".new", os.path.join("rom", romfilename))
-        os.replace(os.path.join("rom", jsonfilename) + ".new", os.path.join("rom", jsonfilename))
+        os.replace(os.path.join(path_prefix,"rom", romfilename) + ".new", os.path.join(path_prefix,"rom", romfilename))
+        os.replace(os.path.join(path_prefix,"rom", jsonfilename) + ".new", os.path.join(path_prefix,"rom", jsonfilename))
     else:
         print('Error: Checksum of patched ROM does not match expected value.   Possible file corruption or incorrect SMW ROM')
     
@@ -99,8 +104,8 @@ def repatch_function(args):
     hackinfo["result_sha224"] = xsha224_patched
     hackinfo["result_sha1"] = sha1_patched
     hackinfo["result_shake1"] = shake1_patched
-    hackinfo["rom"] = os.path.join("rom",  romfilename)
-    hackinfo["romjson"] = os.path.join("rom",  jsonfilename)
+    hackinfo["rom"] = os.path.join(path_prefix,"rom",  romfilename)
+    hackinfo["romjson"] = os.path.join(path_prefix,"rom",  jsonfilename)
     #            f2 = open(os.path.join("pat_meta",  shake1) + ".new", "w")
     #            f2.write( json.dumps(hackinfo) + "\n" )
     #            f2.close()
@@ -120,7 +125,10 @@ def repatch_function(args):
         if not( hackinfo["id"] in hacknotes ):
              hacknotes[ hackinfo["id"] ] = {}
         if not( 'downloaded' in hacknotes[ hackinfo["id"]  ] ) or not( hacknotes[ hackinfo["id"] ]["downloaded"]  ):
-            url = hackinfo["name_href"]
+            if 'name_href' in hackinfo:
+                url = hackinfo["name_href"]
+            else:
+                url = hackinfo["xdata"]["name_href"]
             if (re.match('^\/\/.*', url)):
                 url = 'http:' + url
             print('Sending HEAD request: ' + url)
@@ -130,18 +138,25 @@ def repatch_function(args):
             print(f'Result: {req.status_code} {req.reason} - {req.headers}')
     except Exception as xerr:
         print(str(xerr))
+        traceback.print_exc()
         pass
 
 
     print('Patch was successful!  ROM Location:')
-    print(os.path.join('rom', romfilename))
+    print(os.path.join(path_prefix,'rom', romfilename))
     found = True
-    return os.path.join('rom', romfilename)
+    return os.path.join(path_prefix,'rom', romfilename)
 
 if __name__ == '__main__':
-    repatch_function(sys.argv)
-    
-    
+    rp_result = repatch_function(sys.argv)
+    if len(sys.argv) > 2 and sys.argv[2].lower() == 'sendtosnes':
+       if rp_result:
+           print(str(result))
+           sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+           if not(sendresult):
+               print('ERR: Error sending to snes')
+           else:
+               print('Game sent to snes')
     
     
  

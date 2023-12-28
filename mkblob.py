@@ -6,6 +6,7 @@ import os
 import os
 import json
 import sys
+import loadsmwrh
 from compress import Compressor
 
 from cryptography.fernet import Fernet
