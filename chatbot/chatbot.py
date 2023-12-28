@@ -1920,7 +1920,7 @@ class Bot(commands.Bot):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
         try:
-           await cmd_reset.snes_menu()
+           await cmd_menu.snes_menu()
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - snesmenu:Error, Exception:{xerr}')
             pass
