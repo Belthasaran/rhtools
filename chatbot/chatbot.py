@@ -34,7 +34,7 @@ import cmd_xmario
 import pb_repatch
 import cmd_reset
 import cmd_menu
-
+import pb_sendtosnes
 
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
