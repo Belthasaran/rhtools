@@ -34,6 +34,7 @@ import cmd_xmario
 import pb_repatch
 import cmd_reset
 import cmd_menu
+import cmd_boot
 import pb_sendtosnes
 
 from smw_e_shrink import SmallMarioEffect
@@ -1926,6 +1927,35 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - snesmenu:Error, Exception:{xerr}')
             pass
         await ctx.send(f'@{ctx.author.name} - snesmenu:Done')
+
+    @commands.command(name='snesboot')
+    async def cmd_snesboot(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9\.\/]','_', str(text))
+        paramResult = re.match(r'^!snesboot( +([a-z0-9_\.\/]+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !snesboot <text>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    rhid = text
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !snesboot <number>')
+        try:
+           await cmd_boot.snes_boot(['', text])
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.author.name} - snesboot:Error, Exception:{xerr}')
+            pass
+        await ctx.send(f'@{ctx.author.name} - snesboot:Done')
+
 
     @commands.command(name='snesreset')
     async def cmd_snesreset(self,ctx):
