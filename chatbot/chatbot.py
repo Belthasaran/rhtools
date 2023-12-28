@@ -83,6 +83,11 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.botconfig = bci
+        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        if 'optfile' in self.botconfig['rhtools']:
+            os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools']['optfile']
+
         self.ccflag = False
         self.logger = logging.getLogger("swtbot")
         self.logging = logging.getLogger("swtbot")
@@ -155,7 +160,6 @@ class Bot(commands.Bot):
         self.client2 = base.Client("localhost")
         self.chandata = None
         self.channums = {}
-        self.botconfig = bci
         self.dbconnection = self.init_db()
         self.requiretimes = []
         self.logger.info("Swtbot starting up")
@@ -1293,8 +1297,12 @@ class Bot(commands.Bot):
             return
         try:
            self.chmode = 0
+           self.chaos_loop_1.stop()
+           self.chmode = 0
            self.chmode_stage = 0
-           await self.chaos_loop_1.stop()
+           self.chmode_timeleft = 0
+           #self.effectlist = []
+           self.effectlist_v = []
            await ctx.send(f'@{ctx.author.name}, Okay.')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
@@ -1312,7 +1320,7 @@ class Bot(commands.Bot):
             with open("cc_session_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.ccsession))
             self.cc_game_session_id = self.ccsession["gameSessionID"]
-            self.cc_gamepack_name = self.ccsesion["gamePack"]["game"]["name"]
+            self.cc_gamepack_name = self.ccsession["gamePack"]["game"]["name"]
             self.cc_menuinfo = self.ccinteract.getSessionMenu(self.cc_game_session_id)
             with open("cc_menu_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_menuinfo))
@@ -1342,8 +1350,8 @@ class Bot(commands.Bot):
         self.chmode = 0
         self.chmode_stage = 0
         try:
+            await ctx.send(f'@{ctx.author.name} - Okay, chaos starting. ccinteract:game_name:{self.cc_gamepack_name}')
             await self.chaos_loop_1.start('Test')
-            await ctx.send(f'@{ctx.author.name} - Okay, chaos started. ccinteract:game_name:{self.cc_gamepack_name}')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Tried, but an exception was raised.')
             self.logger.debug(f'chstart:2:ERR: {xerr0}')
@@ -1971,7 +1979,7 @@ class Bot(commands.Bot):
 
     async def chat_perform_rhload(self,ctx,rhid,ccrom=False):
         try:
-            os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+            #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
             result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom)
             if result:
                 print(str(result))
@@ -1984,6 +1992,7 @@ class Bot(commands.Bot):
                     await ctx.send(f'@{ctx.message.author.name} - rhload:Action finished' )
         except Exception as xerr:
             await ctx.send(f'@{ctx.message.author.name} - rhload:Exception, error message: {xerr}' )
+            traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
     @commands.command(name='ccflag')
@@ -2016,7 +2025,9 @@ class Bot(commands.Bot):
 
     @commands.command(name='rhrandom')
     async def cmd_rhrandom(self,ctx):
-        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        #if 'optfile' in self.botconfig['rhtools']:
+        #    os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools'['optfile']
+        #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if await self.cmd_privilege_level(ctx.message.author) < 10:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
@@ -2080,7 +2091,7 @@ class Bot(commands.Bot):
                 pass
         else:
             await ctx.send(f'Usage: !rhload <number>')
-        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
         pass
 

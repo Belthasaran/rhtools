@@ -178,6 +178,8 @@ def has_pnum(hackid):
 
 def get_optfile_path():
     path_prefix = get_path_prefix()
+    if 'RHTOOLS_OPTIONS_FILE' in os.environ:
+        return os.path.join(os.environ['RHTOOLS_OPTIONS_FILE'])
     return os.path.join(path_prefix, 'rhtools_options.dat')
 
 def get_local_options():
@@ -440,7 +442,7 @@ def get_hack_info(hackid,merged=False):
                      for v in x1['xdata'].keys():
                         x1[v] = x1['xdata'][v]
                  if not('xdata' in x1):
-                     if os.path.exists(os.path.join(path_prefix,'rhmd_cache.dat')):
+                     if os.path.exists(os.path.join(get_path_prefix(),'rhmd_cache.dat')):
                          hl2 = get_hacklist_data(filename='rhmd_cache.dat')
                          hli = find_hacklist_index(hl2, hackid)
                          if not(hli == None):

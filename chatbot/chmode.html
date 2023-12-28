@@ -24,6 +24,7 @@
 		  }
 
 	 ws.addEventListener('message', function(event) {
+			  textval = "";
 			  data = JSON.parse(event.data);
 			  //console.log("R <- " + JSON.stringify(event.data))
 			  console.log("R <- event.data");
@@ -32,11 +33,15 @@
 			  //data['chmode_timeleft'] = 60;
 			  event.data = JSON.stringify(data);
 
+			  console.log("" + event.data);
+
 			  $("#xya").text(" ");
-			  if (data.chmode == 0 || data["chmode_stage"] == 0) {
+			  if (data["chmode"] == 0 || data["chmode_stage"] == 0) {
 					  // $("#chmodediv").hide()
-					   $("#chmodediv").html("Websocket ws://127.1.0.10:11889<br>Connected: Currently in standby mode " +
+					   textval = ("Websocket ws://127.1.0.10:11889<br>Connected: Currently in standby mode " +
 						               (Date.now()+""))
+					   $("#chmodediv").html(textval)
+					   return
 
 			   } else {
 					    maxpval = 0;
