@@ -1967,9 +1967,9 @@ class Bot(commands.Bot):
             result = pb_repatch.repatch_function(['launch1',str(rhnumber)] )
             if result:
                 print(str(result))
-                if label_status:
-                    await ctx.send(f'@{ctx.message.author.name} - rhload:patch file applied. SNES should be loading.' )
+                await ctx.send(f'@{ctx.message.author.name} - rhload:patch file applied. SNES should be loading.' )
                 sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+                #
                 if not(sendresult):
                     await ctx.send(f'@{ctx.message.author.name} - rhload:Failed to run (please check launch options)' )
                 else:
