@@ -35,7 +35,7 @@ import cmd_xmario
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
 from smw_e_xmario import XMarioEffect
-
+from ccsmw_e_kaizoblock import KaizoBlockEffect
 
 os.chdir(os.environ['BOTDIR'])
 
@@ -207,6 +207,15 @@ class Bot(commands.Bot):
         # 2023-12-24 04:56:14,775  channel_id=nn id=n-n-n input=None reward=<CustomReward id=a-b-c-d title=text cost=10>
         # status=FULFILLED timestamp=2023-12-24 10:56:14.665624+00:00 user=<PartialUser id=yyyy, name=uid> 
 
+        if re.match(r'.*(for the kaizo|coin block).*', event.reward.title, re.I):
+            try:
+                chan = self.get_channel(str(event.channel_id))
+                effectobj = KaizoBlockEffect(amount=1,duration=20,retries=300)
+                asyncio.run(chbot_apply_affect(effectobj))
+            except Exception as xerr0:
+                self.logger.debug("eventPoints:ERR: " + str(xerr0))
+                pass
+            #
         if event.reward.title=='Shrink Mario':
             #pidnum = os.fork()
             if True: #pidnum == 0:
@@ -1271,6 +1280,21 @@ class Bot(commands.Bot):
     #    self.chaos_loop_1.start('Test')
 
 
+    @commands.command(name='chstop')
+    async def do_chstop_command(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 10:
+            await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
+            return
+        try:
+           self.chmode = 0
+           self.chmode_stage = 0
+           await self.chaos_loop_1.stop()
+           await ctx.send(f'@{ctx.author.name}, Okay.')
+        except Exception as xerr0:
+            await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
+            self.logger.debug(f'chstop:ERR: {xerr0}')
+            traceback.print_exc()
+
 
     @commands.command(name='chstart')
     async def do_chstart_command(self,ctx):
@@ -1282,6 +1306,7 @@ class Bot(commands.Bot):
             with open("cc_session_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.ccsession))
             self.cc_game_session_id = self.ccsession["gameSessionID"]
+            self.cc_gamepack_name = self.ccsesion["gamePack"]["game"]["name"]
             self.cc_menuinfo = self.ccinteract.getSessionMenu(self.cc_game_session_id)
             with open("cc_menu_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_menuinfo))
@@ -1304,13 +1329,20 @@ class Bot(commands.Bot):
                 soutfile.write(json.dumps(self.effectlist))
 
         except Exception as xerr:
-            await ctx.send(f'@{ctx.author.name} - Could not query active session')
+            await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
+            self.logger.debug(f'chstart:1:ERR {xerr0}')
             traceback.print_exc()
             return
         self.chmode = 0
         self.chmode_stage = 0
-        self.chaos_loop_1.start('Test')
-        await ctx.send(f'@{ctx.author.name}, Okay.')
+        try:
+            await self.chaos_loop_1.start('Test')
+            await ctx.send(f'@{ctx.author.name} - Okay, chaos started. ccinteract:game_name:{self.cc_gamepack_name}')
+        except Exception as xerr0:
+            await ctx.send(f'@{ctx.author.name} - Tried, but an exception was raised.')
+            self.logger.debug(f'chstart:2:ERR: {xerr0}')
+            traceback.print_exc()
+            pass
 
 
 
