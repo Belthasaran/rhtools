@@ -17,3 +17,7 @@ fetch_rhlist_smwc.json.old
 *.pyc
 __pycache__
 */__pycache__
+*.zip
+*.sfcjson
+*.hex
+
