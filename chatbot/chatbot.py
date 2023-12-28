@@ -1941,6 +1941,7 @@ class Bot(commands.Bot):
 
     async def chat_perform_rhload(self,ctx,rhid,ccrom=False):
         try:
+            os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
             result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom)
             if result:
                 print(str(result))
@@ -1985,12 +1986,13 @@ class Bot(commands.Bot):
 
     @commands.command(name='rhrandom')
     async def cmd_rhrandom(self,ctx):
+        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if await self.cmd_privilege_level(ctx.message.author) < 10:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!rhrandom( +(\d+)|)', text)
+        paramResult = re.match(r'^!rhrandom( +(.*)|)', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None :
@@ -2004,9 +2006,10 @@ class Bot(commands.Bot):
                                 )
                             )
                     random.shuffle(hld0)
-                    rhid = str(hld[0]["id"])
-                    rhname = str(hld[0]["name"])
-                    rhauthors = str(hld[0]["authors"])
+                    rhid = str(hld0[0]["id"])
+                    rhname = str(hld0[0]["name"])
+                    rhauthors = str(hld0[0]["authors"])
+                    hld0 = None
 
 
                     await ctx.send(f'{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
@@ -2048,7 +2051,6 @@ class Bot(commands.Bot):
         else:
             await ctx.send(f'Usage: !rhload <number>')
         os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-
         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
         pass
 
