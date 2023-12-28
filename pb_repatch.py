@@ -13,7 +13,7 @@ import pb_sendtosnes
 import traceback
 import time
 
-def repatch_function(args):
+def repatch_function(args,ccrom=False):
     path_prefix = loadsmwrh.get_path_prefix()
     if not loadsmwrh.path_rerequisites():
         return None
@@ -74,14 +74,28 @@ def repatch_function(args):
     sha1_patched = (hashlib.sha1(data).hexdigest())
     xsha224_patched = hashlib.sha224(data).hexdigest()
 
+    #SuperMarioWorld.ips
+
+    namesuffix=''
+    resultfile=os.path.join('temp','result')
+    if ccrom:
+        namesuffix='.cc'
+        #
+        os.system(flips_cmd+" --apply " + os.path.join(path_prefix,'zips', 'ccSuperMarioWorld.ips') +"  "+os.path.join(path_prefix,'temp', 'result')+" "+os.path.join(path_prefix,'temp', 'result2'))
+        resultfile=os.path.join('temp','result2')
+        resultf = open(os.path.join(path_prefix, "temp", "result2"), "rb")
+        data = resultf.read()
+        resultf.close()
+        #shake1_patched = (base64.b64encode(hashlib.shake_128(data).digest(24), b"_-")).decode('latin1')
+
     jsonfilename = ''
     
     if re.match('.*repatch.*', args[0]):
-        romfilename = hackinfo["id"] + "_" + shake1_patched  + ".sfc"
-        jsonfilename = hackinfo["id"] + "_" + shake1_patched  + ".sfcjson"
+        romfilename = hackinfo["id"] + "_" + shake1_patched  + namesuffix + ".sfc"
+        jsonfilename = hackinfo["id"] + "_" + shake1_patched + namesuffix + ".sfcjson"
     else:
-        romfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfc"
-        jsonfilename = hackinfo["id"] + "_" +  str(args[0]) + ".sfcjson"
+        romfilename = hackinfo["id"] + "_" +  str(args[0]) + namesuffix + ".sfc"
+        jsonfilename = hackinfo["id"] + "_" +  str(args[0]) + namesuffix + ".sfcjson"
 
     f0 = open(os.path.join(path_prefix,"rom", romfilename) + ".new", "wb")
     f0.write(data)

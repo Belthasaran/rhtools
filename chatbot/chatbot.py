@@ -82,6 +82,7 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.ccflag = False
         self.logger = logging.getLogger("swtbot")
         self.logging = logging.getLogger("swtbot")
         self.ccsession = None
@@ -1938,33 +1939,9 @@ class Bot(commands.Bot):
         await ctx.send(f'@{ctx.author.name} - snesreset:Done')
 
 
-    @commands.command(name='rhload')
-    async def cmd_rhload(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
-            return
-        rhnumber = 0
-        text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!rhload( +(\d+)|)', text)
-        if paramResult != None:
-            try:
-                if paramResult.group(2) == None :
-                    await ctx.send(f'Usage: !rhload <text>')
-                    return
-                else:
-                    text = paramResult.group(2).lower()
-                    rhnumber = int(text)
-                    pass
-            except Exception as rex1:
-                self.logger.debug('ERR:rex1:' + str(rex1))
-                pass
-        else:
-            await ctx.send(f'Usage: !rhload <number>')
-        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-       
+    async def chat_perform_rhload(self,ctx,rhid,ccrom=False):
         try:
-            result = pb_repatch.repatch_function(['launch1',str(rhnumber)] )
+            result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom)
             if result:
                 print(str(result))
                 await ctx.send(f'@{ctx.message.author.name} - rhload:patch file applied. SNES should be loading.' )
@@ -1976,7 +1953,103 @@ class Bot(commands.Bot):
                     await ctx.send(f'@{ctx.message.author.name} - rhload:Action finished' )
         except Exception as xerr:
             await ctx.send(f'@{ctx.message.author.name} - rhload:Exception, error message: {xerr}' )
-        #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhnumber} sendtosnes' )
+        #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
+
+    @commands.command(name='ccflag')
+    async def cmd_ccflag(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!ccflag( +(on|off|yes|no|1|0)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !ccflag <on|off>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    if text=="on" or text=="1" or text=="yes":
+                        self.ccflag = True
+                    elif text=="off" or text=="0" or text=="no":
+                        self.ccflag = False
+                    await ctx.send(f'{ctx.author.name} - crowd control flag set to {self.ccflag}')
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !ccflag <on|off>')
+
+
+    @commands.command(name='rhrandom')
+    async def cmd_rhrandom(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 10:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!rhrandom( +(\d+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !rhrandom <type>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+
+                    hld0 = list( filter(lambda g: 'type' in g and re.search( text, g["type"], re.I) and not(str(g["demo"])=='yes') ,
+                                loadsmwrh.get_hacklist_data()
+                                )
+                            )
+                    random.shuffle(hld0)
+                    rhid = str(hld[0]["id"])
+                    rhname = str(hld[0]["name"])
+                    rhauthors = str(hld[0]["authors"])
+
+
+                    await ctx.send(f'{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
+                    await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+
+                    #def hinfoMatch(hinfo,varText,ipos, iposmaximum=2000):
+
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !rhrandom <type>')
+        
+
+
+
+    @commands.command(name='rhload')
+    async def cmd_rhload(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        rhid = 0
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!rhload( +([a-z0-9_]+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !rhload <text>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    rhid = text
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !rhload <number>')
+        os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+
+        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
         pass
 
 
