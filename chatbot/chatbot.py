@@ -83,6 +83,7 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.moderation = False
         self.botconfig = bci
         os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if 'optfile' in self.botconfig['rhtools']:
@@ -165,6 +166,7 @@ class Bot(commands.Bot):
         self.logger.info("Swtbot starting up")
         self.controlchannels = bci["twitch"]["controlchannels"]
         self.loop = asyncio.get_event_loop()
+        apptoken.check_db_token('bot-api-token','bot-api-token.refresh')
         u = super().__init__(token=apptoken.get_token_secrets(onekey="bot-chat-token"),
                 client_id=apptoken.get_token_secrets(onekey='bot-client_id'),
                 nick=bci["twitch"]["nick"], prefix='!', loop=self.loop,
@@ -310,6 +312,7 @@ class Bot(commands.Bot):
                         self.logger.debug("CMD b = " + b)
                         self.logger.debug("CMD c = " + c)
                         self.logger.debug("CMD params.1 = " + str(params))
+                        self.logger.debug(f"{dir(chan)} | {str(chan)}")
                         self.logger.debug("chanName = " + str(chan.name))
 
                         for n,i in enumerate(params):
@@ -415,7 +418,16 @@ class Bot(commands.Bot):
                         if b == "newword" : await chan.send("!voaction newword")
                         if b == "permit" : await chan.send("!permit " + str(target))
                         if b == "purge" : 
-                            await chan.timeout(str(target), 2)
+                            print(f'{dir(chan)}')
+                            #self.logger.debug(f'{dir(chan)}')
+                            targetUser = await chan.user( str(target))
+                            print(f'{dir(targetUser)}')
+                            await targetUser.timeout_user( apptoken.get_token_secrets(onekey='bot-api-token'), int(botconfig['twitch']['botchid']), targetUser.id, 2, ''  )
+
+                            #t = PartialUser(, str(target))
+
+                            #await 
+                            #await chan.timeout(str(target), 2)
                             await chan.send("!voaction purge " + str(target))
                             self.last_temp[chan.name] = str(target)
                         if b == "timeout" : 
@@ -555,8 +567,10 @@ class Bot(commands.Bot):
 
                 except Exception as xerr0:
                     self.logger.debug("Exception xerr0: " + str(xerr0))
+                    traceback.print_exc()
         except Exception as xerr1:
             self.logger.debug("Exception xerr1: " + str(xerr1))
+            traceback.print_exc()
 
         #self.logger.debug("Send: %r" % message)
         #writer.write(data)
@@ -955,27 +969,38 @@ class Bot(commands.Bot):
                     await self.handle_commands(message)
                     return
 
-                if str(message.channel.name) in self.nuketexts.keys():
+                # Under construction:  For now we're just skipping the rest of checks for all users
+                #
+                #await self.checkfor_votes(message)
+                #await self.handle_commands(message)
+                #return
+                #
+                # Antispam code was below, but APIs have changed...
+                #
+
+                if self.moderation and str(message.channel.name) in self.nuketexts.keys():
                     chname = str(message.channel.name)
                     for tentry in self.nuketexts[chname]:
                         if tentry[0].search( message.content):
                            message.channel.timeout(str(message.author.name), 1200, 'use of blocked text (b)')
                            #self.last_temp[message.channel.name] = message.author.name
 
-                if str(message.channel.name) in self.nukenames.keys():
+                if self.moderation and str(message.channel.name) in self.nukenames.keys():
                     chname = str(message.channel.name)
                     for tentry in self.nukenames[chname]:
                         if tentry[0].search( str(message.autho.name)  ):
                            message.channel.timeout(str(message.author.name), 1200, 'use of blocked text (u)')
                            #self.last_temp[message.channel.name] = message.author.name
 
-                if int(useroptobj['level']) == -90 :
-                    await message.channel.ban(message.author.name, 'autoban -90')
-                elif int(useroptobj['level']) <= -60 :
-                    await message.channel.timeout(message.author.name, 2*86400, 'automatic timeout')
-                elif int(useroptobj['level']) <= -50 :
-                    await message.channel.timeout(message.author.name, 86400, 'automatic timeout')
-                    return
+                if self.moderation:
+                    if int(useroptobj['level']) == -90 :
+                        await message.channel.ban(message.author.name, 'autoban -90')
+                    elif int(useroptobj['level']) <= -60 :
+                        await message.channel.timeout(message.author.name, 2*86400, 'automatic timeout')
+                    elif int(useroptobj['level']) <= -50 :
+                        await message.channel.timeout(message.author.name, 86400, 'automatic timeout')
+                        return
+                pass
             except Exception as err:
                 self.logger.error('Exception in allow list proc: ' + str(err))
                 pass
@@ -990,7 +1015,7 @@ class Bot(commands.Bot):
             #            str(message.author.name[namesearchresult.start():namesearchresult.end()])  + ']')
             #    wasblocked = True
             #    await message.channel.timeout(message.author.name, 86400, 'suspected troll')
-            if wordsearchresult != None and wasblocked == False :
+            if self.moderation and wordsearchresult != None and wasblocked == False :
                 self.logger.info('User ' + str(message.author.name) + 'hit the word filter - match:[' +
                         str(message.content[wordsearchresult.start():wordsearchresult.end()])  + '] full message:[' + str(message.content) +']' )
                 await message.channel.timeout(message.author.name, 12*86400, 'message content')
@@ -999,7 +1024,8 @@ class Bot(commands.Bot):
             #mt = member.display_name[m1.start():m1.end()]
 
         if plev > 0 : 
-            self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
+            if self.moderation:
+                self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
             if wasblocked == False:
                 await self.checkfor_votes(message)
                 await self.handle_commands(message)
@@ -1144,7 +1170,7 @@ class Bot(commands.Bot):
                     #    self.logger.debug("ERROR uopt1: " + str(err))
                     #    pass
 
-        if plev <= 0 :
+        if self.moderation and plev <= 0 :
             if spamsearchresult != None and wasblocked == False and agedaccount == False :
                 self.logger.info('User ' + str(message.author.name) + 'hit the word filter - match:[' +
                  str(message.content[spamsearchresult.start():spamsearchresult.end()])  + '] full message:[' + str(message.content) +']' )
