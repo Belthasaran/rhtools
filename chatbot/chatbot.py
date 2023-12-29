@@ -1332,7 +1332,7 @@ class Bot(commands.Bot):
             return
         try:
            self.chmode = 0
-           self.chaos_loop_1.stop()
+           self.chaos_loop_1.cancel()
            self.chmode = 0
            self.chmode_stage = 0
            self.chmode_timeleft = 0

@@ -24,6 +24,8 @@ import os
 import time
 import base64
 import traceback
+import hashlib
+import urllib.parse
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -143,6 +145,44 @@ def get_token_secrets(filename=None,frnkeyd=None,onekey=None,storename=''):
         traceback.print_exc()
         return None
 
+def validate_token(token,client_id=None):
+    validateRequest = requests.get('https://id.twitch.tv/oauth2/validate', headers = {'Client-ID' : client_id,  'Authorization' : 'OAuth ' +token})
+    validToken = 0
+
+    print(f'validate_token(): response {validateRequest.status_code} {validateRequest.text}')
+    if validateRequest.status_code == 200 :
+        return 1
+    return 0
+
+def new_db_token(authorizationcode, tokenkey, refreshtokenkey, clientidkey='client_id', clientsecretkey='client_secret'):
+    token = get_token_secrets(onekey=tokenkey)
+    refreshtoken = get_token_secrets(onekey=refreshtokenkey)
+    client_id = get_token_secrets(onekey=clientidkey)
+    client_secret = get_token_secrets(onekey=clientsecretkey)
+    #
+    tokenRequestBody = {
+                'client_id' : client_id,
+                'client_secret': client_secret,
+                'code': authorizationcode,
+                'grant_type': 'authorization_code',
+                'redirect_uri': 'http://localhost'
+                }
+    tokenRequest = requests.post('https://id.twitch.tv/oauth2/token', params=tokenRequestBody)
+                #?client_id=' + client_id +'&client_secret=' + client_secret + '&grant_type=client_credentials')
+    print(f'tokenRequest.status_code={tokenRequest.status_code} | {tokenRequest.text}')
+    if tokenRequest.status_code == 200:
+            j = json.loads(tokenRequest.text)
+            newtoken = j["access_token"]
+            newfreshtoken = j["refresh_token"]
+            secrets = get_token_secrets()
+            secrets[tokenkey]=newtoken
+            secrets[refreshtokenkey]=newfreshtoken
+            save_token_secrets(secrets)
+    pass
+
+
+
+
 def check_db_token(tokenkey, refreshtokenkey, clientidkey='client_id', clientsecretkey='client_secret'):
     """
     Checks if the token named 'tokenkey' in the secrets storage is still valid, and if not, then attempt to Refresh the token.
@@ -258,6 +298,49 @@ def get_tokens(filename=None,frnkeyd=None,storename=''):
     return [client_id, client_secret, app_token]
 
 
-
+# REQUEST CREDENTIALS 
 # https://id.twitch.tv/oauth2/authorize?client_id=%%CID%%&response_type=code&state=%%STATEHASH%%&redirect_uri=http://localhost&scope=channel%3Abot+user%3Abot+chat%3Aread+user%3Aread%3Achat+channel%3Amoderate+channel%3Aread%3Aredemptions
+
+def mktoken_url_pubsub(client_id):
+    data = bytes(32) + bytes(str(get_tokens_secrets(onekey='client_secret')),'utf8') +  bytes(str(time.time()),'utf8') + bytes(32)
+    statehash= xsha224_patched = hashlib.sha224(data).hexdigest()
+    data = None
+    url=f'https://id.twitch.tv/oauth2/authorize?client_id={client_id}&response_type=code&state={statehash}&redirect_uri=http://localhost&scope=channel%3Abot+user%3Abot+chat%3Aread+user%3Aread%3Achat+channel%3Amoderate+channel%3Aread%3Aredemptions'
+    print(url)
+
+def mktoken_url_bottoken(client_id=None):
+    if not(client_id):
+        client_id = get_token_secrets(onekey='client_id')
+    data = bytes(32) + bytes(str(get_tokens_secrets(onekey='client_secret')),'utf8') +  bytes(str(time.time()),'utf8') + bytes(32)
+    statehash= xsha224_patched = hashlib.sha224(data).hexdigest()
+    data = None
+    scope_list = '+'.join(map(lambda g: urllib.parse.quote(g), [
+        'moderation:read',
+        'moderator:manage:announcements',
+        'moderator:read:automod_settings',
+        'moderator:manage:banned_users',
+        'moderator:manage:chat_messages',
+        'moderator:read:chatters',
+        'moderator:read:followers',
+        'moderator:read:guest_star',
+        'moderator:read:shield_mode',
+        'moderator:manage:shield_mode',
+        'moderator:read:shoutouts',
+        'user:read:follows',
+        'channel:bot',
+        'channel:moderate',
+        'chat:edit',
+        'chat:read',
+        'user:bot',
+        'user:read:chat'
+        ]))
+    scope_list_e = scope_list # urllib.parse.quote(scope_list)
+    url=f'https://id.twitch.tv/oauth2/authorize?client_id={client_id}&response_type=code&state={statehash}&redirect_uri=http://localhost&scope={scope_list_e}'
+    print(url)
+
+
+
+
+
+
 
