@@ -219,7 +219,7 @@ class Bot(commands.Bot):
         # 2023-12-24 04:56:14,775  channel_id=nn id=n-n-n input=None reward=<CustomReward id=a-b-c-d title=text cost=10>
         # status=FULFILLED timestamp=2023-12-24 10:56:14.665624+00:00 user=<PartialUser id=yyyy, name=uid> 
 
-        if re.match(r'.*(for the kaizo|coin block).*', event.reward.title, re.I):
+        if self.ccflag and re.match(r'.*(for the kaizo|coin block).*', event.reward.title, re.I):
             try:
                 chan = self.get_channel(str(event.channel_id))
                 effectobj = KaizoBlockEffect(amount=1,duration=20,retries=300)
