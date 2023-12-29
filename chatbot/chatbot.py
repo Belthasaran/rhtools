@@ -1067,108 +1067,117 @@ class Bot(commands.Bot):
             except Exception as exv0:
                 self.logger.error("SQL Error on SELECT * from userdata i::: " + str(exv0))
                 
-        if not mcloaduo :
-            #readTokens = apptoken.get_tokens()
-            readTokens = self.readTokens
-            client_id = readTokens[0]
-            client_secret = readTokens[1]
-            app_token = readTokens[2]
-            self.logger.debug('About to ask Twitch for userinfo on single user: ['  + str(userid) + '] ' + str(message.author.name) + ' in ' +
-                    str(message.channel.name))
-
-            lookup_request = requests.get('https://api.twitch.tv/helix/users/?id=' + str(userid),
-                    headers = {'Client-ID' : client_id,  'Authorization' : 'Bearer ' +app_token
-                    #           'Accept'    : 'application/vnd.twitchtv.v5+json'
-                      }
-                     )
-            if not lookup_request.status_code == 200:
-                self.client.set("user_" + str(userid), "", 300)
-                self.client.set("usern_" + str( message.author.name.lower() ), "", 300)
-            else:
-                usersli = [ json.loads(lookup_request.text) ]
-
-                #usersli = await self.get_users(*usersla)
-                #self.client.set("user_" + self.userid, json.dumps(usersli))
-                #print("Z:"+str(usersli))
-                for userent in usersli:
-                    userent["_id"] = userent["id"]      #  v5 API fields from helix request
-                    userent["name"] = userent["login"]  #  v5 API fields from helix request
-                    userent["bio"] = userent["description"]
-                    userent["logo"] = userent["profile_image_url"]
-
-                    #print("U:"+str(userent))
-                    #print("X\n")
-                    self.client.set("user_" + str(userid), json.dumps(userent), self.cachettl )
-                    self.client.set("usern_" + str(message.author.name.lower()), json.dumps(userent), self.cachettl )
-                    mcloaduo = json.dumps(userent)
-                    #mcloaduo = self.client.get("user_" + str(userid))
-                    #
-                    try:
-                        dbc = await self.get_cursor()
-                        #values = ( str(userid),  message.author.name, json.dumps(userent)   )
-                        values = ( str(userid),  message.author.name, json.dumps(userent)   )
-                        dbc.execute('REPLACE INTO userdata (twid,username,jsondata) VALUES (%s,%s,%s)', values)
-                        self.dbconnection.commit()
-                    except Exception as exv0:
-                        self.logger.error(f'Error: exception during SQL query: ' + str(exv0) )
-                    pass
-                #
-            #
-        if mcloaduo != None :
-            mcloaduobj = json.loads(mcloaduo)
-            self.logger.debug('mcloaduo = ' + str(mcloaduo))
-            self.logger.debug('mcloaduobj = ' + str(mcloaduobj))
-            self.logger.debug('type(mcloaduobj) = ' + str(type(mcloaduobj)))
-            acctcreatedat = mcloaduobj['created_at']
-            acctbio = mcloaduobj['bio']
-            acctlogo = mcloaduobj['logo']
-            viewcount = 0
-
-            if 'view_count' in mcloaduobj:
-                viewcount = int(mcloaduobj['view_count'])
-
-            # Default logo image:
-            #https://static-cdn.jtvnw.net/user-default-pictures-uv/41780b5a-def8-11e9-94d9-784f43822e80-profile_image-300x300.png
-            if mcloaduobj != None :
-                try:
-                    requiretimeopt  = int(self.chandata[ self.channums[message.channel.name.lower()]]['requiretime'])
-                except Exception as err:
-                    requiretimeopt = 0
-                    self.logger.debug("Error loading requiretimeopt : " + str(err))
-
-                #if requiretimeopt > 0 :
-                #    print("REQVAL:" + str(requiretimeopt))
-                #    print("CREATE:" + str(acctcreatedat))
-
-                createdt = dateutil.parser.parse(acctcreatedat)
-                createts =  (createdt - datetime.datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc  )).total_seconds()
-                accountage = time.time() - createts
-                if time.time() - 86400*14 > createts:
-                    agedaccount = True
-                if viewcount > 200:
-                    agedaccount = True
-                if createts + 86400 > time.time() and createts > 1599460370:
-                    youngaccount = True
-                    self.logger.debug("WARN: YOUNG ACCOUNT " + str(message.author.name) + " - (" + 
-                            str( time.time() - createts) + ")   createts="+str(acctcreatedat) )
-                if requiretimeopt > 0 and (createts + int(requiretimeopt)) > time.time() and createts > 1601879529 and viewcount < 50:
-                    self.logger.debug("ACCOUNT " + str(message.author.name) + " Account newer than required " )
-                    #await ctx.ban(ctx.author.name, 'Nope')
-                    await message.channel.timeout(message.author.name, 3600, 'Account created too recently '+ str(datetime.timedelta(seconds=time.time() - createts)) +' (ts)')
-                    self.last_temp[message.channel.name] = message.author.name
-                    #await XXXX ctx.message.author
+        try:         
+            if not mcloaduo :
+                #readTokens = apptoken.get_tokens()
+                readTokens = self.readTokens
+                client_id = readTokens[0]
+                client_secret = readTokens[1]
+                app_token = readTokens[2]
+                self.logger.debug('About to ask Twitch for userinfo on single user: ['  + str(userid) + '] ' + str(message.author.name) + ' in ' +
+                        str(message.channel.name))
+            
+                lookup_request = requests.get('https://api.twitch.tv/helix/users/?id=' + str(userid),
+                        headers = {'Client-ID' : client_id,  'Authorization' : 'Bearer ' +app_token
+                        #           'Accept'    : 'application/vnd.twitchtv.v5+json'
+                          }
+                         )
+                if not lookup_request.status_code == 200:
+                    self.client.set("user_" + str(userid), "", 300)
+                    self.client.set("usern_" + str( message.author.name.lower() ), "", 300)
                 else:
-                    self.logger.debug("ACCOUNT " + str(message.author.name) + " Account age ("+str(datetime.timedelta(seconds=time.time()-createts))+"s)" )
-                    # Wait, didn't we already do this?
-                    #try: 
-                    #    useroptobj = await self.get_useropt( author.name )
-                    #    if useroptobj != None :
-                    #        uolevel = int(useroptobj["level"])
-                    #        if uolevel != 0 :
-                    #            plev = uolevel
-                    #except Exception as err:
-                    #    self.logger.debug("ERROR uopt1: " + str(err))
-                    #    pass
+                    usersli = [ json.loads(lookup_request.text) ]
+            
+                    #usersli = await self.get_users(*usersla)
+                    #self.client.set("user_" + self.userid, json.dumps(usersli))
+                    #print("Z:"+str(usersli))
+                    for userent in usersli:
+                        userent["_id"] = userent["id"]      #  v5 API fields from helix request
+                        userent["name"] = userent["login"]  #  v5 API fields from helix request
+                        userent["bio"] = userent["description"]
+                        userent["logo"] = userent["profile_image_url"]
+            
+                        #print("U:"+str(userent))
+                        #print("X\n")
+                        self.client.set("user_" + str(userid), json.dumps(userent), self.cachettl )
+                        self.client.set("usern_" + str(message.author.name.lower()), json.dumps(userent), self.cachettl )
+                        mcloaduo = json.dumps(userent)
+                        #mcloaduo = self.client.get("user_" + str(userid))
+                        #
+                        try:
+                            dbc = await self.get_cursor()
+                            #values = ( str(userid),  message.author.name, json.dumps(userent)   )
+                            values = ( str(userid),  message.author.name, json.dumps(userent)   )
+                            dbc.execute('REPLACE INTO userdata (twid,username,jsondata) VALUES (%s,%s,%s)', values)
+                            self.dbconnection.commit()
+                        except Exception as exv0:
+                            self.logger.error(f'Error: exception during SQL query: ' + str(exv0) )
+                        pass
+                    #
+                #
+        except Exception as xerr0:
+            self.logger.error(f'Error: exception finding user data: {xerr0}')
+            traceback.print_exc()
+
+        try:             
+            if mcloaduo != None :
+                mcloaduobj = json.loads(mcloaduo)
+                self.logger.debug('mcloaduo = ' + str(mcloaduo))
+                self.logger.debug('mcloaduobj = ' + str(mcloaduobj))
+                self.logger.debug('type(mcloaduobj) = ' + str(type(mcloaduobj)))
+                acctcreatedat = mcloaduobj['created_at']
+                acctbio = mcloaduobj['bio']
+                acctlogo = mcloaduobj['logo']
+                viewcount = 0
+            
+                if 'view_count' in mcloaduobj:
+                    viewcount = int(mcloaduobj['view_count'])
+            
+                # Default logo image:
+                #https://static-cdn.jtvnw.net/user-default-pictures-uv/41780b5a-def8-11e9-94d9-784f43822e80-profile_image-300x300.png
+                if mcloaduobj != None :
+                    try:
+                        requiretimeopt  = int(self.chandata[ self.channums[message.channel.name.lower()]]['requiretime'])
+                    except Exception as err:
+                        requiretimeopt = 0
+                        self.logger.debug("Error loading requiretimeopt : " + str(err))
+            
+                    #if requiretimeopt > 0 :
+                    #    print("REQVAL:" + str(requiretimeopt))
+                    #    print("CREATE:" + str(acctcreatedat))
+            
+                    createdt = dateutil.parser.parse(acctcreatedat)
+                    createts =  (createdt - datetime.datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc  )).total_seconds()
+                    accountage = time.time() - createts
+                    if time.time() - 86400*14 > createts:
+                        agedaccount = True
+                    if viewcount > 200:
+                        agedaccount = True
+                    if createts + 86400 > time.time() and createts > 1599460370:
+                        youngaccount = True
+                        self.logger.debug("WARN: YOUNG ACCOUNT " + str(message.author.name) + " - (" + 
+                                str( time.time() - createts) + ")   createts="+str(acctcreatedat) )
+                    if self.moderation and requiretimeopt > 0 and (createts + int(requiretimeopt)) > time.time() and createts > 1601879529 and viewcount < 50:
+                        self.logger.debug("ACCOUNT " + str(message.author.name) + " Account newer than required " )
+                        #await ctx.ban(ctx.author.name, 'Nope')
+                        await message.channel.timeout(message.author.name, 3600, 'Account created too recently '+ str(datetime.timedelta(seconds=time.time() - createts)) +' (ts)')
+                        self.last_temp[message.channel.name] = message.author.name
+                        #await XXXX ctx.message.author
+                    else:
+                        self.logger.debug("ACCOUNT " + str(message.author.name) + " Account age ("+str(datetime.timedelta(seconds=time.time()-createts))+"s)" )
+                        # Wait, didn't we already do this?
+                        #try: 
+                        #    useroptobj = await self.get_useropt( author.name )
+                        #    if useroptobj != None :
+                        #        uolevel = int(useroptobj["level"])
+                        #        if uolevel != 0 :
+                        #            plev = uolevel
+                        #except Exception as err:
+                        #    self.logger.debug("ERROR uopt1: " + str(err))
+                        #    pass
+        except Exception as xerr0:
+            self.logger.debug(f"ERROR loading uinfo from database {xerr0}")
+            traecback.print_exc()
 
         if self.moderation and plev <= 0 :
             if spamsearchresult != None and wasblocked == False and agedaccount == False :
@@ -1177,7 +1186,7 @@ class Bot(commands.Bot):
                 await message.channel.ban(message.author.name, 'ts=' + str(time.strftime('%Y%m%d')) + 'spam')
                 self.last_temp[message.channel.name] = message.author.name
                 #await message.channel.timeout(message.author.name, 12*86400, 'spam')
-            if namesearchresult != None and plev < 1 and agedaccount == False and str(message.author.name).lower() != 'manofsteel2141x' :
+            if namesearchresult != None and plev < 1 and agedaccount == False :
                 self.logger.info('User ' + str(message.author.name) + 'username hit a filter - match:[' +
                         str(message.author.name[namesearchresult.start():namesearchresult.end()])  + ']')
                 wasblocked = True
