@@ -43,7 +43,13 @@
 					   siauthors = data['rhinfo']['authors'];
 					   siadded = data['rhinfo']['added'];
 					   sitags = ""
+					   sicc = ""
 					   siname = data['rhinfo']['name'];
+					   if ('ccflag' in data) {
+							    if (data['ccflag']) {
+									     sicc = "+(CC)"
+								     }
+						    }
 					   if (siname.match('^Super')) {
 						siname = siname.substr(6);
 					    }
@@ -57,7 +63,7 @@
 					   
 					   gameval = "<TABLE ID=\"infotable\"><TR><TD>";
 					   gameval += escapeHTML(simethod) + " " + escapeHTML(data['rhinfo']['id']) + "";
-					   gameval += escapeHTML(siname) + "<BR>";
+					   gameval += escapeHTML(siname) + sicc + "<BR>";
 					   gameval += escapeHTML(siauthors) + "<BR>";
 					   gameval += escapeHTML(data['rhinfo']['type']) + "<BR>";
 					   gameval += "</TD></TR></TABLE>";

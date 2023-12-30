@@ -270,6 +270,10 @@ class Bot(commands.Bot):
                 if data['query'] == 'chmode' :
                     if self.rhinfo:
                         answer['rhinfo'] = self.rhinfo
+                    if self.ccflag:
+                        answer['ccflag'] = self.ccflag
+                    else:
+                        answer['ccflag'] = False
                     answer['chmode'] = self.chmode
                     answer['chmode_stage'] = self.chmode_stage
                     answer['chmode_timeleft'] = self.chmode_timeleft
