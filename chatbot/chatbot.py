@@ -1337,7 +1337,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='chstop')
     async def do_chstop_command(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 10:
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
             return
         try:
@@ -1357,7 +1357,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='chstart')
     async def do_chstart_command(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 10:
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
             return
         try:
@@ -1413,7 +1413,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are: !swrequire | !swjoin | !swallowlist | !swpart | !swtomsg ')
+        await ctx.send(f'@{ctx.author.name} commands are: unspecified ')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             return
             #await ctx.timeout(ctx.author.name, 600, 'Sorry, !swhelp is mod-only')
@@ -1697,7 +1697,7 @@ class Bot(commands.Bot):
         # Command not yet implemented
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
-            if privlev < 20:
+            if privlev < 21:
                 return
             self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
 
@@ -1865,8 +1865,8 @@ class Bot(commands.Bot):
             self.logger.debug('swunblock - exception: ' + str(err) )
             pass
 
-    @commands.command(name='swsetlevel')
-    async def do_swsetlevel(self,ctx):
+    @commands.command(name='swuserlevel')
+    async def do_swuserlevel(self,ctx):
         try:
             #await ctx.send(f'@{ctx.author.name} - swunblock')
             c_plev = await self.cmd_privilege_level(ctx.message.author)
@@ -1972,7 +1972,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='snesmenu')
     async def cmd_snesmenu(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
+        if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
         self.rhinfo = None
         try:
@@ -1984,7 +1984,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='snesboot')
     async def cmd_snesboot(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
+        if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
         self.rhinfo = None
         text = str(ctx.message.content)
@@ -2014,7 +2014,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='snesreset')
     async def cmd_snesreset(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
         try:
            await cmd_reset.snes_reset()
@@ -2078,7 +2078,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='ccflag')
     async def cmd_ccflag(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
         text = str(ctx.message.content)
@@ -2109,7 +2109,7 @@ class Bot(commands.Bot):
         #if 'optfile' in self.botconfig['rhtools']:
         #    os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools'['optfile']
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-        if await self.cmd_privilege_level(ctx.message.author) < 10:
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
         text = str(ctx.message.content)
@@ -2151,7 +2151,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='rhload')
     async def cmd_rhload(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 20:
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
         rhid = 0
@@ -2205,6 +2205,20 @@ class Bot(commands.Bot):
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         print(f'rhset_command')
         await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccflag)
+        if str(rhid) == "vanilla" or str(rhid) == "ccvanilla" or str(rhid) == "vanilla":
+            if not(self.rhinfo):
+                self.rhinfo = {'id':'Vanilla', 'name':'', 'authors':'', 'method':'', 'added':'1990'}
+            self.rhinfo['name'] = 'Super Mario World'
+            self.rhinfo['authors'] = '(original SNES game)'
+            self.rhinfo['added'] = '11/21/1990'
+        if str(rhid) == "smwrando" :
+            self.rhinfo = {'id':'SMWRando', 'name':'Mario World Randomizer (SNES)', 'authors':'', 'method':'', 'added':''}
+        if str(rhid) == "snes":
+            self.rhinfo = {'id':'','name':'', 'authors':'(original SNES game)', 'method':'', 'added':''}
+        if str(rhid) == "lttp":
+            self.rhinfo = {'id':'lttp', 'name':'The Legend of Zelda: A link to the past', 'authors':'(original SNES game)', 'method':'', 'added':''}
+        if str(rhid) == "rando" or str(rhid) == "z3rando":
+            self.rhinfo = {'id':'z3rando', 'name':'Zelda3+ALttP VT Randomizer', 'authors':'Various', 'method':'', 'added':''}
         pass
 
     @commands.command(name='rhsearch')
