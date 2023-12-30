@@ -59,6 +59,7 @@
 					   gameval += escapeHTML(siname) + "<BR>";
 					   gameval += escapeHTML(siauthors) + "<BR>";
 					   gameval += "</TD></TR></TABLE>";
+					   $("#gamediv").html(gameval)
 
 			   }
 
@@ -118,7 +119,8 @@
 
 						     }
 					  }
-			  $("#gamediv").html(gameval);
+			  //$("#gamediv").html(gameval);
+			  $("#gamediv").show();
 			  $("#chmodediv").html(textval);
 			  $("#chmodediv").show();
 		  })
