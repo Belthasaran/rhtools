@@ -24,6 +24,7 @@
 		  }
 
 	 ws.addEventListener('message', function(event) {
+			  gameval="";
 			  textval = "";
 			  data = JSON.parse(event.data);
 			  //console.log("R <- " + JSON.stringify(event.data))
@@ -33,7 +34,33 @@
 			  //data['chmode_timeleft'] = 60;
 			  event.data = JSON.stringify(data);
 
+
 			  console.log("" + event.data);
+
+			  if (('rhinfo' in data)) {
+					   siname = data['rhinfo']['name'];
+					   siauthors = data['rhinfo']['authors'];
+					   siadded = data['rhinfo']['added'];
+					   sitags = ""
+					   siname = data['rhinfo'['name'];
+					   if (siname.match('^Super')) {
+						siname = siname.substr(6);
+					    }
+					   if (siname.length > 23) {
+							    siname = siname.substr(0,20) + "...";
+					    }
+					   siadded = siadded.split(' ')[0];
+					   if (siauthors.length > 23) {
+							    siauthors = siauthors.substr(0,20) + "...";
+					    }
+					   
+					   gameval = "<TABLE ID="infotable"><TR><TD>";
+					   gameval += escapeHTML(data['rhinfo']['method']) + escapeHTML(data['rhinfo']['id']) + "<BR>";
+					   gameval += escapeHTML(siname) + "<BR>";
+					   gameval += escapeHTML(siauthors) + "<BR>;
+					   gameval += "</TD></TR></TABLE>";
+
+			   }
 
 			  $("#xya").text(" ");
 			  if (data["chmode"] == 0 || data["chmode_stage"] == 0) {
@@ -91,6 +118,7 @@
 
 						     }
 					  }
+			  $("#gamediv").html(gameval);
 			  $("#chmodediv").html(textval);
 			  $("#chmodediv").show();
 		  })
@@ -110,6 +138,9 @@
 
  </script>
 <style>
+#infotable {
+    opacity: 0.80;
+}
 #chmodediv {
 	width: 600px;
 	overflow-wrap: break-word;

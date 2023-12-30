@@ -42,6 +42,9 @@ from smw_e_takeitem import TakeItemEffect
 from smw_e_xmario import XMarioEffect
 from ccsmw_e_kaizoblock import KaizoBlockEffect
 
+if os.path.exists('../cur_makepage.py'):
+    import cur_makepage
+
 os.chdir(os.environ['BOTDIR'])
 
                 #effectobj = XMarioEffect()
@@ -89,6 +92,7 @@ class Bot(commands.Bot):
         if 'optfile' in self.botconfig['rhtools']:
             os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools']['optfile']
 
+        self.rhinfo = None
         self.ccflag = False
         self.logger = logging.getLogger("swtbot")
         self.logging = logging.getLogger("swtbot")
@@ -264,6 +268,8 @@ class Bot(commands.Bot):
             try:
                 data = json.loads(message)
                 if data['query'] == 'chmode' :
+                    if self.rhinfo:
+                        answer['rhinfo'] = self.rhinfo
                     answer['chmode'] = self.chmode
                     answer['chmode_stage'] = self.chmode_stage
                     answer['chmode_timeleft'] = self.chmode_timeleft
@@ -1964,6 +1970,7 @@ class Bot(commands.Bot):
     async def cmd_snesmenu(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        self.rhinfo = None
         try:
            await cmd_menu.snes_menu()
         except Exception as xerr:
@@ -1975,6 +1982,7 @@ class Bot(commands.Bot):
     async def cmd_snesboot(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        self.rhinfo = None
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9\.\/]','_', str(text))
         paramResult = re.match(r'^!snesboot( +([a-z0-9_\.\/]+)|)', text)
@@ -2012,11 +2020,45 @@ class Bot(commands.Bot):
         await ctx.send(f'@{ctx.author.name} - snesreset:Done')
 
 
+    async def chat_perform_rhset(self,ctx,rhid,ccrom=False,result=None):
+        try:
+            if not(result):
+                result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom,noexit=True)
+            if result:
+                try:
+                    if os.path.exists(result +'json'):
+                        cur_makepage.mkpage_function(['mkpage'], result+'json')
+                        jsf = open(result+'json','r')
+                        self.rhinfo = json.load(jsf)
+                        jsf.close()
+                        await ctx.send(f'@{ctx.message.author.name} - rhset:{rhid} cc:{ccrom} - {self.rhinfo["name"]} - {self.rhinfo["authors"]}')
+                except  Exception as xerrmp:
+                        self.rhinfo = None
+                        await ctx.send(f'@{ctx.message.author.name} - rhset:{rhid} cc:{ccrom} - Game set to none')
+
+                        self.logger.error(f'chat_perfform_rhset:mkpage: {xerrmp}')
+                        traceback.print_exc()
+                    #print(str(result))
+        except Exception as xerr0:
+            self.logger.error(f'chat_perfform_rhset: {xerr0}')
+            traceback.print_exc()
+
+
     async def chat_perform_rhload(self,ctx,rhid,ccrom=False):
         try:
             #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-            result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom)
+            result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom,noexit=True)
+            chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
             if result:
+                try:
+                    pass
+                    #if os.path.exists(result +'json'):
+                    #    cur_makepage.mkpage_function(['mkpage'], result+'json')
+                    #jsf = open(result+'json','r')
+                    #self.rhinfo = json.load(jsf)
+                    #jsf.close()
+                except Exception as xerrmp:
+                    print(f'mkpageErr:{xerrmp}')
                 print(str(result))
                 await ctx.send(f'@{ctx.message.author.name} - rhload:patch file applied. SNES should be loading.' )
                 sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
@@ -2130,6 +2172,36 @@ class Bot(commands.Bot):
         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
         pass
 
+    @commands.command(name='rhset')
+    async def cmd_rhset(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        rhid = 0
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!rhset( +([a-z0-9_]+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !rhset <text>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    rhid = text
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !rhset <number>')
+        if str(rhid) == "0" or str(rhid).lower() == "none":
+            self.rhinfo = None
+            await ctx.send(f'@{ctx.author.name} - Ok, rhinfo set to none.')
+        #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        print(f'rhset_command')
+        await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccflag)
+        pass
 
     @commands.command(name='rhsearch')
     async def cmd_rhsearch(self,ctx):

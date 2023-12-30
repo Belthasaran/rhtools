@@ -13,7 +13,7 @@ import pb_sendtosnes
 import traceback
 import time
 
-def repatch_function(args,ccrom=False):
+def repatch_function(args,ccrom=False,noexit=False):
     path_prefix = loadsmwrh.get_path_prefix()
     if not loadsmwrh.path_rerequisites():
         return None
@@ -41,6 +41,8 @@ def repatch_function(args,ccrom=False):
 
     if not hackinfo:
         print('Err: Could not load hack metadata for hack #' + str(hackid))
+        if noexit:
+            return None
         sys.exit(1)
     #fr = open(os.path.join('hacks', str(hackid) ))
     #hackinfo = json.load(fr)
