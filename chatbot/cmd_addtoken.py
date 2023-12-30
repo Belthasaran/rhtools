@@ -103,6 +103,10 @@ def add_app_token(args):
 if __name__ == '__main__':
     if len(sys.argv)>1 and sys.argv[1].upper()=='SETUP':
         setup_secret_storage(sys.argv)
+    elif len(sys.argv)>1 and sys.argv[1].upper()=='READ':
+        confirm=input('Press [y] to confirm read: ')
+        if (confirm=='y'):
+            print(json.dumps(apptoken.get_token_secrets(),indent=4))
     else:
         add_app_token(sys.argv)
 
