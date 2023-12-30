@@ -5,6 +5,8 @@ import traceback
 from twitchio.ext import commands
 from twitchio.ext import pubsub
 from twitchio.ext import routines
+from twitchio.ext.commands import Bucket
+
 import twitchio
 import yaml
 import json
@@ -46,6 +48,7 @@ if os.path.exists('../cur_makepage.py'):
     import cur_makepage
 
 os.chdir(os.environ['BOTDIR'])
+#bucket = Bucket(rate=1, per=10)
 
                 #effectobj = XMarioEffect()
                 #asyncio.run(chbot_apply_affect(effectobj))
@@ -91,6 +94,10 @@ class Bot(commands.Bot):
         os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if 'optfile' in self.botconfig['rhtools']:
             os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools']['optfile']
+        self.debuglevel = 0
+        if 'debuglevel' in self.botconfig['twitch']:
+            self.debuglevel = int(self.botconfig['twitch']['debuglevel'])
+
 
         self.rhinfo = None
         self.ccflag = False
@@ -258,7 +265,8 @@ class Bot(commands.Bot):
             return #
         if re.match("^PING ", data):
             return #
-        self.logger.debug("raw_event: " + str(data))
+        if self.debuglevel > 1:
+           self.logger.debug("raw_event: " + str(data))
         #print(data)
 
     async def handle_wslistener(self, websocket, pa):
@@ -1334,8 +1342,24 @@ class Bot(commands.Bot):
     #    self.chmode_stage = 0
     #    self.chaos_loop_1.start('Test')
 
+    @commands.command(name='ccinteract')
+    @commands.cooldown(1,10)
+    async def cmd_do_ccinteract(self,ctx):
+        try:
+            #cclink = None
+            #if 'crowdcontrol' in botconfig and interact_link in botconfig['crowdcontrol']:
+            cclink = botconfig['crowdcontrol']['interact_link']
+            if cclink:
+                await ctx.send(f'@{ctx.author.name} - Crowd Control Interact link:  {cclink}')
+        except Exception as xerr:
+            print(f'ccinteract error {xerr}')
+            traceback.print_exc()
+            pass
+
+
 
     @commands.command(name='chstop')
+    @commands.cooldown(2,1)
     async def do_chstop_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
@@ -1356,6 +1380,7 @@ class Bot(commands.Bot):
 
 
     @commands.command(name='chstart')
+    @commands.cooldown(2,1)
     async def do_chstart_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
@@ -1408,6 +1433,7 @@ class Bot(commands.Bot):
 
     # Command help
     @commands.command(name='help')
+    @commands.cooldown(1,20)
     async def do_help_command(self, ctx):
         return ## Temporary no longer available
         # message.author is  <User name=hh channel=hh>
@@ -1421,6 +1447,7 @@ class Bot(commands.Bot):
 
     # Commands use a different decorator
     @commands.command(name='swping')
+    @commands.cooldown(1,10)
     async def my_command(self, ctx):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
@@ -1552,6 +1579,7 @@ class Bot(commands.Bot):
             pass
 
     @commands.command(name='swcleanbuf')
+    @commands.cooldown(2,1)
     async def do_cleanbuffer(self,ctx):
         try:
             privlev = await self.cmd_privilege_level(ctx.message.author)
@@ -1752,6 +1780,7 @@ class Bot(commands.Bot):
             pass
 
     @commands.command(name='swallowlist')
+    @commands.cooldown(2,1)
     async def do_swallow(self,ctx):
         try:
             if await self.cmd_privilege_level(ctx.message.author) < 20:
@@ -1787,6 +1816,7 @@ class Bot(commands.Bot):
             pass
 
     @commands.command(name='swblock')
+    @commands.cooldown(2,1)
     async def do_swblock(self,ctx):
         try:
             #await ctx.send(f'@{ctx.author.name} - swblock')
@@ -1831,6 +1861,7 @@ class Bot(commands.Bot):
             pass
 
     @commands.command(name='swunblock')
+    @commands.cooldown(2,1)
     async def do_swunblock(self,ctx):
         try:
             #await ctx.send(f'@{ctx.author.name} - swunblock')
@@ -1867,6 +1898,7 @@ class Bot(commands.Bot):
             pass
 
     @commands.command(name='swuserlevel')
+    @commands.cooldown(2,1)
     async def do_swuserlevel(self,ctx):
         try:
             #await ctx.send(f'@{ctx.author.name} - swunblock')
@@ -1972,6 +2004,7 @@ class Bot(commands.Bot):
             await ctx.send(f'Error: an exception occurred: ' + str(exv0) )
 
     @commands.command(name='snesmenu')
+    @commands.cooldown(2,1)
     async def cmd_snesmenu(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -1985,6 +2018,7 @@ class Bot(commands.Bot):
         await ctx.send(f'@{ctx.author.name} - snesmenu:Done')
 
     @commands.command(name='snesboot')
+    @commands.cooldown(2,1)
     async def cmd_snesboot(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -2016,6 +2050,7 @@ class Bot(commands.Bot):
 
 
     @commands.command(name='snesreset')
+    @commands.cooldown(2,1)
     async def cmd_snesreset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -2081,6 +2116,7 @@ class Bot(commands.Bot):
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
     @commands.command(name='ccflag')
+    @commands.cooldown(2,1)
     async def cmd_ccflag(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -2109,6 +2145,7 @@ class Bot(commands.Bot):
 
 
     @commands.command(name='rhrandom')
+    @commands.cooldown(2,1)
     async def cmd_rhrandom(self,ctx):
         #if 'optfile' in self.botconfig['rhtools']:
         #    os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools'['optfile']
@@ -2154,6 +2191,7 @@ class Bot(commands.Bot):
 
 
     @commands.command(name='rhload')
+    @commands.cooldown(2,1)
     async def cmd_rhload(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -2181,6 +2219,7 @@ class Bot(commands.Bot):
         pass
 
     @commands.command(name='rhset')
+    @commands.cooldown(2,1)
     async def cmd_rhset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
@@ -2226,6 +2265,7 @@ class Bot(commands.Bot):
         pass
 
     @commands.command(name='rhsearch')
+    @commands.cooldown(2,1)
     async def cmd_rhsearch(self,ctx):
         hacklist = loadsmwrh.get_hacklist_data(filename='../rhmd.dat')
         self.logger.debug('rhsearch  message:' + str(dir(ctx.message)))
