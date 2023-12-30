@@ -1,0 +1,23 @@
+mysql:
+    user: mysqldbusername
+    password: mydbpassword
+    database: botdatabase
+twitch:
+    nick: Botusername
+    ownerchan: ownerusername
+    debuglevel: 0
+    ownerchid: (paste owner twitch id number)
+    botchid:  (paste bot twitch id number)
+    wskey: 123456
+    controlchannels:
+      - 'ownerusername'
+    basechans:
+      - '#ownerusername'
+crowdcontrol:
+  interact_link: "(paste crowd control interact link here)
+  chmode_interval1: 30
+  chmode_interval2: 120
+rhtools:
+  path: /home/botuname/run
+  optfile: /home/botuname/rhtools/rhtools_options.dat
+
