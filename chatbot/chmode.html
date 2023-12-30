@@ -38,7 +38,10 @@
 			  console.log("" + event.data);
 
 			  if (('rhinfo' in data)) {
-					   simethod = data['rhinfo']['method'];
+					   simethod = ''
+					   if ('rhinfo' in data && 'method' in data['rhinfo'] && data['rhinfo']['method']) {
+					       simethod = data['rhinfo']['method'];
+					    }
 					   siname = data['rhinfo']['name'];
 					   siauthors = data['rhinfo']['authors'];
 					   siadded = data['rhinfo']['added'];
