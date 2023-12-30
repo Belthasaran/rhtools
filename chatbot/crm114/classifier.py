@@ -16,6 +16,8 @@ CLASSIFY_CMD = " '-{ isolate (:stats:);" \
                " output /:*:best:\\t:*:prob:/ }'"
 
 
+
+
 class Classifier(object):
     def __init__(self, path, categories=None):
         """ Wrapper class for the CRM-114 Discriminator. """
@@ -49,14 +51,24 @@ class Classifier(object):
                                                 path,
                                                 CLASSIFICATION_EXT))
 
-        #proc = subprocess.Popen(,stdin=subprocess.PIPE,stdout=subprocess.PIPE)
-        fin, fout = os.popen2(command)
-        #print('- Command:   %s' % command)
-        fin.write(text)
-        fin.close()
+        classify_cmd_p = ["-{ isolate (:stats:);" \
+               " classify %s ( %s ) (:stats:);" \
+               " match [:stats:] (:: :best: :prob:)" \
+               " /Best match to file .. \(%s\/([[:graph:]]+)\\%s\)" \
+               " prob: ([0-9.]+)/;" \
+               " output /:*:best:\\t:*:prob:/ }" % (CLASSIFICATION_TYPE, self.file_list_string(), path, CLASSIFICATION_EXT)  ]
 
-        output_list = string.split(fout.readline())
-        fout.close()
+        proc = subprocess.Popen([CRM_BINARY] + classify_cmd_p,stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+        #fin, fout = os.popen2(command)
+        #print('- Command:   %s' % command)
+        #fin.write(text)
+        proc.stdin.write(text)
+        #fin.close()
+
+        out,err = proc.communicate()
+        output_list = out.split()
+        #output_list = string.split(fout.readline())
+        #fout.close()
 
         if output_list is None:
             return ('', 0.0)

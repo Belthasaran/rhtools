@@ -98,7 +98,19 @@ class Bot(commands.Bot):
         if 'debuglevel' in self.botconfig['twitch']:
             self.debuglevel = int(self.botconfig['twitch']['debuglevel'])
 
+        self.showmessages = 0
+        if 'showmessages' in self.botconfig['twitch']:
+            self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
+        self.chmode_interval1 = 20
+        self.chmode_interval2 = 160
+        try:
+            if 'crowdcontrol' in botconfig and 'chmode_interval1' in botconfig['crowdcontrol']:
+                self.chmode_interval1 = int(botconfig['crowdcontrol']['chmode_interval1'])
+            if 'crowdcontrol' in botconfig and 'chmode_interval2' in botconfig['crowdcontrol']:
+                self.chmode_interval2 = int(botconfig['crowdcontrol']['chmode_interval2'])
+        except:
+            pass
         self.rhinfo = None
         self.ccflag = False
         self.logger = logging.getLogger("swtbot")
@@ -673,7 +685,8 @@ class Bot(commands.Bot):
             pass
 
     async def message_privlevel(self,message):
-        print('DEBUG: message.tags='  + str(message.tags))
+        if self.debuglevel > 2:
+            print('DEBUG: message.tags='  + str(message.tags))
         moderator = 0
         premium = 0
         if "user-type" in message.tags:
@@ -878,7 +891,7 @@ class Bot(commands.Bot):
 
 
         # Check message from a non-moderator against our patterns
-        if plev < 20 :
+        if self.moderation and plev < 20 :
             wordsearchresult = self.wordFilterRE.search(str(message.content).lower())
             if wordsearchresult == None:
                 wordsearchresult = self.wordFilterRE.search(str(basetext).lower())
@@ -925,7 +938,8 @@ class Bot(commands.Bot):
                      self.chatters_filt[chname].append( str(message.author.name) )
 
                  chatterList2 = list( filter(lambda x: x in self.chatters_filt[chname] , chatterList1) )
-                 self.logger.debug ("CL = " + str(chatterList1))
+                 if self.debuglevel > 1:
+                     self.logger.debug ("CL = " + str(chatterList1))
                  self.client.set("chatters_" + str(chname).lower(),  json.dumps(chatterList1) )
                  self.client2.set("chatters0_" + str(chname).lower(),  json.dumps(chatterList2) )
                  self.client2.get("chattersall_" + str(chname).lower(),  json.dumps( self.chatters_filt[chname] ) )
@@ -939,23 +953,29 @@ class Bot(commands.Bot):
              while len( self.msgbuffers[chname] ) > 1 and  self.msgbuffers[chname][0][0] + 1800 < time.time() :
                  self.msgbuffers[chname].pop(0)
                  ##
-             if (plev < 20 and firstseen > time.time() - 86400*7) and (userid_i == None or userid_i > 691426733)  :
+             if self.moderation and (plev < 20 and firstseen > time.time() - 86400*7) and (userid_i == None or userid_i > 691426733)  :
                  label, confidence = self.cltext.classify( str(message.content) )
                  label2, confidence2 = self.cltext.classify( str(basetext).lower() )
-                 self.logger.info('User ' + str(message.author.name) + ' label=' + str(label) + ' confidence=' + str(confidence) + ' label2=' + str(label2) + ' confidence2=' + str(confidence2) + ' uid=' + str(userid_i) + '  message:' + str(message.content) )
+                 self.logger.info('User(Buf) ' + str(message.author.name) + ' label=' + str(label) + ' confidence=' + str(confidence) + ' label2=' + str(label2) + ' confidence2=' + str(confidence2) + ' uid=' + str(userid_i) + '  message:' + str(message.content) )
         except Exception as err:
-             self.logger.debug("ERR: "  + str(err))
+            self.logger.debug("ERR:l0004: "  + str(err))
+            traceback.print_exc()
+
+        if self.showmessages:
+            self.logger.debug(f'plev={plev} :: {message.author.name}: {basetext}')
 
 
         if plev > 10 :
-            self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to mod+" )
+            if self.debuglevel > 0:
+                self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to mod+" )
             await self.checkfor_votes(message)
             await self.handle_commands(message)
             return
 
         # Not triggering actions against premium accounts, Unless the text hits the main phase filter
         if plev > 0 and wordsearchresult == None :
-            self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
+            if self.debuglevel > 0:
+                self.logger.debug("ACCOUNT " + str(message.author.name) + " Account skips checks due to premium" )
             await self.checkfor_votes(message)
             await self.handle_commands(message)
             return
@@ -1109,7 +1129,9 @@ class Bot(commands.Bot):
                     #usersli = await self.get_users(*usersla)
                     #self.client.set("user_" + self.userid, json.dumps(usersli))
                     #print("Z:"+str(usersli))
-                    for userent in usersli:
+                    for userentOuter in usersli:
+                        userent = userentOuter["data"][0]
+                        self.logger.error(f'X: {json.dumps(userent, indent=4)}')
                         userent["_id"] = userent["id"]      #  v5 API fields from helix request
                         userent["name"] = userent["login"]  #  v5 API fields from helix request
                         userent["bio"] = userent["description"]
@@ -1140,9 +1162,10 @@ class Bot(commands.Bot):
         try:             
             if mcloaduo != None :
                 mcloaduobj = json.loads(mcloaduo)
-                self.logger.debug('mcloaduo = ' + str(mcloaduo))
-                self.logger.debug('mcloaduobj = ' + str(mcloaduobj))
-                self.logger.debug('type(mcloaduobj) = ' + str(type(mcloaduobj)))
+                if self.debuglevel > 2:
+                    self.logger.debug('mcloaduo = ' + str(mcloaduo))
+                    self.logger.debug('mcloaduobj = ' + str(mcloaduobj))
+                    self.logger.debug('type(mcloaduobj) = ' + str(type(mcloaduobj)))
                 acctcreatedat = mcloaduobj['created_at']
                 acctbio = mcloaduobj['bio']
                 acctlogo = mcloaduobj['logo']
@@ -1182,7 +1205,8 @@ class Bot(commands.Bot):
                         self.last_temp[message.channel.name] = message.author.name
                         #await XXXX ctx.message.author
                     else:
-                        self.logger.debug("ACCOUNT " + str(message.author.name) + " Account age ("+str(datetime.timedelta(seconds=time.time()-createts))+"s)" )
+                        if self.debuglevel > 2:
+                            self.logger.debug("ACCOUNT " + str(message.author.name) + " Account age ("+str(datetime.timedelta(seconds=time.time()-createts))+"s)" )
                         # Wait, didn't we already do this?
                         #try: 
                         #    useroptobj = await self.get_useropt( author.name )
@@ -1274,9 +1298,10 @@ class Bot(commands.Bot):
             self.effectlist_v[chosenElementIndex]['chosen'] = 1
             chosenEffect = self.effectlist_v[chosenElementIndex]
             self.chmode_stage = 2
-            self.chmode_timeleft = 120 # 120
-            if 'chmode_interval2' in botconfig['crowdcontrol']:
-                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
+            self.chmode_timeleft = self.chmode_interval2
+            #self.chmode_timeleft = 120 # 120
+            #if 'chmode_interval2' in botconfig['crowdcontrol']:
+            #    self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
             effectAmount = 1
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
@@ -1284,7 +1309,11 @@ class Bot(commands.Bot):
             if chosenEffect['d']['type'] == 'crowdcontrol':
                 print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
                 try:
-                    self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                    result = self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                    if not(result):
+                        self.logger.error(f'ERR:ccinteract.requestEffect: Failed')
+                    else:
+                        self.logger.info(f'Applied effect')
                 except Exception as xerr:
                     self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
 
@@ -1311,15 +1340,16 @@ class Bot(commands.Bot):
                         entry['amount'] = xoff + minimum_qty
                         entry['text'] = entry['text'] + f' (x{entry["amount"]})'
                 except Exception as xerr1:
-                    self.logger.error('ERR: ' + str(xerr1))
+                    self.logger.error('ERR:0003: ' + str(xerr1))
                     traceback.print_exc()
                     pass
                 self.effectlist_v = self.effectlist_v + [entry]
             entry = { "text" : "[5] Random", "d" : { "name" : "random"}, "p": 0 }
             self.effectlist_v = self.effectlist_v + [entry]
-            self.chmode_timeleft = 30 # 120
-            if 'chmode_interval1' in botconfig['crowdcontrol']:
-                self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
+            self.chmode_timeleft = self.chmode_interval1
+            #self.chmode_timeleft = 30 # 120
+            #if 'chmode_interval1' in botconfig['crowdcontrol']:
+            #    self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
 
             self.chmode_stage = 1
             self.chmode = 1
@@ -1439,7 +1469,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are:  !chstart !chstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch ')
+        await ctx.send(f'@{ctx.author.name} commands are:  !chstart !chstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !chinterval ')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
@@ -2114,6 +2144,50 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.message.author.name} - rhload:Exception, error message: {xerr}' )
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
+
+    @commands.command(name='chinterval')
+    @commands.cooldown(2,1)
+    async def cmd_cch_interval(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!ccinterval( +(\d+) +(\d+)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None or paramResult.group(3) == None :
+                    await ctx.send(f'Usage: !ccinterval <delay({self.chmode_interval1})> <cooldown({self.chmode_interval2})>')
+                else:
+                    interval1 = int(paramResult.group(2))
+                    interval2 = int(paramResult.group(3))
+                    #
+                    if (interval2 > 3600):
+                        interval2 = 3600
+                    if (interval1 > 3600):
+                        interval1 = 3600
+                    if (interval2 < 10):
+                        interval2 = 10
+                    if (interval1 < 1):
+                        interval1 = 1
+                    if (interval1 + interval2 < 20):
+                        interval2 = 20 - (interval1 + interval2)
+                    if (interval2 < 10):
+                        interval2 = 10
+                    self.chmode_interval1 = interval1
+                    self.chmode_interval2 = interval2
+                    await ctx.send(f'@{ctx.author.name} - Intervals reset: {self.chmode_interval1} {self.chmode_interval2} ')
+
+            except Exception as rex1:
+                self.logger.debug('ERR:ccinterval:rex1:' + str(rex1))
+        else:
+            await ctx.send(f'Usage: !ccinterval <delay({self.chmode_interval1})> <cooldown({self.chmode_interval2})>')
+            pass
+
+
+
+
+
 
     @commands.command(name='ccflag')
     @commands.cooldown(2,1)
