@@ -38,6 +38,7 @@
 			  console.log("" + event.data);
 
 			  if (('rhinfo' in data)) {
+					   simethod = data['rhinfo']['method'];
 					   siname = data['rhinfo']['name'];
 					   siauthors = data['rhinfo']['authors'];
 					   siadded = data['rhinfo']['added'];
@@ -55,9 +56,10 @@
 					    }
 					   
 					   gameval = "<TABLE ID=\"infotable\"><TR><TD>";
-					   gameval += escapeHTML(data['rhinfo']['method']) + escapeHTML(data['rhinfo']['id']) + "<BR>";
+					   gameval += escapeHTML(simethod) + " " + escapeHTML(data['rhinfo']['id']) + "";
 					   gameval += escapeHTML(siname) + "<BR>";
 					   gameval += escapeHTML(siauthors) + "<BR>";
+					   gameval += escapeHTML(data['rhinfo']['type']) + "<BR>";
 					   gameval += "</TD></TR></TABLE>";
 					   $("#gamediv").html(gameval)
 
