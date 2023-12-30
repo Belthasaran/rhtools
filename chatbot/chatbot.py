@@ -1407,14 +1407,15 @@ class Bot(commands.Bot):
 
 
     # Command help
-    #@commands.command(name='swhelp')
+    @commands.command(name='help')
     async def do_help_command(self, ctx):
         return ## Temporary no longer available
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are: unspecified ')
+        await ctx.send(f'@{ctx.author.name} commands are:  !chstart !chstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch ')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
+            #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
             #await ctx.timeout(ctx.author.name, 600, 'Sorry, !swhelp is mod-only')
 
@@ -1791,7 +1792,7 @@ class Bot(commands.Bot):
             #await ctx.send(f'@{ctx.author.name} - swblock')
             c_plev = await self.cmd_privilege_level(ctx.message.author)
             if c_plev < 60:
-                await ctx.send(f'@{ctx.message.author.name} - Privilege level too low ' + str(c_plev))
+                await ctx.send(f'@{ctx.message.author.name} - Sorry, this is a restricted command {c_plev} < 60  ')
                 return
             self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
             matchResult = re.match(r'^block( +(.*)|)', ctx.message.clean_content)
@@ -1835,7 +1836,7 @@ class Bot(commands.Bot):
             #await ctx.send(f'@{ctx.author.name} - swunblock')
             c_plev = await self.cmd_privilege_level(ctx.message.author)
             if c_plev < 60:
-                await ctx.send(f'@{ctx.message.author.name} - Privilege level too low ' + str(c_plev))
+                await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
                 return
             self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
             matchResult = re.match(r'^unblock( +(.*)|)', ctx.message.clean_content)
@@ -1871,7 +1872,7 @@ class Bot(commands.Bot):
             #await ctx.send(f'@{ctx.author.name} - swunblock')
             c_plev = await self.cmd_privilege_level(ctx.message.author)
             if c_plev < 60:
-                await ctx.send(f'@{ctx.message.author.name} - Privilege level too low ' + str(c_plev))
+                await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
                 return
             self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
             matchResult = re.match(r'^setlevel( +(.*) (-?[0-9]+)|)', ctx.message.clean_content)
@@ -1974,6 +1975,7 @@ class Bot(commands.Bot):
     async def cmd_snesmenu(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
         self.rhinfo = None
         try:
            await cmd_menu.snes_menu()
@@ -1986,6 +1988,7 @@ class Bot(commands.Bot):
     async def cmd_snesboot(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
         self.rhinfo = None
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9\.\/]','_', str(text))
@@ -2016,6 +2019,7 @@ class Bot(commands.Bot):
     async def cmd_snesreset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
         try:
            await cmd_reset.snes_reset()
         except Exception as xerr:
