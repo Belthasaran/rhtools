@@ -1,7 +1,7 @@
 <html>
  <script src="jquery-3.7.1.min.js"></script>
  <script>
-	 //$("#chmodediv").hide()
+	 //$("#shmodediv").hide()
 	 ws=new WebSocket('ws://127.0.0.1:1889/')
 
 	 function escapeHTML(html) {
@@ -29,9 +29,9 @@
 			  data = JSON.parse(event.data);
 			  //console.log("R <- " + JSON.stringify(event.data))
 			  console.log("R <- event.data");
-			  //data['chmode'] = 1;
-			  //data['chmode_stage'] = 2;
-			  //data['chmode_timeleft'] = 60;
+			  //data['shmode'] = 1;
+			  //data['shmode_stage'] = 2;
+			  //data['shmode_timeleft'] = 60;
 			  event.data = JSON.stringify(data);
 
 
@@ -75,22 +75,22 @@
 			   }
 
 			  $("#xya").text(" ");
-			  if (data["chmode"] == 0 || data["chmode_stage"] == 0) {
-					  // $("#chmodediv").hide()
+			  if (data["shmode"] == 0 || data["shmode_stage"] == 0) {
+					  // $("#shmodediv").hide()
 					   textval = ("Websocket ws://127.1.0.10:11889<br>Connected: Currently in standby mode " +
 						               (Date.now()+""))
-					   $("#chmodediv").html(textval)
+					   $("#shmodediv").html(textval)
 					   return
 
 			   } else {
 					    maxpval = 0;
 					    textval = "";
 
-					    if(data['chmode_stage'] == 1) {
-					       textval += "Next random affect in  " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+					    if(data['shmode_stage'] == 1) {
+					       textval += "Next random affect in  " + ("" + data['shmode_timeleft']).toHHMMSS() + "<br>";
 					     }
-					    if(data['chmode_stage'] == 2) {
-                                               textval += "Cooldown for " + ("" + data['chmode_timeleft']).toHHMMSS() + "<br>";
+					    if(data['shmode_stage'] == 2) {
+                                               textval += "Cooldown for " + ("" + data['shmode_timeleft']).toHHMMSS() + "<br>";
                                              }
 
 					    textval += "<hr>"
@@ -105,12 +105,12 @@
 					    for(ei of data["effectlist_v"]) {
 							     eitext = ei["text"]
 							     ptext = ""
-							     if(data["chmode_stage"] == 2 && eitext.indexOf(" ") > 1) {
+							     if(data["shmode_stage"] == 2 && eitext.indexOf(" ") > 1) {
 								    firstSpace = eitext.indexOf(" ");
 									      eitext = eitext.substr(firstSpace)
 
 								      }
-							     if((ei["p"] == maxpval && data['chmode_stage']<2 ) || ei["chosen"] == 1) {
+							     if((ei["p"] == maxpval && data['shmode_stage']<2 ) || ei["chosen"] == 1) {
 								boldo = "<b>";
 							      boldc = "</b>";
 							      } else {
@@ -125,26 +125,26 @@
 						 }
 						     textval = textval + "<hr>";
 						    if (("interact_link" in data) && data["interact_link"]) {
-								     textval += "<B>!CrowdControl</B><br>";
+								     textval += "<B>Effect shuffle via !CrowdControl</B><br>";
 								     textval += "<p>" + escapeHTML(data["interact_link"]) + "</p>";
 
 						     }
 					  }
 			  //$("#gamediv").html(gameval);
 			  $("#gamediv").show();
-			  $("#chmodediv").html(textval);
-			  $("#chmodediv").show();
+			  $("#shmodediv").html(textval);
+			  $("#shmodediv").show();
 		  })
 
 	 function wsOnOpen(event) {
-			  query = { "query" : "chmode" };
+			  query = { "query" : "shmode" };
 			  ws.send( JSON.stringify(query) );
 			  console.log("S ->" + JSON.stringify(query));
 			  setTimeout(wsOnOpen, 2000);
 	  }
 	 ws.addEventListener('open', wsOnOpen);
 	 ws.addEventListener('close', function() { 
-			   $("#chmodediv").html("Websocket ws://127.1.0.10:11889<br>Error or Connection Reset: Retry in 5 seconds " +
+			   $("#shmodediv").html("Websocket ws://127.1.0.10:11889<br>Error or Connection Reset: Retry in 5 seconds " +
                                                                (Date.now()+""));
 			  setTimeout(location.reload(),5000); 
          })
@@ -154,7 +154,7 @@
 #infotable {
     opacity: 0.80;
 }
-#chmodediv {
+#shmodediv {
 	width: 600px;
 	overflow-wrap: break-word;
 }
@@ -174,7 +174,7 @@
  <body>
 	 <div id="gamediv">
 	 </div>
-	 <div id="chmodediv">
+	 <div id="shmodediv">
 		 Attempting to connect<br>
 		 ws://127.1.0.10:11889
 	 </div>

@@ -102,25 +102,25 @@ class Bot(commands.Bot):
         if 'showmessages' in self.botconfig['twitch']:
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
-        self.chmode_costweighted = 0
-        self.chmode_interval1 = 20
-        self.chmode_interval2 = 160
+        self.shmode_costweighted = 0
+        self.shmode_interval1 = 20
+        self.shmode_interval2 = 160
         try:
             interval1  = 20
             interval2 = 160
 
-            if 'crowdcontrol' in botconfig and 'chmode_costweighted' in botconfig['crowdcontrol']:
-                self.chmode_costweighted = int(botconfig['crowdcontrol']['chmode_costweighted'])
-            if 'crowdcontrol' in botconfig and 'chmode_costweighted' in botconfig['crowdcontrol']:
-                self.chmode_poolweighted = int(botconfig['crowdcontrol']['chmode_poolweighted'])
+            if 'crowdcontrol' in botconfig and 'shmode_costweighted' in botconfig['crowdcontrol']:
+                self.shmode_costweighted = int(botconfig['crowdcontrol']['shmode_costweighted'])
+            if 'crowdcontrol' in botconfig and 'shmode_costweighted' in botconfig['crowdcontrol']:
+                self.shmode_poolweighted = int(botconfig['crowdcontrol']['shmode_poolweighted'])
 
 
 
-            if 'crowdcontrol' in botconfig and 'chmode_interval1' in botconfig['crowdcontrol']:
-                interval1 = int(botconfig['crowdcontrol']['chmode_interval1'])
-            if 'crowdcontrol' in botconfig and 'chmode_interval2' in botconfig['crowdcontrol']:
-                interval2 = int(botconfig['crowdcontrol']['chmode_interval2'])
-            [self.chmode_interval1, self.chmode_interval2] = self.conform_cc_intervals(interval1, interval2)
+            if 'crowdcontrol' in botconfig and 'shmode_interval1' in botconfig['crowdcontrol']:
+                interval1 = int(botconfig['crowdcontrol']['shmode_interval1'])
+            if 'crowdcontrol' in botconfig and 'shmode_interval2' in botconfig['crowdcontrol']:
+                interval2 = int(botconfig['crowdcontrol']['shmode_interval2'])
+            [self.shmode_interval1, self.shmode_interval2] = self.conform_cc_intervals(interval1, interval2)
         except:
             pass
         self.rhinfo = None
@@ -144,9 +144,9 @@ class Bot(commands.Bot):
         self.filterExpr = ''
         self.filterjson = None
         self.wordFilterRE = None
-        self.chmode =0 
-        self.chmode_stage = 0
-        self.chmode_timeleft = 0
+        self.shmode =0 
+        self.shmode_stage = 0
+        self.shmode_timeleft = 0
         self.ccinteract = ccinteract.CrowdInteract(logger=self.logger)
         self.effectlist = []
         self.effectlist_v = []
@@ -299,22 +299,22 @@ class Bot(commands.Bot):
             answer = { 'status' : 'error' }
             try:
                 data = json.loads(message)
-                if data['query'] == 'chmode' :
+                if data['query'] == 'shmode' :
                     if self.rhinfo:
                         answer['rhinfo'] = self.rhinfo
                     if self.ccflag:
                         answer['ccflag'] = self.ccflag
                     else:
                         answer['ccflag'] = False
-                    answer['chmode'] = self.chmode
-                    answer['chmode_stage'] = self.chmode_stage
-                    answer['chmode_timeleft'] = self.chmode_timeleft
-                    answer['chmode_active'] = 0
+                    answer['shmode'] = self.shmode
+                    answer['shmode_stage'] = self.shmode_stage
+                    answer['shmode_timeleft'] = self.shmode_timeleft
+                    answer['shmode_active'] = 0
                     answer['interact_link'] = botconfig['crowdcontrol']['interact_link']
                     answer['status'] = 'ok'
-                    if self.chmode == 0 :
+                    if self.shmode == 0 :
                         answer['effectlist_v'] = []
-                    elif self.chmode == 1 :
+                    elif self.shmode == 1 :
                         answer['effectlist_v'] = self.effectlist_v
             except Exception as xerr:
                 answer = { 'status' : 'error',  'note' : str(xerr) }
@@ -817,7 +817,7 @@ class Bot(commands.Bot):
         try:
             basetext = message.content
             #self.logger.debug(f'check_for_votes: {message.author.name.lower()}: {message.content}')
-            if re.match('^\d+$', message.content) and self.chmode == 1 and self.chmode_stage == 1:
+            if re.match('^\d+$', message.content) and self.shmode == 1 and self.shmode_stage == 1:
                 self.logger.debug('Vote: {message.author.name.lower()}: {message.content}')
                 if (message.author.name.lower() in self.effectlist_voters):
                     return ## that user already voted
@@ -976,6 +976,13 @@ class Bot(commands.Bot):
         if self.showmessages:
             self.logger.debug(f'plev={plev} :: {message.author.name}: {basetext} :: {message.author.id} ')
 
+        # Skip legacy handlineg &  debug log collection 
+        if not('userdb' in botconfig['twitch']) or not(botconfig['twitch']['userdb'] == '1'):
+            if self.debuglevel > 0 :
+                self.logger.debug("Skip legacy checks and proceed to command processing")
+            await self.checkfor_votes(message)
+            await self.handle_commands(message)
+            return
 
         if plev > 10 :
             if self.debuglevel > 0:
@@ -1275,18 +1282,18 @@ class Bot(commands.Bot):
             await self.handle_commands(message)
 
     @routines.routine(seconds=2.0)
-    async def chaos_loop_1(self, arg: str):
-        self.chaos_loop_interval = 1 # 2
-        if self.chmode_timeleft % 20 == 0:
-            print(f'Ok - Loop1 chmode={self.chmode}, chmode_stage={self.chmode_stage}, time_left={self.chmode_timeleft}')
+    async def shuffle_loop_1(self, arg: str):
+        self.shuffle_loop_interval = 1 # 2
+        if self.shmode_timeleft % 20 == 0:
+            print(f'Ok - Loop1 shmode={self.shmode}, shmode_stage={self.shmode_stage}, time_left={self.shmode_timeleft}')
         #print(f'Ok - Loop 1')
-        if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft == 0:
-            self.chmode_stage = 0
-        if self.chmode == 1 and self.chmode_stage == 2 and self.chmode_timeleft > 0:
-            self.chmode_timeleft = self.chmode_timeleft - self.chaos_loop_interval
-            if self.chmode_timeleft < 0:
-                self.chmode_timeleft = 0
-        if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft == 0:
+        if self.shmode == 1 and self.shmode_stage == 2 and self.shmode_timeleft == 0:
+            self.shmode_stage = 0
+        if self.shmode == 1 and self.shmode_stage == 2 and self.shmode_timeleft > 0:
+            self.shmode_timeleft = self.shmode_timeleft - self.shuffle_loop_interval
+            if self.shmode_timeleft < 0:
+                self.shmode_timeleft = 0
+        if self.shmode == 1 and self.shmode_stage == 1 and self.shmode_timeleft == 0:
             maxpval = 0
             for ee in self.effectlist_v:
                 if int(ee["p"]) > maxpval:
@@ -1309,11 +1316,11 @@ class Bot(commands.Bot):
 
             self.effectlist_v[chosenElementIndex]['chosen'] = 1
             chosenEffect = self.effectlist_v[chosenElementIndex]
-            self.chmode_stage = 2
-            self.chmode_timeleft = self.chmode_interval2
-            #self.chmode_timeleft = 120 # 120
-            #if 'chmode_interval2' in botconfig['crowdcontrol']:
-            #    self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval2'])
+            self.shmode_stage = 2
+            self.shmode_timeleft = self.shmode_interval2
+            #self.shmode_timeleft = 120 # 120
+            #if 'shmode_interval2' in botconfig['crowdcontrol']:
+            #    self.shmode_timeleft = int(botconfig['crowdcontrol']['shmode_interval2'])
             effectAmount = 1
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
@@ -1323,7 +1330,7 @@ class Bot(commands.Bot):
 
                 try:
                     pass
-                    if self.chmode_poolweighted and 'pool' in chosenEffect['d']['ccobject']:
+                    if self.shmode_poolweighted and 'pool' in chosenEffect['d']['ccobject']:
                         missingAmount = int(chosenEffect['d']['price']) - int(chosenEffect['d']['ccobject']['pool'])
                         result = self.ccinteract.poolToEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], amountValue=missingAmount )
                         if not(result):
@@ -1345,14 +1352,14 @@ class Bot(commands.Bot):
                     except Exception as xerr:
                         self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
 
-        if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
-            print(f'Chmode 1 Stage 1:  Time_Left: {self.chmode_timeleft}')
-            self.chmode_timeleft = self.chmode_timeleft - self.chaos_loop_interval
-            if self.chmode_timeleft < 0:
-                self.chmode_timeleft = 0
+        if self.shmode == 1 and self.shmode_stage == 1 and self.shmode_timeleft > 0:
+            print(f'Shuffle-mode 1 Stage 1:  Time_Left: {self.shmode_timeleft}')
+            self.shmode_timeleft = self.shmode_timeleft - self.shuffle_loop_interval
+            if self.shmode_timeleft < 0:
+                self.shmode_timeleft = 0
 
-        if self.chmode == 0 or self.chmode_stage == 0:
-            self.chmode = 0
+        if self.shmode == 0 or self.shmode_stage == 0:
+            self.shmode = 0
             self.effectlist_s = self.effectlist
             self.effectlist_voters = {}
             random.shuffle(self.effectlist_s)
@@ -1360,7 +1367,7 @@ class Bot(commands.Bot):
             nullprice = 50
             #
             #
-            if self.chmode_costweighted > 0 or self.chmode_costweighted < 0:
+            if self.shmode_costweighted > 0 or self.shmode_costweighted < 0:
                 try:
                     await asyncio.sleep(2)
                     await self.cc_refresh_effectlist()
@@ -1373,32 +1380,32 @@ class Bot(commands.Bot):
                     for i in range(len(self.effectlist_s)):
                         if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
                             thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
-                            if self.chmode_costweighted < 0  and -self.chmode_costweighted > thisPrice:
-                                thisPrice = -self.chmode_costweighted
+                            if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
+                                thisPrice = -self.shmode_costweighted
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
-                        if self.chmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
+                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
                             thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
-                            if self.chmode_poolweighted < 0 and -self.chmode_poolweighted > thisPooled:
-                                thisPooled = -self.chmode_poolweighted
+                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
+                                thisPooled = -self.shmode_poolweighted
                         totalPrice = totalPrice + thisPrice
                         if thisPrice > maxPrice:
                             maxPrice = thisPrice
-                        if self.chmode_poolweighted:
+                        if self.shmode_poolweighted:
                             totalPool = totalPools + thisPooled
                     for i in range(len(self.effectlist_s)):
                         if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
                             thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
-                            if self.chmode_costweighted < 0  and -self.chmode_costweighted > thisPrice:
-                                thisPrice = -self.chmode_costweighted
+                            if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
+                                thisPrice = -self.shmode_costweighted
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
-                        if self.chmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
+                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
                             thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
-                            if self.chmode_poolweighted < 0 and -self.chmode_poolweighted > thisPooled:
-                                thisPooled = -self.chmode_poolweighted
+                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
+                                thisPooled = -self.shmode_poolweighted
                         inversePrice = 1 + maxPrice - thisPrice
                         totalInversePrice = totalInversePrice + inversePrice
                         costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
@@ -1438,14 +1445,14 @@ class Bot(commands.Bot):
                 self.effectlist_v = self.effectlist_v + [entry]
             entry = { "text" : "[5] Random", "d" : { "name" : "random"}, "p": 0 }
             self.effectlist_v = self.effectlist_v + [entry]
-            self.chmode_timeleft = self.chmode_interval1
-            #self.chmode_timeleft = 30 # 120
-            #if 'chmode_interval1' in botconfig['crowdcontrol']:
-            #    self.chmode_timeleft = int(botconfig['crowdcontrol']['chmode_interval1'])
+            self.shmode_timeleft = self.shmode_interval1
+            #self.shmode_timeleft = 30 # 120
+            #if 'shmode_interval1' in botconfig['crowdcontrol']:
+            #    self.shmode_timeleft = int(botconfig['crowdcontrol']['shmode_interval1'])
 
-            self.chmode_stage = 1
-            self.chmode = 1
-            with open("chmode_effect_choices_temp.json", 'w') as soutfile:
+            self.shmode_stage = 1
+            self.shmode = 1
+            with open("shmode_effect_choices_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.effectlist_v, indent=4))
 
 
@@ -1460,9 +1467,9 @@ class Bot(commands.Bot):
     #        return
     #    self.effectlist = []
     #    self.effectlist = self.effectlist + self.smweffects_local()
-    #    self.chmode = 0
-    #    self.chmode_stage = 0
-    #    self.chaos_loop_1.start('Test')
+    #    self.shmode = 0
+    #    self.shmode_stage = 0
+    #    self.shuffle_loop_1.start('Test')
 
     @commands.command(name='ccinteract')
     @commands.cooldown(1,10)
@@ -1480,24 +1487,24 @@ class Bot(commands.Bot):
 
 
 
-    @commands.command(name='chstop')
+    @commands.command(name='shstop')
     @commands.cooldown(2,1)
-    async def do_chstop_command(self,ctx):
+    async def do_shstop_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
             return
         try:
-           self.chmode = 0
-           self.chaos_loop_1.cancel()
-           self.chmode = 0
-           self.chmode_stage = 0
-           self.chmode_timeleft = 0
+           self.shmode = 0
+           self.shuffle_loop_1.cancel()
+           self.shmode = 0
+           self.shmode_stage = 0
+           self.shmode_timeleft = 0
            #self.effectlist = []
            self.effectlist_v = []
            await ctx.send(f'@{ctx.author.name}, Okay.')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
-            self.logger.debug(f'chstop:ERR: {xerr0}')
+            self.logger.debug(f'shstop:ERR: {xerr0}')
             traceback.print_exc()
 
     async def cc_refresh_effectlist(self):
@@ -1532,14 +1539,14 @@ class Bot(commands.Bot):
 
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
-            self.logger.debug(f'chstart:1:ERR {xerr0}')
+            self.logger.debug(f'shstart:1:ERR {xerr0}')
             traceback.print_exc()
             return
 
 
-    @commands.command(name='chstart')
+    @commands.command(name='shstart')
     @commands.cooldown(2,1)
-    async def do_chstart_command(self,ctx):
+    async def do_shstart_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
             return
@@ -1572,17 +1579,17 @@ class Bot(commands.Bot):
 
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
-            self.logger.debug(f'chstart:1:ERR {xerr0}')
+            self.logger.debug(f'shstart:1:ERR {xerr0}')
             traceback.print_exc()
             return
-        self.chmode = 0
-        self.chmode_stage = 0
+        self.shmode = 0
+        self.shmode_stage = 0
         try:
-            await ctx.send(f'@{ctx.author.name} - Okay, chaos starting. ccinteract:game_name:{self.cc_gamepack_name}')
-            await self.chaos_loop_1.start('Test')
+            await ctx.send(f'@{ctx.author.name} - Okay, Shuffle effect mode starting. ccinteract:game_name:{self.cc_gamepack_name}')
+            await self.shuffle_loop_1.start('Test')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Tried, but an exception was raised.')
-            self.logger.debug(f'chstart:2:ERR: {xerr0}')
+            self.logger.debug(f'shstart:2:ERR: {xerr0}')
             traceback.print_exc()
             pass
 
@@ -1597,7 +1604,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are:  !chstart !chstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !chinterval ')
+        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval ')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
@@ -2289,7 +2296,7 @@ class Bot(commands.Bot):
         return [interval1, interval2]
     
 
-    @commands.command(name='chinterval')
+    @commands.command(name='shinterval')
     @commands.cooldown(2,1)
     async def cmd_cch_interval(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
@@ -2301,27 +2308,27 @@ class Bot(commands.Bot):
         if paramResult != None:
             try:
                 if paramResult.group(2) == None or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !ccinterval <delay({self.chmode_interval1})> <cooldown({self.chmode_interval2})>')
+                    await ctx.send(f'Usage: !ccinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
                 else:
                     interval1 = int(paramResult.group(2))
                     interval2 = int(paramResult.group(3))
                     # no 4
                     if paramResult.group(5) and paramResult.group(6):
-                        self.chmode_costweighted = int(paramResult.group(5))
-                        self.chmode_poolweighted = int(paramResult.group(6))
+                        self.shmode_costweighted = int(paramResult.group(5))
+                        self.shmode_poolweighted = int(paramResult.group(6))
 
 
                     #
                     [interval1, interval2] = self.conform_cc_intervals(interval1,interval2)
-                    self.chmode_interval1 = interval1
-                    self.chmode_interval2 = interval2
-                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.chmode_interval1} cooldown_between_rounds(in seconds)={self.chmode_interval2} costweight={self.chmode_costweighted} poolweight={self.chmode_poolweighted} ')
+                    self.shmode_interval1 = interval1
+                    self.shmode_interval2 = interval2
+                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.shmode_interval1} cooldown_between_rounds(in seconds)={self.shmode_interval2} costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
 
 
             except Exception as rex1:
                 self.logger.debug('ERR:ccinterval:rex1:' + str(rex1))
         else:
-            await ctx.send(f'Usage: !ccinterval <delay({self.chmode_interval1})> <cooldown({self.chmode_interval2})>')
+            await ctx.send(f'Usage: !ccinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
             pass
 
 
@@ -2349,7 +2356,7 @@ class Bot(commands.Bot):
                         self.ccflag = True
                     elif text=="off" or text=="0" or text=="no":
                         self.ccflag = False
-                    await ctx.send(f'{ctx.author.name} - crowd control flag set to {self.ccflag}')
+                    await ctx.send(f'{ctx.author.name} - crowd control status set to: {self.ccflag}')
                     pass
             except Exception as rex1:
                 self.logger.debug('ERR:rex1:' + str(rex1))
