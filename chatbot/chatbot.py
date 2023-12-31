@@ -1604,7 +1604,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval ')
+        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval !shpweight !shcweight ')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
@@ -2295,6 +2295,53 @@ class Bot(commands.Bot):
             interval2 = 10
         return [interval1, interval2]
     
+    @commands.command(name='shcweight')
+    @commands.cooldown(2,1)
+    async def cmd_csh_cweight(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!shcweight( +(\d+))?|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None or paramResult.group(3) == None :
+                    await ctx.send(f'Usage: !shcweight <integer>')
+                else:
+                    value  = int(paramResult.group(2))
+                    self.shmode_costweighted = value
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
+            except Exception as rex1:
+                self.logger.debug('ERR:shcweight:rex1:' + str(rex1))
+        else:
+            await ctx.send(f'Usage: !shcweight <integer>')
+            pass
+
+    @commands.command(name='shpweight')
+    @commands.cooldown(2,1)
+    async def cmd_csh_pweight(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!shpweight( +(\d+))?|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None or paramResult.group(3) == None :
+                    await ctx.send(f'Usage: !shpweight <integer>')
+                else:
+                    value  = int(paramResult.group(2))
+                    self.shmode_poolweighted = value
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
+            except Exception as rex1:
+                self.logger.debug('ERR:shpweight:rex1:' + str(rex1))
+        else:
+            await ctx.send(f'Usage:!shpweight <integer({self.shmode_costweighted})>')
+            pass
+
+
 
     @commands.command(name='shinterval')
     @commands.cooldown(2,1)
@@ -2304,11 +2351,11 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!ccinterval( +(\d+) +(\d+)( +(-?\d+) +(-?\d+))?|)', text)
+        paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+) +(-?\d+))?|)', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !ccinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
+                    await ctx.send(f'Usage: !shinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
                 else:
                     interval1 = int(paramResult.group(2))
                     interval2 = int(paramResult.group(3))
@@ -2326,9 +2373,9 @@ class Bot(commands.Bot):
 
 
             except Exception as rex1:
-                self.logger.debug('ERR:ccinterval:rex1:' + str(rex1))
+                self.logger.debug('ERR:shinterval:rex1:' + str(rex1))
         else:
-            await ctx.send(f'Usage: !ccinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
+            await ctx.send(f'Usage: !shinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
             pass
 
 
