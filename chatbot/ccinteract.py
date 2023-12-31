@@ -141,6 +141,43 @@ class CrowdInteract():
             self.logger.error(f'ccinteract:requestEffect fail status={response.status_code} {response.text}')
             return None
 
+    #
+    def poolToEffect(self,game_session_id, effectObject, effectQuantity=1, amountValue=1):
+        cc_auth_token = apptoken.get_token_secrets(onekey='cc-auth-token')
+        ccuid_raw = apptoken.get_token_secrets(onekey='ccuid')
+        ccuid_urlencoded = urllib.parse.quote(ccuid_raw)
+        game_session_id_urlencoded = urllib.parse.quote(game_session_id)
+
+        if not('quantity' in effectObject):
+            effectQuantity = 1
+        else:
+            if 'min' in effectObject['quantity'] and effectQuantity < effectObject['quantity']['min']:
+                effectQuantity = effectObject['quantity']['min']
+            if 'max' in effectObject['quantity'] and effectQuantity > effectObject['quantity']['max']:
+                effectQuantity = effectObject['quantity']['max']
+
+        url = 'https://trpc.crowdcontrol.live/gameSession.requestEffect'
+        requestObject = {
+                'gameSessionID' : game_session_id,
+                'effectType' :  effectObject['type'],
+                'effectID'   :  effectObject['effectID'],
+                'amount'     :  amountValue,
+                'anonymous'  :  True
+                }
+        response = requests.post(url,
+                json = requestObject,
+                headers = self.getRequestHeaders(cc_auth_token))
+        if response.status_code == 200:
+            self.logger.info('ccinteract:getSessionInfo success')
+            self.logger.debug(f'Content = {response.content}')
+            return json.loads(response.content)['result']['data']['effectRequest']
+        else:
+            self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')
+            return None
+
+
+
+
 #
 #  Query the session and attempt to request a randomized affect -> 
 #
