@@ -102,13 +102,25 @@ class Bot(commands.Bot):
         if 'showmessages' in self.botconfig['twitch']:
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
+        self.chmode_costweighted = 0
         self.chmode_interval1 = 20
         self.chmode_interval2 = 160
         try:
+            interval1  = 20
+            interval2 = 160
+
+            if 'crowdcontrol' in botconfig and 'chmode_costweighted' in botconfig['crowdcontrol']:
+                self.chmode_costweighted = int(botconfig['crowdcontrol']['chmode_costweighted'])
+            if 'crowdcontrol' in botconfig and 'chmode_costweighted' in botconfig['crowdcontrol']:
+                self.chmode_poolweighted = int(botconfig['crowdcontrol']['chmode_poolweighted'])
+
+
+
             if 'crowdcontrol' in botconfig and 'chmode_interval1' in botconfig['crowdcontrol']:
-                self.chmode_interval1 = int(botconfig['crowdcontrol']['chmode_interval1'])
+                interval1 = int(botconfig['crowdcontrol']['chmode_interval1'])
             if 'crowdcontrol' in botconfig and 'chmode_interval2' in botconfig['crowdcontrol']:
-                self.chmode_interval2 = int(botconfig['crowdcontrol']['chmode_interval2'])
+                interval2 = int(botconfig['crowdcontrol']['chmode_interval2'])
+            [self.chmode_interval1, self.chmode_interval2] = self.conform_cc_intervals(interval1, interval2)
         except:
             pass
         self.rhinfo = None
@@ -962,7 +974,7 @@ class Bot(commands.Bot):
             traceback.print_exc()
 
         if self.showmessages:
-            self.logger.debug(f'plev={plev} :: {message.author.name}: {basetext}')
+            self.logger.debug(f'plev={plev} :: {message.author.name}: {basetext} :: {message.author.id} ')
 
 
         if plev > 10 :
@@ -1307,15 +1319,31 @@ class Bot(commands.Bot):
                 effectAmount = chosenEffect['amount']
             print(f":: chosenEffect : " + json.dumps(chosenEffect))
             if chosenEffect['d']['type'] == 'crowdcontrol':
-                print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
+                effectApplied = 0
+
                 try:
-                    result = self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
-                    if not(result):
-                        self.logger.error(f'ERR:ccinteract.requestEffect: Failed')
-                    else:
-                        self.logger.info(f'Applied effect')
+                    pass
+                    if self.chmode_poolweighted and 'pool' in chosenEffect['d']['ccobject']:
+                        missingAmount = int(chosenEffect['d']['price']) - int(chosenEffect['d']['ccobject']['pool'])
+                        result = self.ccinteract.poolToEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], amountValue=missingAmount )
+                        if not(result):
+                            self.logger.error(f'ERR:ccinteract.poolToEffect: Failed')
+                        else:
+                            effectApplied = True #  OK
+                        #    def poolToEffect(self,game_session_id, effectObject, effectQuantity=1, amountValue=1):
                 except Exception as xerr:
-                    self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
+                    self.logger.error(f'ccinteract:poolWeighted:exception ERR: {xerr}')
+
+                if not(effectApplied):
+                    print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
+                    try:
+                        result = self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                        if not(result):
+                            self.logger.error(f'ERR:ccinteract.requestEffect: Failed')
+                        else:
+                            self.logger.info(f'Applied effect')
+                    except Exception as xerr:
+                        self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
 
         if self.chmode == 1 and self.chmode_stage == 1 and self.chmode_timeleft > 0:
             print(f'Chmode 1 Stage 1:  Time_Left: {self.chmode_timeleft}')
@@ -1329,8 +1357,72 @@ class Bot(commands.Bot):
             self.effectlist_voters = {}
             random.shuffle(self.effectlist_s)
             self.effectlist_v = []
+            nullprice = 50
+            #
+            #
+            if self.chmode_costweighted > 0 or self.chmode_costweighted < 0:
+                try:
+                    await asyncio.sleep(2)
+                    await self.cc_refresh_effectlist()
+                    costWeights = []
+                    totalPrice = 0
+                    # inverse price = (The highest price of the most expensive effect) minus (the Price of this one effect)
+                    totalInversePrice = 0  # The sum of all effects' inversePrice
+                    totalPools = 0
+                    maxPrice = 0
+                    for i in range(len(self.effectlist_s)):
+                        if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
+                            thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
+                            if self.chmode_costweighted < 0  and -self.chmode_costweighted > thisPrice:
+                                thisPrice = -self.chmode_costweighted
+                        else:
+                            thisPrice = nullprice
+                        thisPooled = 0
+                        if self.chmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
+                            thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
+                            if self.chmode_poolweighted < 0 and -self.chmode_poolweighted > thisPooled:
+                                thisPooled = -self.chmode_poolweighted
+                        totalPrice = totalPrice + thisPrice
+                        if thisPrice > maxPrice:
+                            maxPrice = thisPrice
+                        if self.chmode_poolweighted:
+                            totalPool = totalPools + thisPooled
+                    for i in range(len(self.effectlist_s)):
+                        if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
+                            thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
+                            if self.chmode_costweighted < 0  and -self.chmode_costweighted > thisPrice:
+                                thisPrice = -self.chmode_costweighted
+                        else:
+                            thisPrice = nullprice
+                        thisPooled = 0
+                        if self.chmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
+                            thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
+                            if self.chmode_poolweighted < 0 and -self.chmode_poolweighted > thisPooled:
+                                thisPooled = -self.chmode_poolweighted
+                        inversePrice = 1 + maxPrice - thisPrice
+                        totalInversePrice = totalInversePrice + inversePrice
+                        costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
+                    effectlist_2 = np.random.choice(self.effectlist_s,size=5,replace=False,p=costWeights)
+                    self.effectlist_s = effectlist_2
+                except Exception as xerp:
+                    self.logger.error(f'ccCostWeighted: {xerp}')
+                    traceback.print_exc()
+
+                # np.random.choice(['a','b','c'],size=2,replace=False,p=[0.333333333333333,0.33333333333,0.333333333])
+                self.effectlist_s = random.choices(  )
+                #choiceWeights = []
+                #for i in range(len(self.effectlist_s)):
+                #    thisPrice = int(self.effectlist_s[i]['price'])
+                #    choiceWeights.append(thisPrice)
+
+            #
+            #
             for i in range(4):
-                entry = { 'text' :  f'{i+1}. { self.effectlist_s[i]["name"] }', 'chosen' : 0, 'p' : 0, 'd' : dict(self.effectlist_s[i])}
+                noteText = ''
+                if 'note' in self.effectlist_s[i]:
+                     noteText = ' (' + self.effectlist_s[i]["note"] + ')'
+
+                entry = { 'text' :  f'{i+1}. { self.effectlist_s[i]["name"] }{noteText}', 'chosen' : 0, 'p' : 0, 'd' : dict(self.effectlist_s[i])}
                 try:
                     if 'ccobject' in entry['d'] and 'quantity' in entry['d']['ccobject']:
                         minimum_qty = entry['d']['ccobject']['quantity']['min']
@@ -1407,6 +1499,42 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
             self.logger.debug(f'chstop:ERR: {xerr0}')
             traceback.print_exc()
+
+    async def cc_refresh_effectlist(self):
+        try:
+            #self.ccsession = self.ccinteract.getSessionInfo()
+            #with open("cc_session_temp.json", 'w') as soutfile:
+            #    soutfile.write(json.dumps(self.ccsession))
+            #self.cc_game_session_id = self.ccsession["gameSessionID"]
+            #self.cc_gamepack_name = self.ccsession["gamePack"]["game"]["name"]
+            new_cc_menuinfo = self.ccinteract.getSessionMenu(self.cc_game_session_id)
+            self.cc_menuinfo = new_cc_menuinfo
+
+            with open("cc_menu_temp_refresh.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.cc_menuinfo))
+            self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+            with open("cc_effects_temp_refresh.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.cc_effects))
+            self.effectlist = []
+            for cce in self.cc_effects:
+                myeffectinfo = dict({})
+                for ak in ['name', 'effectID', 'description']:
+                    myeffectinfo[ak] = cce[ak]
+                myeffectinfo['type'] = 'crowdcontrol'
+                myeffectinfo['ccobject'] = dict(cce)
+                self.effectlist = self.effectlist + [myeffectinfo]
+            if self.ccsession['gamePackID'] == 'SuperMarioWorld':
+                pass
+                ####
+                ####
+            with open("avail_effects_temp.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.effectlist))
+
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
+            self.logger.debug(f'chstart:1:ERR {xerr0}')
+            traceback.print_exc()
+            return
 
 
     @commands.command(name='chstart')
@@ -2145,6 +2273,22 @@ class Bot(commands.Bot):
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
+    def conform_cc_intervals(self, interval1, interval2):
+        if (interval2 > 3600):
+            interval2 = 3600
+        if (interval1 > 3600):
+            interval1 = 3600
+        if (interval2 < 10):
+            interval2 = 10
+        if (interval1 < 1):
+            interval1 = 1
+        if (interval1 + interval2 < 20):
+            interval2 = 20 - (interval1 + interval2)
+        if (interval2 < 10):
+            interval2 = 10
+        return [interval1, interval2]
+    
+
     @commands.command(name='chinterval')
     @commands.cooldown(2,1)
     async def cmd_cch_interval(self,ctx):
@@ -2153,7 +2297,7 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!ccinterval( +(\d+) +(\d+)|)', text)
+        paramResult = re.match(r'^!ccinterval( +(\d+) +(\d+)( +(-?\d+) +(-?\d+))?|)', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None or paramResult.group(3) == None :
@@ -2161,22 +2305,18 @@ class Bot(commands.Bot):
                 else:
                     interval1 = int(paramResult.group(2))
                     interval2 = int(paramResult.group(3))
+                    # no 4
+                    if paramResult.group(5) and paramResult.group(6):
+                        self.chmode_costweighted = int(paramResult.group(5))
+                        self.chmode_poolweighted = int(paramResult.group(6))
+
+
                     #
-                    if (interval2 > 3600):
-                        interval2 = 3600
-                    if (interval1 > 3600):
-                        interval1 = 3600
-                    if (interval2 < 10):
-                        interval2 = 10
-                    if (interval1 < 1):
-                        interval1 = 1
-                    if (interval1 + interval2 < 20):
-                        interval2 = 20 - (interval1 + interval2)
-                    if (interval2 < 10):
-                        interval2 = 10
+                    [interval1, interval2] = self.conform_cc_intervals(interval1,interval2)
                     self.chmode_interval1 = interval1
                     self.chmode_interval2 = interval2
-                    await ctx.send(f'@{ctx.author.name} - Intervals reset: {self.chmode_interval1} {self.chmode_interval2} ')
+                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.chmode_interval1} cooldown_between_rounds(in seconds)={self.chmode_interval2} costweight={self.chmode_costweighted} poolweight={self.chmode_poolweighted} ')
+
 
             except Exception as rex1:
                 self.logger.debug('ERR:ccinterval:rex1:' + str(rex1))
@@ -2233,10 +2373,15 @@ class Bot(commands.Bot):
         if paramResult != None:
             try:
                 if paramResult.group(2) == None :
-                    await ctx.send(f'Usage: !rhrandom <type>')
+                    await ctx.send(f'Usage: !rhrandom [+]<type>')
                     return
                 else:
                     text = paramResult.group(2).lower()
+                    loadtoo = False
+                    if text[0]=='+' or text[0]=='-':
+                        if text[0] == '+':
+                            loadtoo = True
+                        text = text[1:]
 
                     hld0 = list( filter(lambda g: 'type' in g and re.search( text, g["type"], re.I) and not(str(g["demo"])=='yes') ,
                                 loadsmwrh.get_hacklist_data()
@@ -2248,9 +2393,11 @@ class Bot(commands.Bot):
                     rhauthors = str(hld0[0]["authors"])
                     hld0 = None
 
-
-                    await ctx.send(f'{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
-                    await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+                    if loadtoo:
+                        await ctx.send(f'{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
+                        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+                    else:
+                        await ctx.send(f'{ctx.author.name} - Game #{rhid} by {rhauthors} ({rhname})')
 
                     #def hinfoMatch(hinfo,varText,ipos, iposmaximum=2000):
 
@@ -2374,6 +2521,8 @@ class Bot(commands.Bot):
                 else:
                     hnames = hnames + ('By %s: ' % h['authors'])
                 hnames = hnames + ('%s - %s' % (h['id'], h['name']))
+                if len(hnames) >= 10:
+                    break
 
         if hnames == '':
             for h in hacklist:
