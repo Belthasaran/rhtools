@@ -1320,7 +1320,7 @@ class Bot(commands.Bot):
             return # Socket already running?
 
         try:
-            while not(self.shmode == 0 and self.shmode_loop_stopping == 0g):
+            while not(self.shmode == 0 and self.shmode_loop_stopping == 0):
                 self.shmode_socket_running = 1
                 ccpubsuburl = 'wss://pubsub.crowdcontrol.live/'
                 _wstate = 0
@@ -1595,7 +1595,7 @@ class Bot(commands.Bot):
            self.effectlist_v = []
            while self.shmode_socket_running:
                await asyncio.sleep(1)
-            self.shmode_loop_stopping = 0
+           self.shmode_loop_stopping = 0
            await ctx.send(f'@{ctx.author.name}, Okay.')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
@@ -2603,7 +2603,7 @@ class Bot(commands.Bot):
                         # exclude_tags: 'suggestive dialogue',  'crude language' 'mature content' 'crude content' ]
                         excludetags  = ['adult content',"sexual content","epilepsy warning"]
                         hld0 = list( filter(lambda g: not('tags' in g) or
-                                         not(any(x in g["tags"] for x in excludetags) )  , hld0)
+                                         not(any(x in g["tags"] for x in excludetags) )  , hld0) )
 
 
 
