@@ -19,7 +19,9 @@ argvstr =  ' '.join(sys.argv[1:])
 includeCodes = ['+', '_', 'B', 'G', 'M']
 excludeCodes = ['E', 'C', 'X', 'XX', 'Z', 'ZZ', 'V', 'VB', 'U', 'S', 'L', '?', 'O', 'T', 'P']
 
-
+excludetags  = ['adult content',"sexual contet","epilepsy warning"]
+hacklist = list( filter(lambda g: not('tags' in g) or
+                                         not(any(x in g["tags"] for x in excludetags) )  , hacklist))
 if len(sys.argv) < 2:
     print('Please Specify a Type: ')
     print('Or any for ANY type.')

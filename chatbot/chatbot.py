@@ -102,6 +102,7 @@ class Bot(commands.Bot):
         if 'showmessages' in self.botconfig['twitch']:
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
+        self.shmode_socket_running = 0
         self.shmode_costweighted = 0
         self.shmode_poolweighted = 0
         self.shmode_interval1 = 20
@@ -146,6 +147,7 @@ class Bot(commands.Bot):
         self.filterjson = None
         self.wordFilterRE = None
         self.shmode =0 
+        self.shmode_loop_stopping = 0
         self.shmode_stage = 0
         self.shmode_timeleft = 0
         self.ccinteract = ccinteract.CrowdInteract(logger=self.logger)
@@ -1282,6 +1284,91 @@ class Bot(commands.Bot):
             await self.checkfor_votes(message)
             await self.handle_commands(message)
 
+    ###
+    # "game-session-menu-update","payload":{"menu":{"effects":[{"effectID":"squash","type":"game","sessionCooldown":{"startTime":1704027530,"duration":20}}]}},"timestamp":1704027530192}
+    async def cc_game_session_menu_update(payload):
+        try:
+            if 'menu' in payload and 'effects' in payload['menu']:
+                effectUpdates = payload['menu']['effects']
+                for listIndex in range(len( payload['menu']['effects']  )):
+                    item = payload['menu']['effects'][listIndex]
+                    for i in range(len(self.cc_menuinfo['effects'])):
+                        if self.cc_menuinfo['effects'][i] == item['effectID']:
+                            for key in item.keys():
+                                self.cc_menuinfo['effects'][i][key] = item[key]
+                    self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+                    await self.cc_effectlist_from_menuinfo()
+
+                    #for i in range(len(self.effectlist)):
+                    #    if self.effectlist[i]['d']['ccobject']['effectID'] == item['effectID']:
+                    #        for key in item.keys():
+                    #            self.effectlist[i]['d']['ccobject'][key] = item[key]
+                    if self.effectlist_s: 
+                        for i in range(len(self.effectlist_s)):
+                            if self.effectlist_s[i]['d']['ccobject']['effectID'] == item['effectID']:
+                                for key in item.keys():
+                                    self.effectlist_s[i]['d']['ccobject'][key] = item[key]
+                    self.logger.debug(f'OK:cc_game_session_menu_update')
+                    pass
+        except Exception as xerr:
+            self.logger.debug(f'ERR:cc_game_session_menu_update {payload}')
+            pass
+
+
+    async def shuffle_mode_websocket_client():
+        if self.shmode_socket_running:
+            return # Socket already running?
+
+        try:
+            while not(self.shmode == 0 and self.shmode_loop_stopping == 0g):
+                self.shmode_socket_running = 1
+                ccpubsuburl = 'wss://pubsub.crowdcontrol.live/'
+                _wstate = 0
+                _wtime = time.time()
+                _pingsent = _wtime
+                await asyncio.sleep(2)
+                self.logger.debug(f'websockets.connect')
+                async with websockets.connect(ccpubsuburl) as websocket:
+                    if _wstate == 0:
+                        ccuid = apptoken.get_token_secrets(onekey='ccuid')
+                        subscribe_data = { 'token' : apptoken.get_token_secrets(onekey='cc-auth-token'),
+                                'topics' : [ "ext/*/*",f"ext/*/{ccuid}", f"ext/{ccuid}/*", f"ext/{ccuid}/{ccuid}",
+                                    f"pub/{ccuid}", f"whisper/*", f"whisper/{ccuid}", f"whisper/{ccuid}/{ccuid}" ]
+                                }
+                        subscribe_payload = { "action" : "subscribe",
+                                "data" : f"{json.dumps(subscribe_data)}"
+                                }
+                        self.logger.debug('-> cc_pubsubwss:Send')
+                        await websocket.send(json.dumps(subscribe_payload))
+                        _wstate = 1
+                    if _wstate == 1:
+                        if time.time() - _pingsent > 120:
+                            await websocket.send(json.dumps({ "action" : "ping" }))
+                            _pingsent = time.time()
+                            await asyncio.sleep(1)
+                    response = await websocket.recv()
+                    self.logger.debug(f'<- cc_pubsubwss: {response}')
+                    try:
+                        incoming = json.loads(response)
+                        self.logger.debug(f'incoming: {incoming} : {json.dumps(incoming)}')
+                        if response['type'] == 'timed-effect-update':
+                            pass
+                        if response['type'] == 'game-session-menu-update':
+                            self.cc_game_session_menu_update(payload)
+                    except Exception as xerr:
+                        self.logger.debug(f'wss:err:{xerr}')
+                        traceback.print_exc()
+                        pass
+                print(response)
+                await asyncio.sleep(30)
+            #
+        except Exception as xerr:
+            self.logger.debug(f'ERR:shmode_socket:{xerr}')
+            traceback.print_exc()
+        finally:
+            self.shmode_socket_running = 0
+
+
     @routines.routine(seconds=2.0)
     async def shuffle_loop_1(self, arg: str):
         self.shuffle_loop_interval = 1 # 2
@@ -1497,16 +1584,40 @@ class Bot(commands.Bot):
         try:
            self.shmode = 0
            self.shuffle_loop_1.cancel()
+           self.shmode_loop_stopping = 1
            self.shmode = 0
            self.shmode_stage = 0
            self.shmode_timeleft = 0
            #self.effectlist = []
            self.effectlist_v = []
+           while self.shmode_socket_running:
+               await asyncio.sleep(1)
+            self.shmode_loop_stopping = 0
            await ctx.send(f'@{ctx.author.name}, Okay.')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Error: {xerr0}')
             self.logger.debug(f'shstop:ERR: {xerr0}')
             traceback.print_exc()
+
+    async def cc_effectlist_from_menuinfo(self):
+        self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+        with open("cc_effects_temp_refresh.json", 'w') as soutfile:
+                soutfile.write(json.dumps(self.cc_effects))
+        self.effectlist = []
+        for cce in self.cc_effects:
+            myeffectinfo = dict({})
+            for ak in ['name', 'effectID', 'description']:
+                myeffectinfo[ak] = cce[ak]
+            myeffectinfo['type'] = 'crowdcontrol'
+            myeffectinfo['ccobject'] = dict(cce)
+            self.effectlist = self.effectlist + [myeffectinfo]
+        if self.ccsession['gamePackID'] == 'SuperMarioWorld':
+            pass
+            ####
+            ####
+        with open("avail_effects_temp.json", 'w') as soutfile:
+            soutfile.write(json.dumps(self.effectlist))
+     #
 
     async def cc_refresh_effectlist(self):
         try:
@@ -1520,23 +1631,7 @@ class Bot(commands.Bot):
 
             with open("cc_menu_temp_refresh.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_menuinfo))
-            self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
-            with open("cc_effects_temp_refresh.json", 'w') as soutfile:
-                soutfile.write(json.dumps(self.cc_effects))
-            self.effectlist = []
-            for cce in self.cc_effects:
-                myeffectinfo = dict({})
-                for ak in ['name', 'effectID', 'description']:
-                    myeffectinfo[ak] = cce[ak]
-                myeffectinfo['type'] = 'crowdcontrol'
-                myeffectinfo['ccobject'] = dict(cce)
-                self.effectlist = self.effectlist + [myeffectinfo]
-            if self.ccsession['gamePackID'] == 'SuperMarioWorld':
-                pass
-                ####
-                ####
-            with open("avail_effects_temp.json", 'w') as soutfile:
-                soutfile.write(json.dumps(self.effectlist))
+            await self.cc_effectlist_from_menuinfo()
 
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
@@ -1552,6 +1647,14 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
             return
         try:
+            if self.shmode_loop_stopping:
+                self.logger.debug('shstart: Sleeping 1 second (still waiting for previous shstop)')
+                await asyncio.sleep(1)
+            #shuffle_mode_websocket_client()
+            asyncio.get_event_loop().run_until_complete(shuffle_mode_websocket_client())
+
+            #coro = asyncio.start_server(self.handle_echo, '127.0.0.1', 1888) #, loop=self.loop)
+            #server = self.loop.run_until_complete(coro)
             self.ccsession = self.ccinteract.getSessionInfo()
             with open("cc_session_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.ccsession))
@@ -2426,6 +2529,14 @@ class Bot(commands.Bot):
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
         paramResult = re.match(r'^!rhrandom( +(.*)|)', text)
+        m_racelevels = False
+        m_demos = False
+        m_demosonly = False
+        m_racesonly = False
+        m_contests = False
+        m_contestsonly = False
+        m_xfilters = True
+
         if paramResult != None:
             try:
                 if paramResult.group(2) == None :
@@ -2434,15 +2545,66 @@ class Bot(commands.Bot):
                 else:
                     text = paramResult.group(2).lower()
                     loadtoo = False
+                    if '%' in text:
+                        parts = text.split('%')
+                        for part in parts:
+                            if part=='races' or part=='racelevels' or part=='racelevel':
+                                m_racelevels = True
+                                m_racelevelsonly = True
+                            if part=='demos' or part=='demolevels':
+                                m_demos = True
+                                m_demosonly = True
+                            if part=='contests' or part=='contestlevels':
+                                m_contests = True
+                                m_contestsonly = True
+                            if part=='racestoo':
+                                m_racelevels = True
+                            if part=='nofilters':
+                                m_xfilters=False
+                            if part=='all' or part=='anything':
+                                m_racelevels = True
+                                m_demos = True
+                                m_contests = True
+                        text = parts[-1]
                     if text[0]=='+' or text[0]=='-':
                         if text[0] == '+':
                             loadtoo = True
                         text = text[1:]
 
-                    hld0 = list( filter(lambda g: 'type' in g and re.search( text, g["type"], re.I) and not(str(g["demo"])=='yes') ,
+                    hld0 = list( filter(lambda g: 'type' in g and re.search( text, g["type"], re.I) and (m_demos or not(str(g["demo"])=='yes')) ,
                                 loadsmwrh.get_hacklist_data()
                                 )
                             )
+                    yesvalues = ['yes', 'true', '1']
+                    novalues = ['', 'false', 'no', '0']
+                    if m_demosonly:
+                        hld0 = list( filter(lambda g: yesvalues in str(g['demo']).lower() or  
+                                     'demo' in tags )  , hld0)
+                    if not(m_races):
+                        hld0 = list( filter(lambda g: not('racelevel' in g) or
+                                     novalues in str(g['racelevel']).lower() )  , hld0)
+                        hld0 = list( filter(lambda g: not('tags' in g) or 
+                                     not('racelevel' in g["tags"]) )  , hld0)
+                    if m_racesonly:
+                        hld0 = list( filter(lambda g: ('tags' in g) and
+                                     ('racelevel' in g["tags"]) or 'racelevel' in g )  , hld0)
+                    if not(m_contests):
+                        hld0 = list( filter(lambda g: not('contest' in g) or
+                                     novalues in str(g['contest']).lower() )  , hld0)
+                        hld0 = list( filter(lambda g: not('tags' in g) or
+                                     not('contestlevel' in g["tags"]) )  , hld0)
+                    if m_contestsonly:
+                         hld0 = list( filter(lambda g: ('tags' in g) and
+                             ('contestlevel' in g["tags"]) or 'contest' in g )  , hld0)
+                    if m_xfilters:
+                        # exclude_tags: 'suggestive dialogue',  'crude language' 'mature content' 'crude content' ]
+                        excludetags  = ['adult content',"sexual content","epilepsy warning"]
+                        hld0 = list( filter(lambda g: not('tags' in g) or
+                                         not(any(x in g["tags"] for x in excludetags) )  , hld0)
+
+
+
+
                     random.shuffle(hld0)
                     rhid = str(hld0[0]["id"])
                     rhname = str(hld0[0]["name"])
@@ -2450,7 +2612,7 @@ class Bot(commands.Bot):
                     hld0 = None
 
                     if loadtoo:
-                        await ctx.send(f'{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
+                        await ctx.send(f'@{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
                         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
                     else:
                         await ctx.send(f'{ctx.author.name} - Game #{rhid} by {rhauthors} ({rhname})')
