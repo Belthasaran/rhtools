@@ -1496,7 +1496,10 @@ class Bot(commands.Bot):
                                 thisPooled = -self.shmode_poolweighted
                         inversePrice = 1 + maxPrice - thisPrice
                         totalInversePrice = totalInversePrice + inversePrice
-                        costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
+                        #costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
+                        costWeights.append( inversePrice + thisPooled )
+                    costWeights = np.array(costWeights)
+                    costWeights = np.divide(costWeights, costWeights.sum())
                     effectlist_2 = np.random.choice(self.effectlist_s,size=5,replace=False,p=costWeights)
                     self.effectlist_s = effectlist_2
                 except Exception as xerp:
