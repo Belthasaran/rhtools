@@ -19,6 +19,25 @@ import pdb
 nest_asyncio.apply()
 #IPython.embed()
 
+# KaizoBlockEffect() : Spawns a kaizo block by writing \x01 to 0xF60729 to SNES while running
+#                      the SMW ROM patched by crod control  (smw.cc.sfc)
+#
+#  Continuous applied effect runner:   Effect is re-applied every 2 seconds,
+#                                      over Total Default duration: 20 seconds, 
+#
+# Example usage in chatbot/chatbot.py:  Twitch Channel Points redeem
+#
+#     async def event_pubsub_channel_points(self, event: pubsub.PubSubChannelPointsMessage) -> 
+#        if self.ccflag and re.match(r'.*(for the kaizo|coin block).*', event.reward.title, re.I):
+#              try:
+#                   effectobj = KaizoBlockEffect(amount=1,duration=20,retries=300)
+#                   asyncio.run(chbot_apply_affect(effectobj))
+#                   await asyncio.sleep(0.5)
+#            except Exception as xerr0:
+#                self.logger.debug(“TwitchChannelPoints:eventPoints:ERR: " + str(xerr0))
+
+
+
 class KaizoBlockEffect(SmwEffectRunner):
     #async def run(self,amount=1,duration=0):
     #    self.super.run(amount,duration)
