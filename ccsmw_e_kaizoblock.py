@@ -19,8 +19,8 @@ import pdb
 nest_asyncio.apply()
 #IPython.embed()
 
-# KaizoBlockEffect() : Spawns a kaizo block by writing \x01 to 0xF60729 to SNES while running
-#                      the SMW ROM patched by crod control  (smw.cc.sfc)
+# KaizoBlockEffect() : Spawns a kaizo block by writing \x01 to 0xF60729 to SNES when it is already running
+#                      the SMW ROM patched by crowd control  (smw.cc.sfc) - https://crowdcontrol.live/
 #
 #  Continuous applied effect runner:   Effect is re-applied every 2 seconds,
 #                                      over Total Default duration: 20 seconds, 
