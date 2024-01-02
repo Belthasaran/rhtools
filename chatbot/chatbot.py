@@ -103,6 +103,7 @@ class Bot(commands.Bot):
         if 'showmessages' in self.botconfig['twitch']:
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
+        self.shmode_pause = 0
         self.shmode_socket_running = 0
         self.shmode_started = 0
         self.shmode_costweighted = 0
@@ -1424,7 +1425,11 @@ class Bot(commands.Bot):
     async def shuffle_loop_1(self, arg: str):
         self.shuffle_loop_interval = 1 # 2
         if self.shmode_timeleft % 20 == 0:
-            print(f'Ok - Loop1 shmode={self.shmode}, shmode_stage={self.shmode_stage}, time_left={self.shmode_timeleft}')
+            print(f'Ok - Loop1 shpause={self.shmode_pause} shmode={self.shmode}, shmode_stage={self.shmode_stage}, time_left={self.shmode_timeleft}')
+
+        if self.shmode_pause:
+            return
+
         #print(f'Ok - Loop 1')
         if self.shmode == 1 and self.shmode_stage == 2 and self.shmode_timeleft == 0:
             self.shmode_stage = 0
@@ -1780,7 +1785,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval !shpweight !shcweight ')
+        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval !shpweight !shcweight !shcycle !shpause')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
@@ -2504,7 +2509,7 @@ class Bot(commands.Bot):
                     factor = self.conform_costfactor(factor)
                     self.shmode_costweighted = value
                     self.shmode_costfactor = factor
-                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.chmode_costfactor} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.shmode_costfactor} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
             except Exception as rex1:
                 self.logger.debug('ERR:shcweight:rex1:' + str(rex1))
         else:
@@ -2568,13 +2573,17 @@ class Bot(commands.Bot):
 
                         self.shmode_costweighted = int(group5s[0])
                         if len(group5s)>1:
-                            factor = int(group5s[1])
+                            factor = 1
+                            if re.match(r'^-?\d+$',group5s[1]):
+                                factor = int(group5s[1])
                             factor = self.conform_costfactor(factor)
                             self.shmode_costfactor = factor
 
                         self.shmode_poolweighted = int(group6s[0])
                         if len(group6s)>1:
-                            factor = int(group6s[1])
+                            factor = 1
+                            if re.match(r'^-?\d+$',group6s[1]):
+                                factor = int(group6s[1])
                             factor = self.conform_poolfactor(factor)
                             self.shmode_poolfactor = factor
 
@@ -2627,6 +2636,62 @@ class Bot(commands.Bot):
                 pass
         else:
             await ctx.send(f'Usage: !ccflag <on|off>')
+
+
+    @commands.command(name='shpause')
+    @commands.cooldown(2,1)
+    async def cmd_shpause_fl(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!shpause( +(on|off|yes|no|1|0)|)', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !shpause <on|off>')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    if text=="on" or text=="1" or text=="yes":
+                        self.shmode_pause = True
+                    elif text=="off" or text=="0" or text=="no":
+                        self.shmode_pause = False
+                    await ctx.send(f'{ctx.author.name} - shuffle mode pause status set to: {self.shmode_pause}')
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !shpause <on|off>')
+
+    @commands.command(name='shcycle')
+    @commands.cooldown(2,1)
+    async def cmd_shpause_fl(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!shcycle( +(skip|0|\d+)?|)', text, re.I)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None or paramResult.group(2).lower() == 'skip' :
+                    self.shmode_timeleft = 0
+                    await ctx.send(f'@{ctx.author.name} - Remaining time in cycle set to 0 seconds')
+                    return
+                else:
+                    text = paramResult.group(2).lower()
+                    self.shmode_timeleft = int(text)
+                    await ctx.send(f'@{ctx.author.name} - Remaining time in cycle set to @{self.shmode_timeleft} seconds')
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !shcycle <0|integer> - Skips current cycle or sets remaining time in seconds')
+
 
 
     @commands.command(name='rhrandom')
