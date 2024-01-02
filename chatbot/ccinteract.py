@@ -135,7 +135,7 @@ class CrowdInteract():
                 headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
             self.logger.info('ccinteract:requestEffect success')
-            self.logger.debug(f'Content = {response.content}')
+            self.logger.debug(f'reqEff:Content = {response.content}')
             return json.loads(response.content)['result']['data']['effectRequest']
         else:
             self.logger.error(f'ccinteract:requestEffect fail status={response.status_code} {response.text}')
@@ -156,7 +156,8 @@ class CrowdInteract():
             if 'max' in effectObject['quantity'] and effectQuantity > effectObject['quantity']['max']:
                 effectQuantity = effectObject['quantity']['max']
 
-        url = 'https://trpc.crowdcontrol.live/gameSession.requestEffect'
+        #url = 'https://trpc.crowdcontrol.live/gameSession.requestEffect'
+        url = 'https://trpc.crowdcontrol.live/gameSession.contributeToPool'
         requestObject = {
                 'gameSessionID' : game_session_id,
                 'effectType' :  effectObject['type'],
@@ -164,12 +165,13 @@ class CrowdInteract():
                 'amount'     :  amountValue,
                 'anonymous'  :  True
                 }
+        self.logger.debug(f'ccI:contributeToPool: {json.dump(requestObject)}')
         response = requests.post(url,
                 json = requestObject,
                 headers = self.getRequestHeaders(cc_auth_token))
         if response.status_code == 200:
             self.logger.info('ccinteract:getSessionInfo success')
-            self.logger.debug(f'Content = {response.content}')
+            self.logger.debug(f'poolToEff:Content = {response.content}')
             return json.loads(response.content)['result']['data']['effectRequest']
         else:
             self.logger.error(f'ccinteract:getSessionInfo fail status={response.status_code} {response.text}')

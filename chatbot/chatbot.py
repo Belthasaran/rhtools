@@ -106,7 +106,9 @@ class Bot(commands.Bot):
         self.shmode_socket_running = 0
         self.shmode_started = 0
         self.shmode_costweighted = 0
+        self.shmode_costfactor = 1
         self.shmode_poolweighted = 0
+        self.shmode_poolfactor = 1
         self.shmode_interval1 = 20
         self.shmode_interval2 = 160
         try:
@@ -1288,7 +1290,7 @@ class Bot(commands.Bot):
 
     ###
     # "game-session-menu-update","payload":{"menu":{"effects":[{"effectID":"squash","type":"game","sessionCooldown":{"startTime":1704027530,"duration":20}}]}},"timestamp":1704027530192}
-    async def cc_game_session_menu_update(payload):
+    async def cc_game_session_menu_update(self,payload):
         try:
             if 'menu' in payload and 'effects' in payload['menu']:
                 effectUpdates = payload['menu']['effects']
@@ -1305,7 +1307,7 @@ class Bot(commands.Bot):
                     #    if self.effectlist[i]['d']['ccobject']['effectID'] == item['effectID']:
                     #        for key in item.keys():
                     #            self.effectlist[i]['d']['ccobject'][key] = item[key]
-                    if self.effectlist_s: 
+                    if not(self.effectlist_s==None): 
                         for i in range(len(self.effectlist_s)):
                             if self.effectlist_s[i]['ccobject']['effectID'] == item['effectID']:
                                 for key in item.keys():
@@ -1313,9 +1315,21 @@ class Bot(commands.Bot):
                     self.logger.debug(f'OK:cc_game_session_menu_update')
                     pass
         except Exception as xerr:
-            self.logger.debug(f'ERR:cc_game_session_menu_update {payload}')
+            self.logger.debug(f'ERR:cc_game_session_menu_update {payload} : {xerr}')
+            traceback.print_exc()
             pass
 
+    async def shuffle_mode_websocket_recvobjectstring(self, incoming):
+        response = incoming.strip()
+        if incoming == '':
+            return
+        rdata = json.loads(response)
+        #self.logger.debug(f'incoming: {response} : {json.dumps(rdata)}')
+        if rdata['type'] == 'timed-effect-update':
+            pass
+        if rdata['type'] == 'game-session-menu-update':
+            await self.cc_game_session_menu_update(rdata['payload'])
+        pass
 
     async def shuffle_mode_websocket_client(self):
         print(f'shuffle_mode_websocket_client()')
@@ -1325,7 +1339,7 @@ class Bot(commands.Bot):
 
         try:
             print('shuffle_mode_websocket_client:try')
-            while not(self.shmode_started == 0 and self.shmode_loop_stopping == 0):
+            while not(self.shmode_started == 0 or self.shmode_loop_stopping == 1):
                 print('shuffle_mode_websocket_client:loop')
                 self.shmode_socket_running = 1
                 ccpubsuburl = 'wss://pubsub.crowdcontrol.live/'
@@ -1335,42 +1349,69 @@ class Bot(commands.Bot):
                 await asyncio.sleep(2)
                 self.logger.debug(f'websockets.connect')
                 async with websockets.connect(ccpubsuburl) as websocket:
-                    if _wstate == 0:
-                        pubsubtoken = apptoken.get_token_secrets(onekey='cc-auth-token')
-                        pubsubtoken = re.sub(r'^cc-auth-token ','',pubsubtoken)
-                        ccuid = apptoken.get_token_secrets(onekey='ccuid')
-                        subscribe_data = { 'token' : pubsubtoken,
-                                'topics' : [ "ext/*/*",f"ext/*/{ccuid}", f"ext/{ccuid}/*", f"ext/{ccuid}/{ccuid}",
-                                    f"pub/{ccuid}", f"whisper/*", f"whisper/{ccuid}", f"whisper/{ccuid}/{ccuid}" ]
-                                }
-                        subscribe_payload = { "action" : "subscribe",
-                                "data" : f"{json.dumps(subscribe_data)}"
-                                }
-                        self.logger.debug('-> cc_pubsubwss:Send')
-                        #print(f'SUB={json.dumps(subscribe_payload)}')
-                        await websocket.send(json.dumps(subscribe_payload))
-                        _wstate = 1
-                    if _wstate == 1:
-                        if time.time() - _pingsent > 120:
-                            await websocket.send(json.dumps({ "action" : "ping" }))
-                            _pingsent = time.time()
+                    while not(self.shmode_started == 0 or self.shmode_loop_stopping == 1):
+                        if _wstate == 0:
+                            pubsubtoken = apptoken.get_token_secrets(onekey='cc-auth-token')
+                            pubsubtoken = re.sub(r'^cc-auth-token ','',pubsubtoken)
+                            ccuid = apptoken.get_token_secrets(onekey='ccuid')
+                            subscribe_data = { 'token' : pubsubtoken,
+                                    'topics' : [ "ext/*/*",f"ext/*/{ccuid}", f"ext/{ccuid}/*", f"ext/{ccuid}/{ccuid}",
+                                        f"pub/{ccuid}", f"whisper/*", f"whisper/{ccuid}", f"whisper/{ccuid}/{ccuid}" ]
+                                    }
+                            subscribe_payload = { "action" : "subscribe",
+                                    "data" : f"{json.dumps(subscribe_data)}"
+                                    }
+                            self.logger.debug('-> cc_pubsubwss:Send')
+                            #print(f'SUB={json.dumps(subscribe_payload)}')
+                            await websocket.send(json.dumps(subscribe_payload))
+                            _wstate = 1
                             await asyncio.sleep(1)
-                    response = await websocket.recv()
-                    self.logger.debug(f'<- cc_pubsubwss: {response}')
-                    try:
-                        rdata = json.loads(response)
-                        self.logger.debug(f'incoming: {incoming} : {json.dumps(incoming)}')
-                        if rdata['type'] == 'timed-effect-update':
+                        if _wstate == 1:
+                            if time.time() - _pingsent > 120:
+                                await websocket.send(json.dumps({ "action" : "ping" }))
+                                _pingsent = time.time()
+                                await asyncio.sleep(1)
+                        incoming = await websocket.recv()
+                        #self.logger.debug(f'<- cc_pubsubwss: {incoming}') #
+                        try:
+                            br_depth=0
+                            qu_depth=0
+                            escape=0
+                            accum = ''
+                            for idx in range(len(incoming)):
+                                if not(qu_depth) and incoming[idx]=='{':
+                                    br_depth = br_depth + 1  #  { outside a string
+                                if not(qu_depth) and incoming[idx]=='}':
+                                    br_depth = br_depth - 1  #  } outside a string
+                                    if br_depth < 0 :
+                                        await self.shuffle_mode_websocket_recvobjectstring(accum)
+                                        accum = ''
+                                        br_depth = 0
+                                if not(escape) and incoming[idx]=='"':
+                                    qu_depth = int(not(qu_depth))
+                                if incoming[idx]=='\\':
+                                    escape = int(not(escape))
+                                else:
+                                    escape = 0
+                                if  br_depth > 0 or incoming[idx]=='{' or incoming[idx]=='}' :
+                                     accum = accum + incoming[idx]
+                            await self.shuffle_mode_websocket_recvobjectstring(accum)
+                            #
+
+                            #response = incoming
+                            #rdata = json.loads(response)
+                            ##self.logger.debug(f'incoming: {response} : {json.dumps(response)}')
+                            #if rdata['type'] == 'timed-effect-update':
+                            #    pass
+                            #if rdata['type'] == 'game-session-menu-update':
+                            #    await self.cc_game_session_menu_update(rdata['payload'])
+                        except Exception as xerr:
+                            self.logger.debug(f'wss:err:{xerr}')
+                            self.logger.error(f'CrowdConrol Websocket Error: {xerr}')
+                            traceback.print_exc()
                             pass
-                        if rdata['type'] == 'game-session-menu-update':
-                            self.cc_game_session_menu_update(payload)
-                    except Exception as xerr:
-                        self.logger.debug(f'wss:err:{xerr}')
-                        self.logger.error(f'CrowdConrol Websocket Error: {xerr}')
-                        traceback.print_exc()
-                        pass
-                print(response)
-                await asyncio.sleep(30)
+                    print(response)
+                await asyncio.sleep(60)
             #
         except Exception as xerr:
             self.logger.debug(f'ERR:shmode_socket:{xerr}')
@@ -1429,7 +1470,8 @@ class Bot(commands.Bot):
                 try:
                     pass
                     if self.shmode_poolweighted and 'pool' in chosenEffect['d']['ccobject']:
-                        missingAmount = int(chosenEffect['d']['price']) - int(chosenEffect['d']['ccobject']['pool'])
+                        missingAmount = int(chosenEffect['d']['ccobject']['price']) - int(chosenEffect['d']['ccobject']['pool'])
+                        self.logger.debug(f'cci:poolToEffect {missingAmount}')
                         result = self.ccinteract.poolToEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], amountValue=missingAmount )
                         if not(result):
                             self.logger.error(f'ERR:ccinteract.poolToEffect: Failed')
@@ -1438,6 +1480,7 @@ class Bot(commands.Bot):
                         #    def poolToEffect(self,game_session_id, effectObject, effectQuantity=1, amountValue=1):
                 except Exception as xerr:
                     self.logger.error(f'ccinteract:poolWeighted:exception ERR: {xerr}')
+                    traceback.print_exc()
 
                 if not(effectApplied):
                     print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
@@ -1476,18 +1519,21 @@ class Bot(commands.Bot):
                     totalPools = 0
                     maxPrice = 0
                     for i in range(len(self.effectlist_s)):
-                        print(f'---> {json.dumps(self.effectlist_s[i])}')
+                        #print(f'---> {json.dumps(self.effectlist_s[i])}')
                         if self.effectlist_s[i]['type'] == 'crowdcontrol' :
                             thisPrice = int(self.effectlist_s[i]['ccobject']['price'])
-                            if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
+                            thisPrice = thisPrice
+                            if self.shmode_costweighted < 0  and -self.shmode_costweighted < thisPrice:
                                 thisPrice = -self.shmode_costweighted
+                            #thisPrice = thisPrice *  self.shmode_costfactor
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
                         if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['ccobject']:
                             thisPooled = int(self.effectlist_s[i]['ccobject']['pool'])
-                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
+                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted < thisPooled:
                                 thisPooled = -self.shmode_poolweighted
+                            #thisPooled = thisPooled *  self.shmode_poolfactor
                         totalPrice = totalPrice + thisPrice
                         if thisPrice > maxPrice:
                             maxPrice = thisPrice
@@ -1496,23 +1542,26 @@ class Bot(commands.Bot):
                     for i in range(len(self.effectlist_s)):
                         if self.effectlist_s[i]['type'] == 'crowdcontrol' :
                             thisPrice = int(self.effectlist_s[i]['ccobject']['price'])
-                            if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
+                            if self.shmode_costweighted < 0  and -self.shmode_costweighted < thisPrice:
                                 thisPrice = -self.shmode_costweighted
+                            thisPrice = thisPrice *  self.shmode_costfactor
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
                         if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['ccobject']:
                             thisPooled = int(self.effectlist_s[i]['ccobject']['pool'])
-                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
+                            if self.shmode_poolweighted < 0 and -self.shmode_poolweighted < thisPooled:
                                 thisPooled = -self.shmode_poolweighted
+                            thisPooled = thisPooled *  self.shmode_poolfactor
                         inversePrice = 1 + maxPrice - thisPrice
+                        inversePrice = inversePrice  *  self.shmode_costfactor
                         totalInversePrice = totalInversePrice + inversePrice
                         #costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
                         costWeights.append( inversePrice + thisPooled )
                     costWeights = np.array(costWeights)
                     costWeights = np.divide(costWeights, costWeights.sum())
                     effectlist_2 = np.random.choice(self.effectlist_s,size=5,replace=False,p=costWeights)
-                    self.effectlist_s = effectlist_2
+                    self.effectlist_s = list(effectlist_2)
                 except Exception as xerp:
                     self.logger.error(f'ccCostWeighted: {xerp}')
                     traceback.print_exc()
@@ -2407,6 +2456,16 @@ class Bot(commands.Bot):
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
+    def conform_costfactor(self, fact):
+        if fact < -1000:
+            return -1000
+        if fact > 1000:
+            return 1000
+        return fact
+
+    def conform_poolfactor(self, fact):
+        return self.conform_costfactor(fact)
+
     def conform_cc_intervals(self, interval1, interval2):
         if (interval2 > 3600):
             interval2 = 3600
@@ -2430,19 +2489,26 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
-        paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
+        #paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
+        paramResult = re.match(r'^!shcweight( +(-?\d+)(x-?\d+)?)|', text)
+
         if paramResult != None:
             try:
                 if paramResult.group(2) == None : # or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !shcweight <integer({self.shmode_costweighted})>')
+                    await ctx.send(f'Usage: !shcweight <integer({self.shmode_costweighted}x{self.shmode_costfactor})>')
                 else:
+                    factor = 1
                     value  = int(paramResult.group(2))
+                    if len(paramResult.groups()) >= 3 and paramResult.group(3):
+                        factor = int(paramResult.group(3)[1:])
+                    factor = self.conform_costfactor(factor)
                     self.shmode_costweighted = value
-                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
+                    self.shmode_costfactor = factor
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.chmode_costfactor} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
             except Exception as rex1:
                 self.logger.debug('ERR:shcweight:rex1:' + str(rex1))
         else:
-            await ctx.send(f'Usage: !shcweight <integer{self.shmode_costweighted}>')
+            await ctx.send(f'Usage: !shcweight <integer{self.shmode_costweighted}x{self.shmode_costfactor}>')
             pass
 
     @commands.command(name='shpweight')
@@ -2453,19 +2519,25 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
-        paramResult = re.match(r'^!shpweight( +(-?\d+))|', text)
+        paramResult = re.match(r'^!shpweight( +(-?\d+)(x-?\d+)?)|', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None: # or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !shpweight <integer{self.shmode_poolweighted}>')
+                    await ctx.send(f'Usage: !shpweight <integer{self.shmode_poolweighted}x{self.shmode_poolfactor}>')
                 else:
                     value  = int(paramResult.group(2))
+                    factor = 1
+                    if len(paramResult.groups()) >= 3 and paramResult.group(3):
+                        factor = int(paramResult.groups(3)[1:])
+                        factor = self.conform_poolfactor(factor)
+
                     self.shmode_poolweighted = value
-                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
+                    self.shmode_poolfactor = factor
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.shmode_costfactor} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
             except Exception as rex1:
                 self.logger.debug('ERR:shpweight:rex1:' + str(rex1))
         else:
-            await ctx.send(f'Usage:!shpweight <integer({self.shmode_poolweighted})>')
+            await ctx.send(f'Usage:!shpweight <integer({self.shmode_poolweighted}x{self.shmode_poolfactor})>')
             pass
 
 
@@ -2478,32 +2550,48 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
-        paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+) +(-?\d+))?|)', text)
+        paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+x?\d*) +(-?\d+x?\d*))?|)', text)
         if paramResult != None:
             try:
                 self.logger.debug(f'paramResult.groups=@{paramResult.groups()}')
                 if paramResult.group(2) == None or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted})> <pweight({self.shmode_poolweighted})>]')
+                    await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted}x{self.shmode_costfactor})> <pweight({self.shmode_poolweighted}x{self.shmode_poolfactor})>]')
                 else:
-                    interval1 = int(paramResult.group(2))
-                    interval2 = int(paramResult.group(3))
+                    interval1s = paramResult.group(2).split('x')
+                    interval2s = paramResult.group(3).split('x')
+                    interval1 = int(interval1s[0])
+                    interval2 = int(interval2s[0])
                     # no 4
                     if paramResult.group(5) and paramResult.group(6):
-                        self.shmode_costweighted = int(paramResult.group(5))
-                        self.shmode_poolweighted = int(paramResult.group(6))
+                        group5s = paramResult.group(5).split('x')
+                        group6s = paramResult.group(6).split('x')
+
+                        self.shmode_costweighted = int(group5s[0])
+                        if len(group5s)>1:
+                            factor = int(group5s[1])
+                            factor = self.conform_costfactor(factor)
+                            self.shmode_costfactor = factor
+
+                        self.shmode_poolweighted = int(group6s[0])
+                        if len(group6s)>1:
+                            factor = int(group6s[1])
+                            factor = self.conform_poolfactor(factor)
+                            self.shmode_poolfactor = factor
+
 
 
                     #
                     [interval1, interval2] = self.conform_cc_intervals(interval1,interval2)
                     self.shmode_interval1 = interval1
                     self.shmode_interval2 = interval2
-                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.shmode_interval1} cooldown_between_rounds(in seconds)={self.shmode_interval2} costweight={self.shmode_costweighted} poolweight={self.shmode_poolweighted} ')
+                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.shmode_interval1} cooldown_between_rounds(in seconds)={self.shmode_interval2} rng.costweight={self.shmode_costweighted}x{self.shmode_costfactor} rng.poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
 
 
             except Exception as rex1:
                 self.logger.debug('ERR:shinterval:rex1:' + str(rex1))
+                traceback.print_exc()
         else:
-            await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted})> <pweight({self.shmode_poolweighted})>]')
+            await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted}x{self.shmode_costfactor})> <pweight({self.shmode_poolweighted}x{self.shmode_poolfactor})>]')
             #await ctx.send(f'Usage: !shinterval <delay({self.shmode_interval1})> <cooldown({self.shmode_interval2})>')
             pass
 
