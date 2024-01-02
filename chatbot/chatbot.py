@@ -28,6 +28,7 @@ import random
 import asyncio
 import ccinteract
 import websockets
+import numpy as np
 
 botmoduledir = path.Path(__file__).abspath()
 sys.path.append(botmoduledir.parent.parent)
@@ -103,6 +104,7 @@ class Bot(commands.Bot):
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
 
         self.shmode_socket_running = 0
+        self.shmode_started = 0
         self.shmode_costweighted = 0
         self.shmode_poolweighted = 0
         self.shmode_interval1 = 20
@@ -1305,9 +1307,9 @@ class Bot(commands.Bot):
                     #            self.effectlist[i]['d']['ccobject'][key] = item[key]
                     if self.effectlist_s: 
                         for i in range(len(self.effectlist_s)):
-                            if self.effectlist_s[i]['d']['ccobject']['effectID'] == item['effectID']:
+                            if self.effectlist_s[i]['ccobject']['effectID'] == item['effectID']:
                                 for key in item.keys():
-                                    self.effectlist_s[i]['d']['ccobject'][key] = item[key]
+                                    self.effectlist_s[i]['ccobject'][key] = item[key]
                     self.logger.debug(f'OK:cc_game_session_menu_update')
                     pass
         except Exception as xerr:
@@ -1315,12 +1317,16 @@ class Bot(commands.Bot):
             pass
 
 
-    async def shuffle_mode_websocket_client():
+    async def shuffle_mode_websocket_client(self):
+        print(f'shuffle_mode_websocket_client()')
         if self.shmode_socket_running:
+            print(f'exit:shmode_Socket_running')
             return # Socket already running?
 
         try:
-            while not(self.shmode == 0 and self.shmode_loop_stopping == 0):
+            print('shuffle_mode_websocket_client:try')
+            while not(self.shmode_started == 0 and self.shmode_loop_stopping == 0):
+                print('shuffle_mode_websocket_client:loop')
                 self.shmode_socket_running = 1
                 ccpubsuburl = 'wss://pubsub.crowdcontrol.live/'
                 _wstate = 0
@@ -1330,8 +1336,10 @@ class Bot(commands.Bot):
                 self.logger.debug(f'websockets.connect')
                 async with websockets.connect(ccpubsuburl) as websocket:
                     if _wstate == 0:
+                        pubsubtoken = apptoken.get_token_secrets(onekey='cc-auth-token')
+                        pubsubtoken = re.sub(r'^cc-auth-token ','',pubsubtoken)
                         ccuid = apptoken.get_token_secrets(onekey='ccuid')
-                        subscribe_data = { 'token' : apptoken.get_token_secrets(onekey='cc-auth-token'),
+                        subscribe_data = { 'token' : pubsubtoken,
                                 'topics' : [ "ext/*/*",f"ext/*/{ccuid}", f"ext/{ccuid}/*", f"ext/{ccuid}/{ccuid}",
                                     f"pub/{ccuid}", f"whisper/*", f"whisper/{ccuid}", f"whisper/{ccuid}/{ccuid}" ]
                                 }
@@ -1339,6 +1347,7 @@ class Bot(commands.Bot):
                                 "data" : f"{json.dumps(subscribe_data)}"
                                 }
                         self.logger.debug('-> cc_pubsubwss:Send')
+                        #print(f'SUB={json.dumps(subscribe_payload)}')
                         await websocket.send(json.dumps(subscribe_payload))
                         _wstate = 1
                     if _wstate == 1:
@@ -1349,14 +1358,15 @@ class Bot(commands.Bot):
                     response = await websocket.recv()
                     self.logger.debug(f'<- cc_pubsubwss: {response}')
                     try:
-                        incoming = json.loads(response)
+                        rdata = json.loads(response)
                         self.logger.debug(f'incoming: {incoming} : {json.dumps(incoming)}')
-                        if response['type'] == 'timed-effect-update':
+                        if rdata['type'] == 'timed-effect-update':
                             pass
-                        if response['type'] == 'game-session-menu-update':
+                        if rdata['type'] == 'game-session-menu-update':
                             self.cc_game_session_menu_update(payload)
                     except Exception as xerr:
                         self.logger.debug(f'wss:err:{xerr}')
+                        self.logger.error(f'CrowdConrol Websocket Error: {xerr}')
                         traceback.print_exc()
                         pass
                 print(response)
@@ -1466,15 +1476,16 @@ class Bot(commands.Bot):
                     totalPools = 0
                     maxPrice = 0
                     for i in range(len(self.effectlist_s)):
-                        if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
-                            thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
+                        print(f'---> {json.dumps(self.effectlist_s[i])}')
+                        if self.effectlist_s[i]['type'] == 'crowdcontrol' :
+                            thisPrice = int(self.effectlist_s[i]['ccobject']['price'])
                             if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
                                 thisPrice = -self.shmode_costweighted
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
-                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
-                            thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
+                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['ccobject']:
+                            thisPooled = int(self.effectlist_s[i]['ccobject']['pool'])
                             if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
                                 thisPooled = -self.shmode_poolweighted
                         totalPrice = totalPrice + thisPrice
@@ -1483,15 +1494,15 @@ class Bot(commands.Bot):
                         if self.shmode_poolweighted:
                             totalPool = totalPools + thisPooled
                     for i in range(len(self.effectlist_s)):
-                        if self.effectlist_s[i]['d']['type'] == 'crowdcontrol' :
-                            thisPrice = int(self.effectlist_s[i]['d']['ccobject']['price'])
+                        if self.effectlist_s[i]['type'] == 'crowdcontrol' :
+                            thisPrice = int(self.effectlist_s[i]['ccobject']['price'])
                             if self.shmode_costweighted < 0  and -self.shmode_costweighted > thisPrice:
                                 thisPrice = -self.shmode_costweighted
                         else:
                             thisPrice = nullprice
                         thisPooled = 0
-                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['d']['ccobject']:
-                            thisPooled = int(self.effectlist_s[i]['d']['ccobject']['pool'])
+                        if self.shmode_poolweighted and 'pool' in self.effectlist_s[i]['ccobject']:
+                            thisPooled = int(self.effectlist_s[i]['ccobject']['pool'])
                             if self.shmode_poolweighted < 0 and -self.shmode_poolweighted > thisPooled:
                                 thisPooled = -self.shmode_poolweighted
                         inversePrice = 1 + maxPrice - thisPrice
@@ -1507,7 +1518,8 @@ class Bot(commands.Bot):
                     traceback.print_exc()
 
                 # np.random.choice(['a','b','c'],size=2,replace=False,p=[0.333333333333333,0.33333333333,0.333333333])
-                self.effectlist_s = random.choices(  )
+                #
+                #self.effectlist_s = random.choices(  )
                 #choiceWeights = []
                 #for i in range(len(self.effectlist_s)):
                 #    thisPrice = int(self.effectlist_s[i]['price'])
@@ -1588,6 +1600,7 @@ class Bot(commands.Bot):
            self.shmode = 0
            self.shuffle_loop_1.cancel()
            self.shmode_loop_stopping = 1
+           self.shmode_started = 0
            self.shmode = 0
            self.shmode_stage = 0
            self.shmode_timeleft = 0
@@ -1654,7 +1667,7 @@ class Bot(commands.Bot):
                 self.logger.debug('shstart: Sleeping 1 second (still waiting for previous shstop)')
                 await asyncio.sleep(1)
             #shuffle_mode_websocket_client()
-            asyncio.get_event_loop().run_until_complete(shuffle_mode_websocket_client())
+            #asyncio.get_event_loop().run_until_complete(self.shuffle_mode_websocket_client())
 
             #coro = asyncio.start_server(self.handle_echo, '127.0.0.1', 1888) #, loop=self.loop)
             #server = self.loop.run_until_complete(coro)
@@ -1686,14 +1699,21 @@ class Bot(commands.Bot):
 
         except Exception as xerr:
             await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
-            self.logger.debug(f'shstart:1:ERR {xerr0}')
+            self.logger.debug(f'shstart:1:ERR {xerr}')
             traceback.print_exc()
             return
         self.shmode = 0
         self.shmode_stage = 0
+        self.shmode_started = 1
         try:
+            shufflestart =  self.shuffle_loop_1.start('Test')
             await ctx.send(f'@{ctx.author.name} - Okay, Shuffle effect mode starting. ccinteract:game_name:{self.cc_gamepack_name}')
-            await self.shuffle_loop_1.start('Test')
+            coro3 = self.shuffle_mode_websocket_client()
+            print('coro3:pre')
+            self.loop.run_until_complete(coro3)
+            print('coro3:run')
+            await shufflestart
+            #asyncio.get_event_loop().run_until_complete(coro3)
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - Tried, but an exception was raised.')
             self.logger.debug(f'shstart:2:ERR: {xerr0}')
@@ -2361,9 +2381,9 @@ class Bot(commands.Bot):
 
     async def chat_perform_rhload(self,ctx,rhid,ccrom=False):
         try:
-            #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+            os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
             result = pb_repatch.repatch_function(['launch1',str(rhid)],ccrom=ccrom,noexit=True)
-            chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
+            self.chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
             if result:
                 try:
                     pass
@@ -2409,11 +2429,11 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
             return
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!shcweight( +(\d+))?|', text)
+        text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
+        paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
         if paramResult != None:
             try:
-                if paramResult.group(2) == None or paramResult.group(3) == None :
+                if paramResult.group(2) == None : # or paramResult.group(3) == None :
                     await ctx.send(f'Usage: !shcweight <integer({self.shmode_costweighted})>')
                 else:
                     value  = int(paramResult.group(2))
@@ -2432,11 +2452,11 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
             return
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!shpweight( +(\d+))?|', text)
+        text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
+        paramResult = re.match(r'^!shpweight( +(-?\d+))|', text)
         if paramResult != None:
             try:
-                if paramResult.group(2) == None or paramResult.group(3) == None :
+                if paramResult.group(2) == None: # or paramResult.group(3) == None :
                     await ctx.send(f'Usage: !shpweight <integer{self.shmode_poolweighted}>')
                 else:
                     value  = int(paramResult.group(2))
@@ -2457,10 +2477,11 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
             return
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
         paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+) +(-?\d+))?|)', text)
         if paramResult != None:
             try:
+                self.logger.debug(f'paramResult.groups=@{paramResult.groups()}')
                 if paramResult.group(2) == None or paramResult.group(3) == None :
                     await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted})> <pweight({self.shmode_poolweighted})>]')
                 else:
@@ -2530,12 +2551,12 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
             return
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        text = re.sub(r'[^- .?!_a-zA-z0-9%+,"&()#!\\\']','_', str(text))
         paramResult = re.match(r'^!rhrandom( +(.*)|)', text)
         m_racelevels = False
         m_demos = False
         m_demosonly = False
-        m_racesonly = False
+        m_racelevelsonly = False
         m_contests = False
         m_contestsonly = False
         m_xfilters = True
@@ -2582,23 +2603,23 @@ class Bot(commands.Bot):
                     novalues = ['', 'false', 'no', '0']
                     if m_demosonly:
                         hld0 = list( filter(lambda g: yesvalues in str(g['demo']).lower() or  
-                                     'demo' in tags )  , hld0)
-                    if not(m_races):
+                                     'demo' in tags, hld0))
+                    if not(m_racelevels):
                         hld0 = list( filter(lambda g: not('racelevel' in g) or
-                                     novalues in str(g['racelevel']).lower() )  , hld0)
+                                     str(g['racelevel']).lower() in novalues, hld0))
                         hld0 = list( filter(lambda g: not('tags' in g) or 
-                                     not('racelevel' in g["tags"]) )  , hld0)
-                    if m_racesonly:
+                                     not('racelevel' in g["tags"]), hld0))
+                    if m_racelevelsonly:
                         hld0 = list( filter(lambda g: ('tags' in g) and
-                                     ('racelevel' in g["tags"]) or 'racelevel' in g )  , hld0)
+                                     ('racelevel' in g["tags"]) or 'racelevel' in g , hld0))
                     if not(m_contests):
                         hld0 = list( filter(lambda g: not('contest' in g) or
-                                     novalues in str(g['contest']).lower() )  , hld0)
+                                     str(g['contest']).lower() in novalues, hld0 ))
                         hld0 = list( filter(lambda g: not('tags' in g) or
-                                     not('contestlevel' in g["tags"]) )  , hld0)
+                                     not('contestlevel' in g["tags"]), hld0))
                     if m_contestsonly:
                          hld0 = list( filter(lambda g: ('tags' in g) and
-                             ('contestlevel' in g["tags"]) or 'contest' in g )  , hld0)
+                             ('contestlevel' in g["tags"]) or 'contest' in g, hld0) )
                     if m_xfilters:
                         # exclude_tags: 'suggestive dialogue',  'crude language' 'mature content' 'crude content' ]
                         excludetags  = ['adult content',"sexual content","epilepsy warning"]
@@ -2625,6 +2646,7 @@ class Bot(commands.Bot):
                     pass
             except Exception as rex1:
                 self.logger.debug('ERR:rex1:' + str(rex1))
+                traceback.print_exc()
                 pass
         else:
             await ctx.send(f'Usage: !rhrandom <type>')
