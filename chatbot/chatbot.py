@@ -106,12 +106,13 @@ class Bot(commands.Bot):
         self.shmode_pause = 0
         self.shmode_socket_running = 0
         self.shmode_started = 0
-        self.shmode_costweighted = 0
+        self.shmode_maxprice = 500
+        self.shmode_costweighted = -10
         self.shmode_costfactor = 1
-        self.shmode_poolweighted = 0
-        self.shmode_poolfactor = 1
+        self.shmode_poolweighted = -30
+        self.shmode_poolfactor = 100
         self.shmode_interval1 = 20
-        self.shmode_interval2 = 160
+        self.shmode_interval2 = 90
         try:
             interval1  = 20
             interval2 = 160
@@ -1291,6 +1292,16 @@ class Bot(commands.Bot):
 
     ###
     # "game-session-menu-update","payload":{"menu":{"effects":[{"effectID":"squash","type":"game","sessionCooldown":{"startTime":1704027530,"duration":20}}]}},"timestamp":1704027530192}
+
+    def cc_effects_filter(self, effectlist):
+        return list(
+                    filter(lambda g: (
+                               (not('inactive' in g) or not(g['inactive'])) and 
+                                (self.shmode_costweighted or not(self.shmode_maxprice) or  
+                                 int(g['price']) <= self.shmode_maxprice )
+                                ), 
+                           self.cc_menuinfo['effects'])
+                   )
     async def cc_game_session_menu_update(self,payload):
         try:
             if 'menu' in payload and 'effects' in payload['menu']:
@@ -1301,7 +1312,8 @@ class Bot(commands.Bot):
                         if self.cc_menuinfo['effects'][i] == item['effectID']:
                             for key in item.keys():
                                 self.cc_menuinfo['effects'][i][key] = item[key]
-                    self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+                    self.cc_effects = self.cc_effects_filter(self.cc_menuinfo['effects'])
+                    #self.cc_effects = list(filter(lambda g: (not('inactive' in g) or not(g['inactive'])), self.cc_menuinfo['effects']))
                     await self.cc_effectlist_from_menuinfo()
 
                     #for i in range(len(self.effectlist)):
@@ -1476,8 +1488,15 @@ class Bot(commands.Bot):
                     pass
                     if self.shmode_poolweighted and 'pool' in chosenEffect['d']['ccobject']:
                         missingAmount = int(chosenEffect['d']['ccobject']['price']) - int(chosenEffect['d']['ccobject']['pool'])
-                        self.logger.debug(f'cci:poolToEffect {missingAmount}')
-                        result = self.ccinteract.poolToEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], amountValue=missingAmount )
+                        amountToAdd = missingAmount
+                        #
+                        # if the Amount needed for the effect is more than our maximum price per round,
+                        # then cut the "added amount" to the maximum.
+                        #
+                        if self.shmode_maxprice and  amountToAdd > self.shmode_maxprice:
+                            amountToAdd = self.shmode_maxprice
+                        self.logger.debug(f'cci:poolToEffect {amountToAdd}')
+                        result = self.ccinteract.poolToEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], amountValue=amountToAdd )
                         if not(result):
                             self.logger.error(f'ERR:ccinteract.poolToEffect: Failed')
                         else:
@@ -1559,6 +1578,8 @@ class Bot(commands.Bot):
                                 thisPooled = -self.shmode_poolweighted
                             thisPooled = thisPooled *  self.shmode_poolfactor
                         inversePrice = 1 + maxPrice - thisPrice
+                        if self.shmode_maxprice and  inversePrice > self.shmode_maxprice:
+                            inversePrice = 0
                         inversePrice = inversePrice  *  self.shmode_costfactor
                         totalInversePrice = totalInversePrice + inversePrice
                         #costWeights.append( (inversePrice+thisPooled) / (totalInversePrice+totalPools)  )
@@ -1670,7 +1691,8 @@ class Bot(commands.Bot):
             traceback.print_exc()
 
     async def cc_effectlist_from_menuinfo(self):
-        self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+        self.cc_effects = self.cc_effects_filter(self.cc_menuinfo['effects'])
+        #self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
         with open("cc_effects_temp_refresh.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_effects))
         self.effectlist = []
@@ -1733,7 +1755,8 @@ class Bot(commands.Bot):
             self.cc_menuinfo = self.ccinteract.getSessionMenu(self.cc_game_session_id)
             with open("cc_menu_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_menuinfo))
-            self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+            #self.cc_effects = list(filter(lambda g: not('inactive' in g) or not(g['inactive']), self.cc_menuinfo['effects']))
+            self.cc_effects = self.cc_effects_filter(self.cc_menuinfo['effects'])
             with open("cc_effects_temp.json", 'w') as soutfile:
                 soutfile.write(json.dumps(self.cc_effects))
             self.effectlist = []
@@ -2461,6 +2484,14 @@ class Bot(commands.Bot):
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
+    def conform_maxprice(self, mp):
+        if (mp < 0):
+            mp = 0
+        if (mp > 999999):
+            mp = 999999
+        return mp
+
+
     def conform_costfactor(self, fact):
         if fact < -1000:
             return -1000
@@ -2495,7 +2526,7 @@ class Bot(commands.Bot):
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
         #paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
-        paramResult = re.match(r'^!shcweight( +(-?\d+)(x-?\d+)?)|', text)
+        paramResult = re.match(r'^!shcweight( +(-?\d+)(x-?\d+)?(x-?\d+)?)|', text)
 
         if paramResult != None:
             try:
@@ -2507,13 +2538,16 @@ class Bot(commands.Bot):
                     if len(paramResult.groups()) >= 3 and paramResult.group(3):
                         factor = int(paramResult.group(3)[1:])
                     factor = self.conform_costfactor(factor)
+                    if len(paramResult.groups()) >= 4 and paramResult.group(4):
+                        maxpricevalue = int(paramResult.group(4)[1:])
+                        self.shmode_maxprice = self.conform_maxprice(maxpricevalue)
                     self.shmode_costweighted = value
                     self.shmode_costfactor = factor
-                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.shmode_costfactor} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
+                    await ctx.send(f'@{ctx.author.name} - costweight={self.shmode_costweighted}x{self.shmode_costfactor}x{self.shmode_maxprice} poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
             except Exception as rex1:
                 self.logger.debug('ERR:shcweight:rex1:' + str(rex1))
         else:
-            await ctx.send(f'Usage: !shcweight <integer{self.shmode_costweighted}x{self.shmode_costfactor}>')
+            await ctx.send(f'Usage: !shcweight <(CostWeights)x(Factor)x(Maximum) {self.shmode_costweighted}x{self.shmode_costfactor}x{self.shmode_maxprice}>')
             pass
 
     @commands.command(name='shpweight')
@@ -2555,12 +2589,13 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
-        paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+x?\d*) +(-?\d+x?\d*))?|)', text)
+        paramResult = re.match(r'^!shinterval( +(\d+) +(\d+)( +(-?\d+x?\d*x?\d*) +(-?\d+x?\d*))?|)', text)
         if paramResult != None:
             try:
                 self.logger.debug(f'paramResult.groups=@{paramResult.groups()}')
                 if paramResult.group(2) == None or paramResult.group(3) == None :
-                    await ctx.send(f'Usage: !shinterval <shuffle_time({self.shmode_interval1})> <cooldown({self.shmode_interval2})> [<cweight({self.shmode_costweighted}x{self.shmode_costfactor})> <pweight({self.shmode_poolweighted}x{self.shmode_poolfactor})>]')
+                     await ctx.send(f'Usage: !shinterval <shuffle_time> <cooldown> [<cost weights>x<multiplier>x<price cutoff> <pool weight>x<multiplier>]')
+                     await ctx.send(f'Currently: {self.shmode_interval1} {self.shmode_interval2} {self.shmode_costweighted}x{self.shmode_costfactor}x{self.shmode_maxprice} {self.shmode_poolweighted}x{self.shmode_poolfactor}')
                 else:
                     interval1s = paramResult.group(2).split('x')
                     interval2s = paramResult.group(3).split('x')
@@ -2578,6 +2613,8 @@ class Bot(commands.Bot):
                                 factor = int(group5s[1])
                             factor = self.conform_costfactor(factor)
                             self.shmode_costfactor = factor
+                            if len(group5s)>2 and re.match(r'^-?\d+$',group5s[2]):
+                                self.shmode_maxprice = self.conform_maxprice( int(group5s[2]) )
 
                         self.shmode_poolweighted = int(group6s[0])
                         if len(group6s)>1:
@@ -2593,7 +2630,7 @@ class Bot(commands.Bot):
                     [interval1, interval2] = self.conform_cc_intervals(interval1,interval2)
                     self.shmode_interval1 = interval1
                     self.shmode_interval2 = interval2
-                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.shmode_interval1} cooldown_between_rounds(in seconds)={self.shmode_interval2} rng.costweight={self.shmode_costweighted}x{self.shmode_costfactor} rng.poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
+                    await ctx.send(f'@{ctx.author.name} - Clock intervals set: time_for_round(in seconds)={self.shmode_interval1} cooldown_between_rounds(in seconds)={self.shmode_interval2} rng.costweight={self.shmode_costweighted}x{self.shmode_costfactor} maxprice={self.shmode_maxprice} rng.poolweight={self.shmode_poolweighted}x{self.shmode_poolfactor} ')
 
 
             except Exception as rex1:
