@@ -39,6 +39,7 @@ import cmd_reset
 import cmd_menu
 import cmd_boot
 import pb_sendtosnes
+import smw_repatch_url
 
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
