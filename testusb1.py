@@ -382,15 +382,17 @@ async def runsnes():
     ohash = loadsmwrh.get_local_options()
 
     #snes = py2snes.snes()
-    snes = mysnes()
-    await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
-    devices = await snes.DeviceList()
-    print('Devices =' + str(devices))
-    print('Attaching')
-    await snes.Attach(devices[0])
-    print('Attach done')
-    print('usb2snes information:')
-    print(await snes.Info())
+    #snes = mysnes()
+    snes = SnesLink()
+    await snes.readyup()
+    #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
+    #devices = await snes.DeviceList()
+    #print('Devices =' + str(devices))
+    #print('Attaching')
+    #await snes.Attach(devices[0])
+    #print('Attach done')
+    #print('usb2snes information:')
+    #print(await snes.Info())
     ramplus = 0x77
     #rambase = 0x85
     rambase = 0xF5

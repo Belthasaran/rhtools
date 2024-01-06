@@ -25,6 +25,7 @@ SRAM_START = 0xE00000
 
 class snes():
     def __init__(self):
+        self.state = SNES_DISCONNECTED
         self.socket = None
         self.recv_queue = asyncio.Queue()
         self.request_lock = asyncio.Lock()
