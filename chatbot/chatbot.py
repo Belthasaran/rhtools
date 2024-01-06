@@ -2485,6 +2485,34 @@ class Bot(commands.Bot):
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
+    async def chat_perform_loadpatch(self,ctx,rhid,ccrom=False):
+        try:
+            os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+            result = smw_repatch_url.repatch_url_function(['launch1',str(rhid)],ccrom=ccrom,noexit=True)
+            #self.chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
+            if result:
+                try:
+                    pass
+                    #if os.path.exists(result +'json'):
+                    #    cur_makepage.mkpage_function(['mkpage'], result+'json')
+                    #jsf = open(result+'json','r')
+                    #self.rhinfo = json.load(jsf)
+                    #jsf.close()
+                except Exception as xerrmp:
+                    print(f'mkpageErr:{xerrmp}')
+                print(str(result))
+                await ctx.send(f'@{ctx.message.author.name} - loadpatch file applied. SNES should be loading.' )
+                sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+                #
+                if not(sendresult):
+                    await ctx.send(f'@{ctx.message.author.name} - loadpatch:Failed to run (please check launch options)' )
+                else:
+                    await ctx.send(f'@{ctx.message.author.name} - loadpatch:Action finished' )
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.message.author.name} - loadpatch:Exception, error message: {xerr}' )
+            traceback.print_exc()
+        #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
+
     def conform_maxprice(self, mp):
         if (mp < 0):
             mp = 0
@@ -2522,7 +2550,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_csh_cweight(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2871,6 +2899,43 @@ class Bot(commands.Bot):
             await ctx.send(f'Usage: !rhload <number>')
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+        pass
+
+    @commands.command(name='smwpatch')
+    @commands.cooldown(2,1)
+    async def cmd_smwpatch(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 50:
+            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            return
+        rhid = 0
+        text = str(ctx.message.content)
+        #text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!smwpatch( +(\S+)(\s*\S*)|)', text)
+        if paramResult != None:
+            try:
+                if len(paramResult.groups())<2 or paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !smwpatch [<?> ]<text>')
+                    return
+                else:
+                    if len(paramResult.groups()) >= 3:
+                        base = paramResult.group(2).lower()
+                        text = paramResult.group(3).lower()
+                    else:
+                        base = 'smw'
+                        text = paramResult.group(2).lower()
+
+                    if not(text):
+                        await ctx.send(f'Usage: !smwpatch [<?> ]<text>')
+                        return
+                    #rhid = text
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !smwpatch <text>')
+        #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        await self.chat_perform_loadpatch(ctx,text,ccrom=self.ccflag)
         pass
 
     @commands.command(name='rhset')
