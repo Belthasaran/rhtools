@@ -1670,7 +1670,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def do_shstop_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         try:
            self.shmode = 0
@@ -1737,7 +1737,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def do_shstart_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, mod-only command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         try:
             if self.shmode_loop_stopping:
@@ -2377,7 +2377,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_snesmenu(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
             return
         self.rhinfo = None
         try:
@@ -2391,7 +2391,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_snesboot(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
             return
         self.rhinfo = None
         text = str(ctx.message.content)
@@ -2422,8 +2422,8 @@ class Bot(commands.Bot):
     @commands.command(name='snesreset')
     @commands.cooldown(2,1)
     async def cmd_snesreset(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        if await self.cmd_privilege_level(ctx.message.author) < 40:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
             return
         try:
            await cmd_reset.snes_reset()
@@ -2583,7 +2583,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_csh_pweight(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2614,7 +2614,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_cch_interval(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, Mod+ command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2678,8 +2678,8 @@ class Bot(commands.Bot):
     @commands.command(name='ccflag')
     @commands.cooldown(2,1)
     async def cmd_ccflag(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        if await self.cmd_privilege_level(ctx.message.author) < 40:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2708,7 +2708,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_shpause_fl(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2736,7 +2736,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_shpause_fl(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2767,10 +2767,10 @@ class Bot(commands.Bot):
         #    os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools'['optfile']
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
-        text = re.sub(r'[^- .?!_a-zA-z0-9%+,"&()#!\\\']','_', str(text))
+        text = re.sub(r'[^- .?!_a-zA-z0-9:%+,"&()#!\\\']','_', str(text))
         paramResult = re.match(r'^!rhrandom( +(.*)|)', text)
         m_racelevels = False
         m_demos = False
@@ -2876,8 +2876,8 @@ class Bot(commands.Bot):
     @commands.command(name='rhload')
     @commands.cooldown(2,1)
     async def cmd_rhload(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+        if await self.cmd_privilege_level(ctx.message.author) < 50:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
             return
         rhid = 0
         text = str(ctx.message.content)
@@ -2905,7 +2905,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_smwpatch(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
             return
         rhid = 0
         text = str(ctx.message.content)
@@ -2942,7 +2942,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_rhset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, restricted command.')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a mod-only restricted command. {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         rhid = 0
         text = str(ctx.message.content)
@@ -2987,10 +2987,11 @@ class Bot(commands.Bot):
     @commands.command(name='rhsearch')
     @commands.cooldown(2,1)
     async def cmd_rhsearch(self,ctx):
-        hacklist = loadsmwrh.get_hacklist_data(filename='../rhmd.dat')
+        hacklist = loadsmwrh.get_hacklist_data() #filename='../rhmd.dat')
         self.logger.debug('rhsearch  message:' + str(dir(ctx.message)))
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        #text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        text = re.sub(r'[^- .?!_a-zA-z0-9:%+,"&()#!\\\']','_', str(text))
         paramResult = re.match(r'^!rhsearch( +(.*)|)', text)
         if paramResult != None:
            try:
@@ -3011,17 +3012,34 @@ class Bot(commands.Bot):
         foundEntry = None
         extras = '()'
         self.logger.debug('rhsearch:text=' + text)
+        searchdone = False
 
-        for h in hacklist: 
-            if 'authors' in h and re.search(r'\b' + text + r'\b', h['authors'].lower()):
-                hresults = hresults + [h]
-                if not(hnames == ''):
-                    hnames = hnames + '; '
-                else:
-                    hnames = hnames + ('By %s: ' % h['authors'])
-                hnames = hnames + ('%s - %s' % (h['id'], h['name']))
-                if len(hnames) >= 10:
-                    break
+        if re.match(r'^date:',text) or re.match(r'^\d\d\d\d-\d\d', text):
+            searchdone = True
+            if re.match(r'^date:',text):
+                text = text[5:]
+                for h in hacklist:
+                    if re.search(r'\b' + text + r'\b', h['added']):
+                        hresults = hresults + [h]
+                        if not(hnames == ''):
+                            hnames = hnames +'; '
+                        hnames = hnames + f'{h["id"]} '
+                        foundEntry = h
+                        if len(hnames) > 250:
+                            hnames = hnames + '..'
+                            break
+
+        if searchdone == False:
+            for h in hacklist: 
+                if 'authors' in h and re.search(r'\b' + text + r'\b', h['authors'].lower()):
+                    hresults = hresults + [h]
+                    if not(hnames == ''):
+                        hnames = hnames + '; '
+                    else:
+                        hnames = hnames + ('By %s: ' % h['authors'])
+                    hnames = hnames + ('%s - %s' % (h['id'], h['name']))
+                    if len(hresults) >= 10 or len(hnames) > 230:
+                        break
 
         if hnames == '':
             for h in hacklist:

@@ -7,6 +7,7 @@ import json
 import sys
 import loadsmwrh
 from py2snes import py2snes
+from sneslink import SnesLink
 import asyncio
 import time
 import code
@@ -18,7 +19,11 @@ import pdb
 nest_asyncio.apply()
 #IPython.embed()
 
-class mysnes(py2snes.snes):
+#class mysnes(py2snes.snes):
+class mysnes(SnesLink):
+    def __init__(self):
+        super().__init__()
+
     powerupstate = 0xF50019
     powerupvalues = { 'fire' : b'\x03', 'cape': b'\x02', 'super': b'\x01', 'normal': b'\x00'  }
 
