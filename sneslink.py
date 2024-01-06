@@ -24,6 +24,7 @@ class SnesLink(py2snes.snes):
         if not cls._instance:
             cls._instance = super().__new__(cls)
         ####
+        super().__init__(cls._instance)
         ####
         return cls._instance
 
