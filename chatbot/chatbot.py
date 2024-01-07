@@ -2387,7 +2387,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_snesmenu(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/50')
             return
         self.rhinfo = None
         try:
@@ -2401,7 +2401,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_snesboot(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/50')
             return
         self.rhinfo = None
         text = str(ctx.message.content)
@@ -2433,7 +2433,7 @@ class Bot(commands.Bot):
     async def cmd_snesinfo__usb(self,ctx):
         result = ''
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2463,7 +2463,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_smwtestlisb__usb(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 40:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/40')
             return
         try:
             prevtest = ''
@@ -2509,7 +2509,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_smwtest__usb(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 40:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/40')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2582,7 +2582,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_snesreset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 40:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/40')
             return
         try:
            await cmd_reset.snes_reset()
@@ -2841,7 +2841,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_ccmode(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 40:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/40')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2870,7 +2870,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_shpause_fl(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2898,7 +2898,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_shpause_fl(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
@@ -2929,7 +2929,7 @@ class Bot(commands.Bot):
         #    os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools'['optfile']
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if await self.cmd_privilege_level(ctx.message.author) < 21:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/21')
             return
         text = str(ctx.message.content)
         text = re.sub(r'[^- .?!_a-zA-z0-9:%+,"&()#!\\\']','_', str(text))
@@ -3038,8 +3038,9 @@ class Bot(commands.Bot):
     @commands.command(name='rhload')
     @commands.cooldown(2,1)
     async def cmd_rhload(self,ctx):
-        if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
+        authorlevel =  await self.cmd_privilege_level(ctx.message.author)
+        if authorlevel < 50:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {authorlevel}/50')
             return
         rhid = 0
         text = str(ctx.message.content)
@@ -3074,7 +3075,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_smwpatch(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 50:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/50')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/50')
             return
         rhid = 0
         text = str(ctx.message.content)
@@ -3114,7 +3115,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_rhset(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, this is a mod-only restricted command. {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a mod-only restricted command. {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         rhid = 0
         otext = re.sub(r'!rhset ','',str(ctx.message.content))
