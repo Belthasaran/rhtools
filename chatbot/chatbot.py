@@ -40,6 +40,8 @@ import cmd_menu
 import cmd_boot
 import pb_sendtosnes
 import smw_repatch_url
+from smwusbtest import SMWUSBTest
+
 
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
@@ -2417,6 +2419,38 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - snesboot:Error, Exception:{xerr}')
             pass
         await ctx.send(f'@{ctx.author.name} - snesboot:Done')
+
+    @commands.command(name='smwtest')
+    @commands.cooldown(2,1)
+    async def cmd_smwtest__usb(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 40:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
+        #paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
+        paramResult = re.match(r'^!smwtest( (\S+)( (\S*))?)|', text)
+
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None : # or paramResult.group(3) == None :
+                    await ctx.send(f'Usage: !smwtest <method> <args>')
+                text = paramResult.group(2)
+#
+                try:
+                    snes = SMWUSBTest()
+                    await snes.readyup()
+                    attr1 = getattr(snes, text)
+                    await attr1()
+                except Exception as xerr:
+                    await ctx.send(f'@{ctx.author.name} - ssmetest:Error, Exception:{xerr}')
+                pass
+                await ctx.send(f'@{ctx.author.name} - smwtest:Done')
+            except Exception as xerr0:
+                await ctx.send(f'@{ctx.author.name} - smwtest:Error, Exception-0:{xerr0}')
+        else:
+            await ctx.send(f'Usage: !smwtest <method> <args')
+
 
 
     @commands.command(name='snesreset')
