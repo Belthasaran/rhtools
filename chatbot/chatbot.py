@@ -1680,7 +1680,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def do_shstop_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         try:
            self.shmode = 0
@@ -1747,7 +1747,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def do_shstart_command(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         try:
             if self.shmode_loop_stopping:
@@ -2712,7 +2712,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_csh_cweight(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2745,7 +2745,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_csh_pweight(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
@@ -2776,7 +2776,7 @@ class Bot(commands.Bot):
     @commands.cooldown(2,1)
     async def cmd_cch_interval(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 20:
-            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {self.cmd_privilege_level(ctx.message.author)}/20')
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
