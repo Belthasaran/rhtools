@@ -29,7 +29,7 @@ class SnesLink(py2snes.snes):
         ####
         return cls._instance
 
-    async def readyup(self):
+    async def readyup(self, note=''):
         #while not(super(py2snes.snes,self).state == py2snes.SNES_ATTACHED):
         while not(self.state == py2snes.SNES_ATTACHED):
             if self.state == py2snes.SNES_DISCONNECTED:
@@ -38,6 +38,7 @@ class SnesLink(py2snes.snes):
             while self.state == py2snes.SNES_CONNECTING:
                 await asyncio.sleep(1)
             if self.state == py2snes.SNES_CONNECTED:
+                await snes.Name(f'sneslink {note}')
                 devices = await self.DeviceList()
                 print('Devices =' + str(devices))
                 print(f'Attaching {devices[0]}')

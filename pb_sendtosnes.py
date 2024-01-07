@@ -11,6 +11,7 @@ import loadsmwrh
 from py2snes import py2snes
 import asyncio
 import time
+from sneslink import SnesLink
 
 def sendtosnes_function(args):
     result = asyncio.run(sendtosnes_function_async(args))
@@ -27,17 +28,19 @@ async def sendtosnes_function_async(args):
         if 'wsaddress' in ohash:
             print('WebSocket Address for usb2SNES is configured;  Connecting...')
             try: 
-                snes = py2snes.snes()
-                await snes.connect(address=ohash['wsaddress'])
-                print('Socket open, Attaching..')
-                await snes.Name('pb_sendtosnes')
-                devices = await snes.DeviceList()
-                print('devices=' + str(devices))
-                #await snes.Attach(devices[0])
-                print('Attach result:' + str(await snes.Attach(devices[0])))
-                print(await snes.Info())
+                snes = SnesLink()
+                print('snesLink:Readying connection')
+                await snes.readyup(note='pb_sendtosnes')
+                #snes = py2snes.snes()
+                #await snes.connect(address=ohash['wsaddress'])
+                #print('Socket open, Attaching..')
+                #await snes.Name('pb_sendtosnes')
+                #devices = await snes.DeviceList()
+                #print('devices=' + str(devices))
+                ##await snes.Attach(devices[0])
+                #print('Attach result:' + str(await snes.Attach(devices[0])))
+                #print(await snes.Info())
                 print('Uploading file')
-
                 basefilename = os.path.basename(romfile)
                 await snes.PutFile(args[1], '/xfer/'+basefilename)
                 time.sleep(15)
