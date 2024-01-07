@@ -141,7 +141,7 @@ class Bot(commands.Bot):
         except:
             pass
         self.rhinfo = None
-        self.ccflag = False
+        self.ccmode = False
         self.logger = logging.getLogger("swtbot")
         self.logging = logging.getLogger("swtbot")
         self.ccsession = None
@@ -272,7 +272,7 @@ class Bot(commands.Bot):
         # 2023-12-24 04:56:14,775  channel_id=nn id=n-n-n input=None reward=<CustomReward id=a-b-c-d title=text cost=10>
         # status=FULFILLED timestamp=2023-12-24 10:56:14.665624+00:00 user=<PartialUser id=yyyy, name=uid> 
 
-        if self.ccflag and re.match(r'.*(kaizo|coin) block.*', event.reward.title, re.I):
+        if self.ccmode and re.match(r'.*(kaizo|coin) block.*', event.reward.title, re.I):
             try:
                 chan = self.get_channel(str(event.channel_id))
                 effectobj = KaizoBlockEffect(amount=1,duration=20,retries=300)
@@ -322,10 +322,10 @@ class Bot(commands.Bot):
                     answer['headline'] = self.headline
                     if self.rhinfo:
                         answer['rhinfo'] = self.rhinfo
-                    if self.ccflag:
-                        answer['ccflag'] = self.ccflag
+                    if self.ccmode:
+                        answer['ccmode'] = self.ccmode
                     else:
-                        answer['ccflag'] = False
+                        answer['ccmode'] = False
                     answer['shmode'] = self.shmode
                     answer['shmode_stage'] = self.shmode_stage
                     answer['shmode_timeleft'] = self.shmode_timeleft
@@ -1819,7 +1819,7 @@ class Bot(commands.Bot):
         # message.author is  <User name=hh channel=hh>
         print(str(ctx.message.author))
         self.logger.info('Command: ' + str(ctx.message.author.name) + ' :: ' + str(ctx.message.content))
-        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccflag !rhrandom !rhload !rhset !rhsearch !shinterval !shpweight !shcweight !shcycle !shpause')
+        await ctx.send(f'@{ctx.author.name} commands are:  !shstart !shstop !swping  !swblock !swunblock !swuserlevel !snesmenu !snesboot !snesreset !ccmode !rhrandom !rhload !rhset !rhsearch !shinterval !shpweight !shcweight !shcycle !shpause')
         if await self.cmd_privilege_level(ctx.message.author) < 20:
             #await ctx.send(f'@{ctx.message.author.name} - This is a restricted command {c_plev}/60')
             return
@@ -2473,7 +2473,7 @@ class Bot(commands.Bot):
             self.headline = ''
             await snes.readyup()
             inlevel = await snes.inlevel()
-            await ctx.send(f'@{ctx.author.name} - inlevel={inlevel} test round 1: next 5:{testlist[0:5]} - starts when inlevel=True ')
+            await ctx.send(f'@{ctx.author.name} - inlevel={inlevel} test round 1: next 2:{testlist[0:2]} - starts when inlevel=True ')
             await asyncio.sleep(2)
 
             for testname in testlist:
@@ -2484,11 +2484,19 @@ class Bot(commands.Bot):
                 inlevel = await snes.inlevel()
                 while inlevel == False:
                     inlevel = await snes.inlevel()
-                    await asyncio.sleep(7)
+                    await asyncio.sleep(1)
                 attr1 = getattr(snes, testname)
                 result = await attr1()
+                await asyncio.sleep(2)
+                inlevel = await snes.inlevel()
+                while inlevel == False:
+                    inlevel = await snes.inlevel()
+                    await asyncio.sleep(1)
+                attr1 = getattr(snes, testname)
+                result = await attr1()
+                await asyncio.sleep(5)
                 if testidx % 5 == 0:
-                    await ctx.send(f'@{ctx.author.name} - Testing SMW game effects, Current:{testname}, Remaining:{len(testlist)-testidx},  Next 5:{testlist[testidx:testidx+5]} ')
+                    await ctx.send(f'@{ctx.author.name} - Testing SMW game effects, Current:{testname}, Remaining:{len(testlist)-testidx},  Next 2:{",".join(testlist[testidx:testidx+5])} ')
             await ctx.send(f'@{ctx.author.name} - Done')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - smwtestlist:Error, Exception-0:{xerr0}')
@@ -2829,33 +2837,33 @@ class Bot(commands.Bot):
 
 
 
-    @commands.command(name='ccflag')
+    @commands.command(name='ccmode')
     @commands.cooldown(2,1)
-    async def cmd_ccflag(self,ctx):
+    async def cmd_ccmode(self,ctx):
         if await self.cmd_privilege_level(ctx.message.author) < 40:
             await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
             return
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
-        paramResult = re.match(r'^!ccflag( +(on|off|yes|no|1|0)|)', text)
+        paramResult = re.match(r'^!ccmode( +(on|off|yes|no|1|0)|)', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None :
-                    await ctx.send(f'Usage: !ccflag <on|off>')
+                    await ctx.send(f'Usage: !ccmode <on|off>')
                     return
                 else:
                     text = paramResult.group(2).lower()
                     if text=="on" or text=="1" or text=="yes":
-                        self.ccflag = True
+                        self.ccmode = True
                     elif text=="off" or text=="0" or text=="no":
-                        self.ccflag = False
-                    await ctx.send(f'{ctx.author.name} - crowd control status set to: {self.ccflag}')
+                        self.ccmode = False
+                    await ctx.send(f'{ctx.author.name} - crowd control status set to: {self.ccmode}')
                     pass
             except Exception as rex1:
                 self.logger.debug('ERR:rex1:' + str(rex1))
                 pass
         else:
-            await ctx.send(f'Usage: !ccflag <on|off>')
+            await ctx.send(f'Usage: !ccmode <on|off>')
 
 
     @commands.command(name='shpause')
@@ -3010,7 +3018,7 @@ class Bot(commands.Bot):
 
                     if loadtoo:
                         await ctx.send(f'@{ctx.author.name} - I found game #{rhid} by {rhauthors} ({rhname}).  Attempting to load...')
-                        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+                        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccmode)
                     else:
                         await ctx.send(f'{ctx.author.name} - Game #{rhid} by {rhauthors} ({rhname})')
 
@@ -3035,7 +3043,14 @@ class Bot(commands.Bot):
             return
         rhid = 0
         text = str(ctx.message.content)
-        text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        text = re.sub('[^ !_a-zA-z0-9%]','_', str(text))
+        if re.match(r'^cc%.*',text):
+            self.ccmode = True
+            text = text[3:]
+        elif re.search('%cc%',text):
+            self.ccmode = True
+            text = text.replace('%cc%','')
+
         paramResult = re.match(r'^!rhload( +([a-z0-9_]+)|)', text)
         if paramResult != None:
             try:
@@ -3052,7 +3067,7 @@ class Bot(commands.Bot):
         else:
             await ctx.send(f'Usage: !rhload <number>')
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccflag)
+        await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccmode)
         pass
 
     @commands.command(name='smwpatch')
@@ -3063,6 +3078,9 @@ class Bot(commands.Bot):
             return
         rhid = 0
         text = str(ctx.message.content)
+        if re.search('%cc%',text):
+            self.ccmode = True
+            text = text.replace('%cc%','')
         #text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
         paramResult = re.match(r'^!smwpatch( +(\S+)(\s*\S*)|)', text)
         if paramResult != None:
@@ -3089,7 +3107,7 @@ class Bot(commands.Bot):
         else:
             await ctx.send(f'Usage: !smwpatch <text>')
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-        await self.chat_perform_loadpatch(ctx,text,ccrom=self.ccflag)
+        await self.chat_perform_loadpatch(ctx,text,ccrom=self.ccmode)
         pass
 
     @commands.command(name='rhset')
@@ -3133,7 +3151,7 @@ class Bot(commands.Bot):
                 await ctx.send(f'@{ctx.author.name} - err:rhset {xerr1}')
                 pass
         else:
-            await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccflag)
+            await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccmode)
 
         if str(rhid) == "vanilla" or str(rhid) == "ccvanilla" or str(rhid) == "vanilla":
             if not(self.rhinfo):
