@@ -2488,7 +2488,10 @@ class Bot(commands.Bot):
     async def chat_perform_loadpatch(self,ctx,rhid,ccrom=False):
         try:
             os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-            result = smw_repatch_url.repatch_url_function(['launch1',str(rhid)],ccrom=ccrom,noexit=True)
+            #findglyph = re.split(r'/', rhid)[-1]
+            #findglyph = re.split(r'[^a-zA-Z0-9]', rhid)[0]
+
+            result = smw_repatch_url.repatch_url_function(['patchurl',str(rhid)],ccrom=ccrom,noexit=True)
             #self.chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
             if result:
                 try:

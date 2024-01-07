@@ -88,6 +88,10 @@ def repatch_url_function(args,ccrom=False,noexit=False):
     sha1_patched = (hashlib.sha1(data).hexdigest())
     xsha224_patched = hashlib.sha224(data).hexdigest()
 
+    urltrailer = re.split(r'/', bpsurl[-1]
+    urltrailer = re.split(r'[^a-zA-Z0-9]', bpsurl)[0]
+    urltrailer = f'{urltrailer}{shake1_patched[0:6]}'
+
     #SuperMarioWorld.ips
 
     namesuffix=''
@@ -104,6 +108,9 @@ def repatch_url_function(args,ccrom=False,noexit=False):
 
     jsonfilename = ''
     
+    if re.match('urltrailer', args[0]):
+        romfilename = hackinfo["id"] + "_" +  str(urltrailer) + namesuffix + ".sfc"
+        jsonfilename = hackinfo["id"] + "_" +  str(urltrailer) + namesuffix + ".sfcjson"
     if re.match('.*repatch.*', args[0]):
         romfilename = hackinfo["id"] + "_" + shake1_patched  + namesuffix + ".sfc"
         jsonfilename = hackinfo["id"] + "_" + shake1_patched + namesuffix + ".sfcjson"
@@ -181,6 +188,10 @@ if __name__ == '__main__':
         ccrom = True
     if len(sys.argv) > 2 and  re.search('ccrom', ' '.join(sys.argv[2:]).lower()):
         ccrom = True
+    if len(sys.argv) < 2:
+        sys.argv.append('repatch')
+    else:
+        sys.argv[1]='repatch'
     rp_result = repatch_url_function(sys.argv,ccrom=ccrom)
     if len(sys.argv) > 2 and re.search('sendtosnes', ' '.join(sys.argv[2:]).lower()):
        if rp_result:

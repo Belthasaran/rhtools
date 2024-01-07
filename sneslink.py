@@ -22,11 +22,12 @@ class SnesLink(py2snes.snes):
     _instance = None
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
+            print(f'SnesLink:return existing instance')
             cls._instance = super().__new__(cls)
-        ####
-        super().__init__(cls._instance)
-        #super(py2snes.snes,cls._instance).state = py2snes.SNES_DISCONNECTED
-        ####
+            ####
+            super().__init__(cls._instance)
+            #super(py2snes.snes,cls._instance).state = py2snes.SNES_DISCONNECTED
+            ####
         return cls._instance
 
     async def readyup(self, note=''):
