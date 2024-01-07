@@ -71,13 +71,14 @@
 					   
 					   gameval = "<TABLE ID=\"infotable\"><TR><TD>";
 					   if (sheadline != "") {
-						gameval += escapeHTML(sheadline) + "<BR>";
+					        headlineval= escapeHTML(sheadline) + "<BR>";
 						    }
 					   gameval += escapeHTML(simethod) + " " + escapeHTML(data['rhinfo']['id']) + " ";
 					   gameval += escapeHTML(siname) + sicc + "<BR>";
 					   gameval += escapeHTML(siauthors) + "<BR>";
 					   gameval += escapeHTML(data['rhinfo']['type']) + "<BR>";
 					   gameval += "</TD></TR></TABLE>";
+					   $("#headlinediv").html(headlineval)
 					   $("#gamediv").html(gameval)
 
 			   }
@@ -139,6 +140,7 @@
 						     }
 					  }
 			  //$("#gamediv").html(gameval);
+			  $("#headlinediv").show();
 			  $("#gamediv").show();
 			  $("#shmodediv").html(textval);
 			  $("#shmodediv").show();
@@ -180,6 +182,7 @@
  }
 </style>
  <body>
+	 <div id="headlinediv"></div>
 	 <div id="gamediv">
 	 </div>
 	 <div id="shmodediv">
