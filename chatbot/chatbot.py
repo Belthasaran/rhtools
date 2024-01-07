@@ -93,6 +93,7 @@ class Bot(commands.Bot):
             time.sleep(10)
 
     def __init__(self,bci):
+        self.headline = ''
         self.moderation = False
         self.botconfig = bci
         os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
@@ -318,6 +319,7 @@ class Bot(commands.Bot):
             try:
                 data = json.loads(message)
                 if data['query'] == 'shmode' :
+                    answer['headline'] = self.headline
                     if self.rhinfo:
                         answer['rhinfo'] = self.rhinfo
                     if self.ccflag:
@@ -2464,29 +2466,32 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
             return
         try:
-            testlist = ['xmario','c_balloon','c_yellow_yoshi','capepower','c_slippery','c_speed', 'c_starman', 'c_bulletbillgen', 'c_pixelate', 'c_kaizoblock','c_item_flower','c_blueswitch','c_5up','c_silverswitch','c_spawnthwomp','c_fishgen','c_water','c_exitlevel','c_munchers','c_disappearing','c_window']
+            testlist = ['c_duplicating','xmario','c_balloon','c_yellow_yoshi','capepower','setslippery','c_speed', 'c_starman', 'c_bulletbillgen', 'c_pixelate', 'c_kaizoblock', 'c_kaizoblock','c_item_flower','c_blueswitch','c_5up','c_silverswitch','c_spawnthwomp','c_spawnthwomp','c_fishgen','c_water','c_exitlevel','c_munchers','c_disappearing','xmario','c_window']
             testidx = 0
             snes = SMWUSBTest()
+            self.headline = ''
             await snes.readyup()
             inlevel = await snes.inlevel()
-            await ctx.send(f'@{ctx.author.name} - inlevel={inlevel} test round 1: {testlist} - starts when inlevel=True ')
+            await ctx.send(f'@{ctx.author.name} - inlevel={inlevel} test round 1: next 5:{testlist[0:5]} - starts when inlevel=True ')
             await asyncio.sleep(2)
 
             for testname in testlist:
+                self.headline = f'Testing game effects: trying {testname} ({testidx}/{len(testlist)}) '
                 self.logger.info(f'usbTEST: {testname}')
                 textidx = testidx + 1
                 inlevel = await snes.inlevel()
                 while inlevel == False:
                     inlevel = await snes.inlevel()
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(7)
                 attr1 = getattr(snes, testname)
                 result = await attr1()
                 if testidx % 5 == 0:
-                     await ctx.send(f'@{ctx.author.name} - Current:{testname},  Remaining:{testlist[testidx:]} ')
+                    await ctx.send(f'@{ctx.author.name} - Testing SMW game effects, Current:{testname}, Remaining:{len(testlist)-testidx},  Next 5:{testlist[testidx:testidx+5]} ')
             await ctx.send(f'@{ctx.author.name} - Done')
         except Exception as xerr0:
             await ctx.send(f'@{ctx.author.name} - smwtestlist:Error, Exception-0:{xerr0}')
             traceback.print_exc()
+        self.headline = ''
 
 
 

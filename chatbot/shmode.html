@@ -37,6 +37,11 @@
 
 			  console.log("" + event.data);
 
+			  sheadline= ""
+			  if (('headline' in data)) {
+					   sheadline = data['headline']
+			   }
+
 			  if (('rhinfo' in data)) {
 					   simethod = ''
 					   if ('rhinfo' in data && 'method' in data['rhinfo'] && data['rhinfo']['method']) {
@@ -65,6 +70,9 @@
 					    }
 					   
 					   gameval = "<TABLE ID=\"infotable\"><TR><TD>";
+					   if (sheadline != "") {
+						gameval += escapeHTML(sheadline) + "<BR>";
+						    }
 					   gameval += escapeHTML(simethod) + " " + escapeHTML(data['rhinfo']['id']) + " ";
 					   gameval += escapeHTML(siname) + sicc + "<BR>";
 					   gameval += escapeHTML(siauthors) + "<BR>";

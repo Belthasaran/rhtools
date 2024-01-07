@@ -294,7 +294,7 @@ class SMWUSBTest(SnesLink):
     async def c_blueswitch(self, value=b'\xb0', value2=b'\x0e'):
          await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value2) ] )
 
-    async def c_silverswitch(self, value=b'\xb0', value2='\x0e'):
+    async def c_silverswitch(self, value=b'\xb0', value2=b'\x0e'):
              # F60728 => turns enemies into coins on x01
          await self.PutAddress( [ (0xF514AE, value), (0xF51DFB, value2), (0xF60728, b'\x01') ] )
 
