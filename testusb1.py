@@ -230,6 +230,11 @@ class mysnes(SnesLink):
 
          await self.PutAddress([  (0xF50F31, b"\x09") ])
 
+    async def e_xmario(self):
+        await self.settime(2)
+        await self.PutAddress([(0xF50096, b'\xf0')])
+
+
     #c.vanilla addresses# found to work
     async def c_invertcontrols(self, value=b'\x02'): 
          # x01 invert dpand

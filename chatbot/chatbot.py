@@ -108,6 +108,7 @@ class Bot(commands.Bot):
 
         # Make sure to instantiate USBTest() first.
         self.e_usbtest = SMWUSBTest()
+        self.testargs = []
         #self.e_runner = SmwEffectRunner()
 
         self.shmode_pause = 0
@@ -2467,6 +2468,7 @@ class Bot(commands.Bot):
         text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
         #paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
         paramResult = re.match(r'^!smwtest( (\S+)( (\S*))?)|', text)
+        result = ''
 
         if paramResult != None:
             try:
@@ -2475,16 +2477,55 @@ class Bot(commands.Bot):
                 text = paramResult.group(2)
 #
                 try:
+                    extraparam_l = []
+                    extraparam_raw_l = []
+                    if len(paramResult.groups()) >= 3:
+                        extraparam_raw_l = str(ctx.message.content).split()[2:]
+                        pass
+                    for pindex in range(len(extraparam_raw_l)):
+                        thisparam = extraparam_raw_l[pindex].strip()
+                        if re.match(r'^(0x)?[0-9A-F]{4,}$', thisparam):
+                            thisparam = int(thisparam, 16)
+                            extraparam_l.append(thisparam)
+                        elif re.match(r'^\[(0x)?[0-9A-F]{2,}\]$', thisparam):
+                            thisparam = thisparam[1:-1]
+                            thisparam = bytes(int(thisparam, 16))
+                            extraparam_l.append(thisparam)
+                        elif re.match(r'^\\x[0-9a-fA-f]+$',thisparam):
+                            mr = re.match(r'^\\x([0-9a-fA-f]+)$',thisparam)
+                            thisparam = bytes([int(mr.group(1),16)])
+                            extraparam_l.append(thisparam)
+                        elif re.match(r'^\[\(0x[0-9a-fA-F]+,0x[0-9a-fA-F]+\)\]$', thisparam):
+                            mr = re.match(r'^\[\((0x[0-9a-fA-F]+),(0x[0-9a-fA-F]+)\)\]$', thisparam)
+                            thisparam = [ ( int(mr.group(1),16), bytes([int(mr.group(2),16)]) )  ]
+                            extraparam_l.append(thisparam)
+                        elif re.match(r"^\[\(0x[0-9a-fA-F]+,b'\\x[0-9a-fA-F]+'\)\]$", thisparam):
+                            mr = re.match(r"^\[\((0x[0-9a-fA-F]+),(b'\\x[0-9a-fA-F]+')\)\]$", thisparam)
+                            parta = mr.group(1)
+                            partb = mr.group(2)
+                            print(f'TEST parta={parta}  partb={partb}')
+                            partb = int(mr.group(2).replace("'","").replace("b","").replace("\\","0"),16)
+                            thisparam = [( int(parta,16), bytes([partb,16]) )]
+                            extraparam_l.append(thisparam)
+                        elif re.match(r'^[0-9]+$',thisparam):
+                            extraparam_l.append(int(thisparam))
+                        else:
+                            pass
+
+                    await ctx.send(f'@{ctx.author.name} - Ok SuperMarioWorld().{text} {extraparam_l} ')
+
                     snes = SMWUSBTest()
                     await snes.readyup()
                     attr1 = getattr(snes, text)
-                    await attr1()
+                    result = await attr1(*extraparam_l)
                 except Exception as xerr:
                     await ctx.send(f'@{ctx.author.name} - ssmetest:Error, Exception:{xerr}')
+                    traceback.print_exc()
                 pass
-                await ctx.send(f'@{ctx.author.name} - smwtest:Done')
+                await ctx.send(f'@{ctx.author.name} - smwtest:Done result:{result}')
             except Exception as xerr0:
                 await ctx.send(f'@{ctx.author.name} - smwtest:Error, Exception-0:{xerr0}')
+                traceback.print_exc()
         else:
             await ctx.send(f'Usage: !smwtest <method> <args')
 

@@ -103,6 +103,17 @@ class SMWUSBTest(SnesLink):
        # 0=reset b=ow f=enter level
        await self.PutAddress( [ (0xF50100, value) ])
 
+    async def setgamemode_b(self):
+        await snes.setgamemode(b'\x0b')
+
+    async def e_xmario(self):
+        await self.settime(2)
+        await self.PutAddress([(0xF50096, b'\xf0')])
+
+    async def xmario(self):
+        await self.settime(2)
+        await self.PutAddress([(0xF50096, b'\xf0')])
+
     async def setleveloverride(self, value=b'\x03'):
        await self.PutAddress( [ (0xF50109, value)] )
 
