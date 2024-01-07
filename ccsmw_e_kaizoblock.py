@@ -52,6 +52,7 @@ class KaizoBlockEffect(SmwEffectRunner):
         self.game = "SuperMarioWorld"
         self.description = "Make kaizo blocks"
         self.effectId = "makeKaizos"
+        self.magic2 = 0
     async def ready(self):    # ready(): Effect pre-requisites
         return await self.inlevel()
     async def isactive(self): # isactive(): Pause countdown if game is paused or player no longer in a level.
@@ -60,12 +61,18 @@ class KaizoBlockEffect(SmwEffectRunner):
         print(f'KaizoBlockEffect.Initiate({self._amount},{self._duration})')
         await self.snes.PutAddress([(0xF60729,b'\x01')])
     async def refresh(self):   # refresh() -> Actions to repeat every tick to preserve effect
+        self.magic2 = self.magic2 + 1
+        retries_made=0
         retry=3
         waitValue = random.randint(0,10)/10
         await asyncio.sleep(waitValue)
         while (retry > 0) and  await self.snes.GetAddress(0xF60729,1) == b'\x01':
             retry = retry - 1
+            retries_made = retries_made + 1
             await asyncio.sleep(1)
+        if self.magic2 % 3 == 0 and (retries_made > 3):
+             self.time_left = self.time_left + 1
+
         print('KaizoBlockEffect.refresh time_left='+str(self.time_left))
         if await self.inlevel():
             await self.snes.PutAddress([(0xF60729,b'\x01')])
