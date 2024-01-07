@@ -88,7 +88,7 @@ def repatch_url_function(args,ccrom=False,noexit=False):
     sha1_patched = (hashlib.sha1(data).hexdigest())
     xsha224_patched = hashlib.sha224(data).hexdigest()
 
-    urltrailer = re.split(r'/', bpsurl[-1]
+    urltrailer = re.split(r'/', bpsurl[-1])
     urltrailer = re.split(r'[^a-zA-Z0-9]', bpsurl)[0]
     urltrailer = f'{urltrailer}{shake1_patched[0:6]}'
 
