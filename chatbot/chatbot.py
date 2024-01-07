@@ -2457,6 +2457,38 @@ class Bot(commands.Bot):
         else:
             await ctx.send(f'Usage: !snesinfo')
 
+    @commands.command(name='smwtestlist')
+    @commands.cooldown(2,1)
+    async def cmd_smwtestlisb__usb(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 40:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
+            return
+        try:
+            testlist = ['xmario','c_balloon','c_yellow_yoshi','capepower','c_slippery','c_speed', 'c_starman', 'c_bulletbillgen', 'c_pixelate', 'c_kaizoblock','c_item_flower','c_blueswitch','c_5up','c_silverswitch','c_spawnthwomp','c_fishgen','c_water','c_exitlevel','c_munchers','c_disappearing','c_window']
+            testidx = 0
+            snes = SMWUSBTest()
+            await snes.readyup()
+            inlevel = await snes.inlevel()
+            await ctx.send(f'@{ctx.author.name} - inlevel={inlevel} test round 1: {testlist} - starts when inlevel=True ')
+            await asyncio.sleep(2)
+
+            for testname in testlist:
+                self.logger.info(f'usbTEST: {testname}')
+                textidx = testidx + 1
+                inlevel = await snes.inlevel()
+                while inlevel == False:
+                    inlevel = await snes.inlevel()
+                    await asyncio.sleep(5)
+                attr1 = getattr(snes, testname)
+                result = await attr1()
+                if testidx % 5 == 0:
+                     await ctx.send(f'@{ctx.author.name} - Current:{testname},  Remaining:{testlist[testidx:]} ')
+            await ctx.send(f'@{ctx.author.name} - Done')
+        except Exception as xerr0:
+            await ctx.send(f'@{ctx.author.name} - smwtestlist:Error, Exception-0:{xerr0}')
+            traceback.print_exc()
+
+
 
     @commands.command(name='smwtest')
     @commands.cooldown(2,1)
