@@ -2466,6 +2466,7 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/40')
             return
         try:
+            prevtest = ''
             testlist = ['c_duplicating','xmario','c_balloon','c_yellow_yoshi','capepower','setslippery','c_speed', 'c_starman', 'c_bulletbillgen', 'c_pixelate', 'c_kaizoblock', 'c_kaizoblock','c_item_flower','c_blueswitch','c_5up','c_silverswitch','c_spawnthwomp','c_spawnthwomp','c_fishgen','c_water','c_exitlevel','c_munchers','c_disappearing','xmario','c_window']
             testidx = 0
             snes = SMWUSBTest()
@@ -2476,9 +2477,10 @@ class Bot(commands.Bot):
             await asyncio.sleep(2)
 
             for testname in testlist:
-                self.headline = f'Testing game effects: trying {testname} ({testidx}/{len(testlist)}) '
+                self.headline = f'Testing game effects. Sent {prevtest} ({testidx}/{len(testlist)}) next: {testname} '
+                prevtest = testname
                 self.logger.info(f'usbTEST: {testname}')
-                textidx = testidx + 1
+                testidx = testidx + 1
                 inlevel = await snes.inlevel()
                 while inlevel == False:
                     inlevel = await snes.inlevel()
