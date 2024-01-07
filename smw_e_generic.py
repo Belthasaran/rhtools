@@ -13,11 +13,13 @@ import code
 
 import IPython
 import nest_asyncio
+from sneslink import SnesLink
 import pdb
 nest_asyncio.apply()
 #IPython.embed()
 
-class SmwEffectRunner(py2snes.snes):
+#class SmwEffectRunner(py2snes.snes):
+class SmwEffectRunner(SnesLink):
     def __init__(self,amount=1,duration=60,retries=300,tick_interval=0.5):
         super().__init__()
         #super().__init__(amount,duration,retry,tick_interval)
@@ -115,19 +117,21 @@ class SmwEffectRunner(py2snes.snes):
         normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
     async def connect_and_run(self,args=[]):
-        ohash = loadsmwrh.get_local_options()
-        print(f"snes_xmario: {ohash}")
-        #
-        #snes = SMWEffectRunner(retries=300,duration=0,tick_interval=1)
-        await self.connect(address=ohash['wsaddress']) # ws://hostname:8080
-        devices = await self.DeviceList()
-        print('Devices =' + str(devices))
-        print('Attaching')
-        await self.Attach(devices[0])
-        print('Attach done')
-        print('usb2snes information:')
-        print(await self.Info())
-        #image = args[1]
+        print(f'SmwEffectRunner:connect_and_run')
+        readystat = await self.readyup()
+        #ohash = loadsmwrh.get_local_options()
+        #print(f"snes_xmario: {ohash}")
+        ##
+        ##snes = SMWEffectRunner(retries=300,duration=0,tick_interval=1)
+        #await self.connect(address=ohash['wsaddress']) # ws://hostname:8080
+        #devices = await self.DeviceList()
+        #print('Devices =' + str(devices))
+        #print('Attaching')
+        #await self.Attach(devices[0])
+        #print('Attach done')
+        #print('usb2snes information:')
+        #print(await self.Info())
+        ##image = args[1]
         result = await self.run()
         print('Result = ' + str(result))
         return result
@@ -141,15 +145,16 @@ async def smw_gen_effect_runner(args):
 
     #snes = py2snes.snes()
     snes = SmwEffectRunner()
-    await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
-    devices = await snes.DeviceList()
-    print('Devices =' + str(devices))
-    print('Attaching')
-    await snes.Attach(devices[0])
-    print('Attach done')
-    print('usb2snes information:')
-    print(await snes.Info())
-    #image = args[1]
+    await snes.readyup()
+    #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
+    #devices = await snes.DeviceList()
+    #print('Devices =' + str(devices))
+    #print('Attaching')
+    #await snes.Attach(devices[0])
+    #print('Attach done')
+    #print('usb2snes information:')
+    #print(await snes.Info())
+    ##image = args[1]
     result = await snes.run()
     print('Result = ' + str(result))
     return snes

@@ -91,20 +91,21 @@ class KaizoBlockEffect(SmwEffectRunner):
 
 
 async def effect_runner(args):
-    ohash = loadsmwrh.get_local_options()
-    print(f"snes_xmario: {ohash}")
-
-    #snes = py2snes.snes()
+    #ohash = loadsmwrh.get_local_options()
+    #print(f"snes_xmario: {ohash}")
+    #
+    ##snes = py2snes.snes()
     snes = KaizoBlockEffect()
-    await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
-    devices = await snes.DeviceList()
-    print('Devices =' + str(devices))
-    print('Attaching')
-    await snes.Attach(devices[0])
-    print('Attach done')
-    print('usb2snes information:')
-    print(await snes.Info())
-    #image = args[1]
+    #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
+    #devices = await snes.DeviceList()
+    #print('Devices =' + str(devices))
+    #print('Attaching')
+    #await snes.Attach(devices[0])
+    #print('Attach done')
+    #print('usb2snes information:')
+    #print(await snes.Info())
+    ##image = args[1]
+    readystatus = await snes.readyup()
     result = await snes.run()
     print('Result = ' + str(result))
     return snes
