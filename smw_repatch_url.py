@@ -91,7 +91,7 @@ def repatch_url_function(args,ccrom=False,noexit=False):
     print(f'patchBPSURL={bpsurl}')
     urltrailer = re.split(r'/', bpsurl)[-1]
     urltrailer = re.split(r'[^a-zA-Z0-9]', urltrailer)[0]
-    urltrailer = f'{urltrailer}{shake1_patched[0:6]}'
+    urltrailer = f'{urltrailer}{shake1_patched[0:9]}'
 
     #SuperMarioWorld.ips
 

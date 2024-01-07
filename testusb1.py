@@ -16,6 +16,8 @@ import IPython
 import nest_asyncio
 import pdb
 
+from smw_e_generic import SmwEffectRunner
+
 nest_asyncio.apply()
 #IPython.embed()
 
@@ -379,6 +381,7 @@ class mysnes(SnesLink):
 
 
 async def runsnes():
+    #test = SmwEffectRunner()
     ohash = loadsmwrh.get_local_options()
 
     #snes = py2snes.snes()
