@@ -40,6 +40,8 @@
 			  sheadline= ""
 			  if (('headline' in data)) {
 					   sheadline = data['headline']
+                                           headlineval= escapeHTML(sheadline) + "<BR>";
+                                           $("#headlinediv").html(headlineval)
 			   }
 
 			  if (('rhinfo' in data)) {
@@ -78,7 +80,6 @@
 					   gameval += escapeHTML(siauthors) + "<BR>";
 					   gameval += escapeHTML(data['rhinfo']['type']) + "<BR>";
 					   gameval += "</TD></TR></TABLE>";
-					   $("#headlinediv").html(headlineval)
 					   $("#gamediv").html(gameval)
 
 			   }
