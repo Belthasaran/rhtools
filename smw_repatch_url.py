@@ -113,7 +113,7 @@ def repatch_url_function(args,ccrom=False,noexit=False):
         print(f"_______{urltrailer}")
         romfilename = hackinfo["id"] + "_" +  str(urltrailer) + namesuffix + ".sfc"
         jsonfilename = hackinfo["id"] + "_" +  str(urltrailer) + namesuffix + ".sfcjson"
-    if re.match('.*repatch.*', args[0]):
+    elif re.match('.*repatch.*', args[0]):
         romfilename = hackinfo["id"] + "_" + shake1_patched  + namesuffix + ".sfc"
         jsonfilename = hackinfo["id"] + "_" + shake1_patched + namesuffix + ".sfcjson"
     else:

@@ -2420,6 +2420,38 @@ class Bot(commands.Bot):
             pass
         await ctx.send(f'@{ctx.author.name} - snesboot:Done')
 
+    @commands.command(name='snesinfo')
+    @commands.cooldown(2,1)
+    async def cmd_snesinfo__usb(self,ctx):
+        result = ''
+        if await self.cmd_privilege_level(ctx.message.author) < 21:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {self.cmd_privilege_level(ctx.message.author)}/21')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ !_a-zA-z0-9-]','_', str(text))
+        #paramResult = re.match(r'^!shcweight( +(-?\d+))|', text)
+        paramResult = re.match(r'^!snesinfo( (\S+)( (\S*))?)|', text)
+
+        if paramResult != None:
+            try:
+                #if paramResult.group(2) == None : # or paramResult.group(3) == None :
+                #    await ctx.send(f'Usage: !smwtest <method> <args>')
+                #text = paramResult.group(2)
+#
+                try:
+                    snes = SMWUSBTest()
+                    await snes.readyup()
+                    result = await snes.Info()
+                except Exception as xerr:
+                    await ctx.send(f'@{ctx.author.name} - ssmetest:Error, Exception:{xerr}')
+                pass
+                await ctx.send(f'@{ctx.author.name} - SNES Status:{result}')
+            except Exception as xerr0:
+                await ctx.send(f'@{ctx.author.name} - snesinfo:Error, Exception-0:{xerr0}')
+        else:
+            await ctx.send(f'Usage: !snesinfo')
+
+
     @commands.command(name='smwtest')
     @commands.cooldown(2,1)
     async def cmd_smwtest__usb(self,ctx):
@@ -2982,6 +3014,7 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Sorry, this is a mod-only restricted command. {self.cmd_privilege_level(ctx.message.author)}/20')
             return
         rhid = 0
+        otext = re.sub(r'!rhset ','',str(ctx.message.content))
         text = str(ctx.message.content)
         text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
         paramResult = re.match(r'^!rhset( +([a-z0-9_]+)|)', text)
@@ -3003,8 +3036,20 @@ class Bot(commands.Bot):
             self.rhinfo = None
             await ctx.send(f'@{ctx.author.name} - Ok, rhinfo set to none.')
         #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
-        print(f'rhset_command')
-        await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccflag)
+        print(f'rhset_command otext={otext.strip()}')
+        if otext.strip()[0] == '{' and  await self.cmd_privilege_level(ctx.message.author) >= 50 :
+            try:
+                self.rhinfo = {'id':'0', 'name': '', 'authors':'', 'method':'', 'added':''}
+                jobj = json.loads(otext)
+                for keyword1 in ['name', 'id', 'authors', 'method', 'added']:
+                    if keyword1 in jobj:
+                        self.rhinfo[keyword1] = jobj[keyword1]
+            except Exception as xerr1:
+                await ctx.send(f'@{ctx.author.name} - err:rhset {xerr1}')
+                pass
+        else:
+            await self.chat_perform_rhset(ctx,rhid,ccrom=self.ccflag)
+
         if str(rhid) == "vanilla" or str(rhid) == "ccvanilla" or str(rhid) == "vanilla":
             if not(self.rhinfo):
                 self.rhinfo = {'id':'Vanilla', 'name':'', 'authors':'', 'method':'', 'added':'1990'}

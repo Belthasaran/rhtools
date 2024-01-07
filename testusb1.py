@@ -280,7 +280,7 @@ class mysnes(SnesLink):
     async def sfx_mountyoshi(self, value=b'\x1f'):
         await self.PutAddress( [ (0xF51DFC, value)])
 
-    async def c_blueswitch(self, value=b'\xb0', value2='\x0e'):
+    async def c_blueswitch(self, value=b'\xb0', value2=b'\x0e'):
          await self.PutAddress( [ (0xF514AD, value), (0xF51DFB, value2) ] )
 
     async def c_silverswitch(self, value=b'\xb0', value2='\x0e'):
@@ -382,8 +382,8 @@ async def runsnes():
     ohash = loadsmwrh.get_local_options()
 
     #snes = py2snes.snes()
-    #snes = mysnes()
-    snes = SnesLink()
+    snes = mysnes()
+    #snes = SnesLink()
     await snes.readyup()
     #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
     #devices = await snes.DeviceList()
