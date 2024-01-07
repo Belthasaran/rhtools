@@ -33,18 +33,18 @@ class SmallMarioEffect(SmwEffectRunner):
         self.description = "Make mario little"
         self.effectId = "shrinkMario"
     async def ready(self):    # ready(): Effect pre-requisites
-        return await self.inlevel() and  not(await self.GetAddress(0xF50019,1) == b'\x00')
+        return await self.inlevel() and  not(await self.snes.GetAddress(0xF50019,1) == b'\x00')
     async def isactive(self): # isactive(): Pause countdown if game is paused or player no longer in a level.
         return await self.inlevel()
     async def sfx_powerdown(self): # Sound affect
-        await self.PutAddress([(0xF51DF9, b'\x04')])
+        await self.snes.PutAddress([(0xF51DF9, b'\x04')])
     async def initiate(self):  # initiate() -> Initially apply affect
         print(f'SmallMarioEffect.Initiate({self._amount},{self._duration})')
-        await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
+        await self.snes.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
     async def refresh(self):   # refresh() -> Actions to repeat every tick to preserve effect
         print('ShrinkMario.refresh time_left='+str(self.time_left))
-        if not(await self.GetAddress(0xF50019,1) == b'\x00') and await self.inlevel():
-            await self.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
+        if not(await self.snes.GetAddress(0xF50019,1) == b'\x00') and await self.inlevel():
+            await self.snes.PutAddress([ ( 0xF50019, b'\x00' ), (0xF51DF9, b'\x04') ])
         pass
     async def finalize(self):   # finalize() -> Actions to take to remove effect
         # This affect ends on its own when refresh() is no longer called every tick
@@ -55,17 +55,17 @@ class SmallMarioEffect(SmwEffectRunner):
          hundreds = int(curtime / 100)
          tens = int((int(curtime) - hundreds*100)/10)
          ones = (int(curtime) - hundreds*100 - tens*10)  % 10
-         await self.PutAddress([ (0xF50F31, bytes([hundreds]) ),
+         await self.snes.PutAddress([ (0xF50F31, bytes([hundreds]) ),
                                  (0xF50F32, bytes([tens]) ),
                                  (0xF50F33, bytes([ones]) )])
 
     async def inlevel(self):
-        run_game = ((await self.GetAddress(0xF50010,1)) == b'\x00')
-        game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
-        noanimation = (await self.GetAddress(0xF50071,1)) == b'\x00'
-        no_endlevel_keyhole = (await self.GetAddress(0xF51434,1)) == b'\x00'
-        no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
-        normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
+        run_game = ((await self.snes.GetAddress(0xF50010,1)) == b'\x00')
+        game_unpaused = (await self.snes.GetAddress(0xF513D4,1)) == b'\x00'
+        noanimation = (await self.snes.GetAddress(0xF50071,1)) == b'\x00'
+        no_endlevel_keyhole = (await self.snes.GetAddress(0xF51434,1)) == b'\x00'
+        no_endlevel_timer = (await self.snes.GetAddress(0xF51493,1)) == b'\x00'
+        normal_level = (await self.snes.GetAddress(0xF50D9B,1)) == b'\x00'
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
 
 
@@ -75,19 +75,21 @@ async def effect_runner(args):
     print(f"snes_xmario: {ohash}")
 
     #snes = py2snes.snes()
-    snes = SmallMarioEffect(retries=300,duration=60,tick_interval=1)
-    await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
-    devices = await snes.DeviceList()
-    print('Devices =' + str(devices))
-    print('Attaching')
-    await snes.Attach(devices[0])
-    print('Attach done')
-    print('usb2snes information:')
-    print(await snes.Info())
-    #image = args[1]
-    result = await snes.run()
+    runner = SmallMarioEffect(retries=300,duration=60,tick_interval=1)
+    await runner.readyup()
+    #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
+    #devices = await snes.DeviceList()
+    #print('Devices =' + str(devices))
+    #print('Attaching')
+    #await snes.Attach(devices[0])
+    #print('Attach done')
+    #print('usb2snes information:')
+    #print(await snes.Info())
+    ##image = args[1]
+    #result = await snes.run()
+    result = await runner.run()
     print('Result = ' + str(result))
-    return snes
+    return runner
 
 if __name__ == '__main__':
     asyncio.run(effect_runner(sys.argv))

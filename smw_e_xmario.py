@@ -36,7 +36,7 @@ class XMarioEffect(SmwEffectRunner):
         return await self.inlevel()
     async def initiate(self):  # initiate() -> Initially apply affect
         print(f'XMarioEffect.Initiate({self._amount},{self._duration})')
-        await self.PutAddress([(0xF50096, b'\xf0'), (0xF50F31, b'\x00'), 
+        await self.snes.PutAddress([(0xF50096, b'\xf0'), (0xF50F31, b'\x00'), 
                                (0xF50F32, b'\x00'), (0xF50F33, b'\x01')])
     async def connect_and_run(self,args=[]):
         ohash = loadsmwrh.get_local_options()
@@ -63,19 +63,21 @@ async def effect_runner(args):
     print(f"snes_xmario: {ohash}")
 
     #snes = py2snes.snes()
-    snes = XMarioEffect(retries=300,duration=0,tick_interval=1)
-    await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
-    devices = await snes.DeviceList()
-    print('Devices =' + str(devices))
-    print('Attaching')
-    await snes.Attach(devices[0])
-    print('Attach done')
-    print('usb2snes information:')
-    print(await snes.Info())
-    #image = args[1]
-    result = await snes.run()
+    runner = XMarioEffect(retries=300,duration=0,tick_interval=1)
+    await runner.readyup()
+    #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
+    #devices = await snes.DeviceList()
+    #print('Devices =' + str(devices))
+    #print('Attaching')
+    #await snes.Attach(devices[0])
+    #print('Attach done')
+    #print('usb2snes information:')
+    #print(await snes.Info())
+    ##image = args[1]
+    #result = await snes.run()
+    result = await runner.run()
     print('Result = ' + str(result))
-    return snes
+    return runner
 
 if __name__ == '__main__':
     asyncio.run(effect_runner(sys.argv))

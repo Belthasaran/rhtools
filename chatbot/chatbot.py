@@ -42,7 +42,7 @@ import pb_sendtosnes
 import smw_repatch_url
 from smwusbtest import SMWUSBTest
 
-
+from smw_e_generic import SmwEffectRunner
 from smw_e_shrink import SmallMarioEffect
 from smw_e_takeitem import TakeItemEffect
 from smw_e_xmario import XMarioEffect
@@ -105,6 +105,10 @@ class Bot(commands.Bot):
         self.showmessages = 0
         if 'showmessages' in self.botconfig['twitch']:
             self.showmessages = int(self.botconfig['twitch']['showmessages'])
+
+        # Make sure to instantiate USBTest() first.
+        self.e_usbtest = SMWUSBTest()
+        #self.e_runner = SmwEffectRunner()
 
         self.shmode_pause = 0
         self.shmode_socket_running = 0
@@ -270,6 +274,7 @@ class Bot(commands.Bot):
             try:
                 chan = self.get_channel(str(event.channel_id))
                 effectobj = KaizoBlockEffect(amount=1,duration=20,retries=300)
+                print(f'apply_afffect:effectobj {effectobj}')
                 asyncio.run(chbot_apply_affect(effectobj))
             except Exception as xerr0:
                 self.logger.debug("eventPoints:ERR: " + str(xerr0))

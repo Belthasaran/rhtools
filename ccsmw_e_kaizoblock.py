@@ -58,13 +58,17 @@ class KaizoBlockEffect(SmwEffectRunner):
         return await self.inlevel()
     async def initiate(self):  # initiate() -> Initially apply affect
         print(f'KaizoBlockEffect.Initiate({self._amount},{self._duration})')
-        await self.PutAddress([(0xF60729,b'\x01')])
+        await self.snes.PutAddress([(0xF60729,b'\x01')])
     async def refresh(self):   # refresh() -> Actions to repeat every tick to preserve effect
+        retry=3
         waitValue = random.randint(0,10)/10
         await asyncio.sleep(waitValue)
+        while (retry > 0) and  await self.snes.GetAddress(0xF60729,1) == b'\x01':
+            retry = retry - 1
+            await asyncio.sleep(1)
         print('KaizoBlockEffect.refresh time_left='+str(self.time_left))
         if await self.inlevel():
-            await self.PutAddress([(0xF60729,b'\x01')])
+            await self.snes.PutAddress([(0xF60729,b'\x01')])
         pass
     async def finalize(self):   # finalize() -> Actions to take to remove effect
         # This affect ends on its own when refresh() is no longer called every tick
@@ -75,17 +79,17 @@ class KaizoBlockEffect(SmwEffectRunner):
          hundreds = int(curtime / 100)
          tens = int((int(curtime) - hundreds*100)/10)
          ones = (int(curtime) - hundreds*100 - tens*10)  % 10
-         await self.PutAddress([ (0xF50F31, bytes([hundreds]) ),
+         await self.snes.PutAddress([ (0xF50F31, bytes([hundreds]) ),
                                  (0xF50F32, bytes([tens]) ),
                                  (0xF50F33, bytes([ones]) )])
 
     async def inlevel(self):
-        run_game = ((await self.GetAddress(0xF50010,1)) == b'\x00')
-        game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
-        noanimation = (await self.GetAddress(0xF50071,1)) == b'\x00'
-        no_endlevel_keyhole = (await self.GetAddress(0xF51434,1)) == b'\x00'
-        no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
-        normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
+        run_game = ((await self.snes.GetAddress(0xF50010,1)) == b'\x00')
+        game_unpaused = (await self.snes.GetAddress(0xF513D4,1)) == b'\x00'
+        noanimation = (await self.snes.GetAddress(0xF50071,1)) == b'\x00'
+        no_endlevel_keyhole = (await self.snes.GetAddress(0xF51434,1)) == b'\x00'
+        no_endlevel_timer = (await self.snes.GetAddress(0xF51493,1)) == b'\x00'
+        normal_level = (await self.snes.GetAddress(0xF50D9B,1)) == b'\x00'
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
 
 

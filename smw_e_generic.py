@@ -19,10 +19,11 @@ nest_asyncio.apply()
 #IPython.embed()
 
 #class SmwEffectRunner(py2snes.snes):
-class SmwEffectRunner(SnesLink):
+class SmwEffectRunner():
     def __init__(self,amount=1,duration=60,retries=300,tick_interval=0.5):
         super().__init__()
         #super().__init__(amount,duration,retry,tick_interval)
+        self.snes = SnesLink()
         self.is_running = 0
         self.time_left = 0
         self.name = "Generic Effect"
@@ -34,6 +35,9 @@ class SmwEffectRunner(SnesLink):
         self._retries = retries
         self._tick_interval = tick_interval
 
+    async def readyup(self):
+        return await self.snes.readyup()
+
     async def run(self):  #,amount=1,duration=0,retries=60,tick_interval=0.5):
        amount = self._amount
        duration = self._duration
@@ -43,7 +47,8 @@ class SmwEffectRunner(SnesLink):
        while (await self.ready()) == False and i > 1:
            print(f"Not ready, Retry    {i}")
            i = i - 1
-           time.sleep(1)
+           await asyncio.sleep(1)
+           #time.sleep(1)
        pass
        #await self.mutex_lock(amount,duration)
        await self.initiate()
@@ -97,28 +102,28 @@ class SmwEffectRunner(SnesLink):
         pass
 
     async def c_item_empty(self, value=b'\x00'):
-        await self.PutAddress( [ (0xF50dc2, value) ] )
+        await self.snes.PutAddress( [ (0xF50dc2, value) ] )
 
     async def settime(self,seconds):
          curtime = seconds
          hundreds = int(curtime / 100)
          tens = int((int(curtime) - hundreds*100)/10)
          ones = (int(curtime) - hundreds*100 - tens*10)  % 10
-         await self.PutAddress([ (0xF50F31, bytes([hundreds]) ),
+         await self.snes.PutAddress([ (0xF50F31, bytes([hundreds]) ),
                                  (0xF50F32, bytes([tens]) ),
                                  (0xF50F33, bytes([ones]) )])
 
     async def inlevel(self):
-        run_game = ((await self.GetAddress(0xF50010,1)) == b'\x00')
-        game_unpaused = (await self.GetAddress(0xF513D4,1)) == b'\x00'
-        noanimation = (await self.GetAddress(0xF50071,1)) == b'\x00'
-        no_endlevel_keyhole = (await self.GetAddress(0xF51434,1)) == b'\x00'
-        no_endlevel_timer = (await self.GetAddress(0xF51493,1)) == b'\x00'
-        normal_level = (await self.GetAddress(0xF50D9B,1)) == b'\x00'
+        run_game = ((await self.snes.GetAddress(0xF50010,1)) == b'\x00')
+        game_unpaused = (await self.snes.GetAddress(0xF513D4,1)) == b'\x00'
+        noanimation = (await self.snes.GetAddress(0xF50071,1)) == b'\x00'
+        no_endlevel_keyhole = (await self.snes.GetAddress(0xF51434,1)) == b'\x00'
+        no_endlevel_timer = (await self.snes.GetAddress(0xF51493,1)) == b'\x00'
+        normal_level = (await self.snes.GetAddress(0xF50D9B,1)) == b'\x00'
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
     async def connect_and_run(self,args=[]):
         print(f'SmwEffectRunner:connect_and_run')
-        readystat = await self.readyup()
+        readystat = await self.snes.readyup()
         #ohash = loadsmwrh.get_local_options()
         #print(f"snes_xmario: {ohash}")
         ##
@@ -144,7 +149,7 @@ async def smw_gen_effect_runner(args):
     print(f"snes_xmario: {ohash}")
 
     #snes = py2snes.snes()
-    snes = SmwEffectRunner()
+    runner = SmwEffectRunner()
     await snes.readyup()
     #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
     #devices = await snes.DeviceList()
