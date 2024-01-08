@@ -90,8 +90,10 @@ class Spider(scrapy.Spider):
              #
              leveltitle = infodiv.xpath('../..//a[contains(.,"Download Level Patch")]/following-sibling::table/tr/td/text()').extract()
              leveltitle = leveltitle[0].strip()
-             #twitchvod = infodiv.xpath('../..//a[contains(.,"Twitch VOD")]')
              twitchvod = infodiv.xpath('../../*//*[contains(.,"Twitch VOD")]//following-sibling::iframe[contains(@src,"twitch.tv")]/@src').get()
+             vodlist = []
+             if twitchvod and not(str(twitchvod)==''):
+                 vodlist.append(twitchvod)
              dict = {
                   "id": f"rhr_s{season}w{weeknumber}",
                   "name": f"romhackraces_{weeknumber}-{leveltitle}",
@@ -117,6 +119,10 @@ class Spider(scrapy.Spider):
                 "description": f"Season {season} Romhackraces week {weeknumber} race level\n\n",
                 "length": "1 exit(s)"
              }
+             if len(vodlist) > 0:
+                 dict["vods"] = vodlist
+            if twitchvod and not(str(twitchvod) == ""):
+                dict["twitchvod"] = twitchvod
              yield dict
 
         if int(season) > 1 and int(season)-1 >= self.SEASON_LOWER_BOUND : 
