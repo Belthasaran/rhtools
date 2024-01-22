@@ -40,6 +40,8 @@ import cmd_menu
 import cmd_boot
 import pb_sendtosnes
 import smw_repatch_url
+import smw_loadsfc_url
+
 from smwusbtest import SMWUSBTest
 
 from smw_e_generic import SmwEffectRunner
@@ -96,6 +98,8 @@ class Bot(commands.Bot):
         self.headline = ''
         self.moderation = False
         self.botconfig = bci
+        if 'rhtools' in bci and 'sfcpath' in bci['rhtools']:
+            os.environ['SFCFOLDER'] = bci['rhtools']['sfcpath']
         os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
         if 'optfile' in self.botconfig['rhtools']:
             os.environ['RHTOOLS_OPTIONS_FILE'] = self.botconfig['rhtools']['optfile']
@@ -2675,6 +2679,38 @@ class Bot(commands.Bot):
             traceback.print_exc()
         #os.system(os.path.join(self.botconfig['rhtools']['path'], 'pb_repatch.py') + f' {rhid} sendtosnes' )
 
+    ###
+    async def chat_perform_loadimage(self,ctx,rhid,ccrom=False):
+        try:
+            os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+            #findglyph = re.split(r'/', rhid)[-1]
+            #findglyph = re.split(r'[^a-zA-Z0-9]', rhid)[0]
+
+            result = smw_loadsfc_url.repatch_loadsfc_url_function(['sfcurl',str(rhid)],ccrom=ccrom,noexit=True)
+            #self.chat_perform_rhset(ctx,rhid,ccrom=ccrom,result=result)
+            if result:
+                try:
+                    pass
+                    #if os.path.exists(result +'json'):
+                    #    cur_makepage.mkpage_function(['mkpage'], result+'json')
+                    #jsf = open(result+'json','r')
+                    #self.rhinfo = json.load(jsf)
+                    #jsf.close()
+                except Exception as xerrmp:
+                    print(f'mkpageErr:{xerrmp}')
+                print(str(result))
+                await ctx.send(f'@{ctx.message.author.name} - loadimg file applied. SNES should be loading.' )
+                sendresult = pb_sendtosnes.sendtosnes_function(['launch1', result, 'launch1'])
+                #
+                if not(sendresult):
+                    await ctx.send(f'@{ctx.message.author.name} - loadimg:Failed to run (please check launch options)' )
+                else:
+                    await ctx.send(f'@{ctx.message.author.name} - loadimg:Action finished' )
+        except Exception as xerr:
+            await ctx.send(f'@{ctx.message.author.name} - loadimg:Exception, error message: {xerr}' )
+            traceback.print_exc()
+
+
     def conform_maxprice(self, mp):
         if (mp < 0):
             mp = 0
@@ -3071,6 +3107,50 @@ class Bot(commands.Bot):
         await self.chat_perform_rhload(ctx,rhid,ccrom=self.ccmode)
         pass
 
+    @commands.command(name='smwimg')
+    @commands.cooldown(2,1)
+    async def cmd_smwimg_loadrom(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 50:
+            await ctx.send(f'@{ctx.author.name} - Sorry, this is a restricted command. {await self.cmd_privilege_level(ctx.message.author)}/50')
+            return
+        rhid = 0
+        text = str(ctx.message.content)
+        if re.search('%cc%',text):
+            self.ccmode = True
+            text = text.replace('%cc%','')
+        #text = re.sub('[^ !_a-zA-z0-9]','_', str(text))
+        paramResult = re.match(r'^!smwimg( +(\S+)(\s*\S*)|)', text)
+        if paramResult != None:
+            try:
+                if len(paramResult.groups())<2 or paramResult.group(2) == None :
+                    await ctx.send(f'Usage: !smwimg [<?> ]<text>')
+                    return
+                else:
+                    if len(paramResult.groups()) >= 3:
+                        base = paramResult.group(2).lower()
+                        text = paramResult.group(3).lower()
+                    else:
+                        base = 'smw'
+                        text = paramResult.group(2).lower()
+
+                    if len(text)>1 and text[0] == ' ':
+                        text = text[1:]
+
+                    if not(text):
+                        await ctx.send(f'Usage: !smwimg [<?> ]<text>')
+                        return
+                    #rhid = text
+                    pass
+            except Exception as rex1:
+                self.logger.debug('ERR:rex1:' + str(rex1))
+                pass
+        else:
+            await ctx.send(f'Usage: !smwimg <text>')
+        #os.environ['RHTOOLS_PATH'] = self.botconfig['rhtools']['path']
+        await self.chat_perform_loadimage(ctx,text,ccrom=self.ccmode)
+        pass
+
+###
     @commands.command(name='smwpatch')
     @commands.cooldown(2,1)
     async def cmd_smwpatch(self,ctx):

@@ -37,16 +37,24 @@ def repatch_url_function(args,ccrom=False,noexit=False):
     filename = os.path.join(path_prefix,os.path.join("temp","in.zip"))
     
     bpsurl = (args[1])
-    req = requests.get(bpsurl)
-    if not(req.status_code == 200):
-        sys.stderr.write(f'ERR: HTTP Response {req.status_code} for URL')
-        raise Exception(f'ERR: HTTP Response {req.status_code} for URL')
-    dldata = req.content
+    if re.search('http:', bpsurl):
+        req = requests.get(bpsurl)
+        if not(req.status_code == 200):
+            sys.stderr.write(f'ERR: HTTP Response {req.status_code} for URL')
+            raise Exception(f'ERR: HTTP Response {req.status_code} for URL')
+        dldata = req.content
+    elif re.match('[^.]+.(zip|bps)$',bpsurl, re.I):
+        f_handle = open(bpsurl, 'rb')
+        dldata = f_handle.read()
+        f_handle.close()
+    else:
+        dldata = None
+        raise ValueError('Invalid filename')
     shake1 = (base64.b64encode(hashlib.shake_128(dldata).digest(24), b"_-")).decode('latin1')
 
     iszipfile = False
     try:
-        with zipfile.ZipFile(io.BytesIO(req.content)) as zip:
+        with zipfile.ZipFile(io.BytesIO(dldata)) as zip:
             for info in zip.infolist():
                 if re.match('Espa', info.filename) :
                     continue

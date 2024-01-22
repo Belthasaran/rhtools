@@ -288,9 +288,9 @@ def get_tokens(filename=None,frnkeyd=None,storename=''):
                     for ik in dict.keys():
                         if  ik in ['client_id', 'client_secret', 'app_token']:
                             continue
-                        buffer = buffer + base64.urlsafe_b64encode( ik ) + "\n"
-                        buffer = buffer + base64.urlsafe_b64encode( dict[ik] ) + "\n"
-                    soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer, 'utf8'))))
+                        buffer = buffer + base64.urlsafe_b64encode( bytes(ik,'utf8') ).decode('utf8') + "\n"
+                        buffer = buffer + base64.urlsafe_b64encode( bytes(dict[ik],'utf8') ).decode('utf8') + "\n"
+                    soutfile.write(str(frnkey.encrypt(bytes(client_id + "\n" + client_secret + "\n" + app_token + "\n" + buffer, 'utf8')).decode('utf8') ))
                 os.umask(original_umask)
                 os.rename(str(filename) + ".new", filename)
             finally:
