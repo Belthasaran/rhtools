@@ -119,13 +119,14 @@ class Bot(commands.Bot):
         self.shmode_pause = 0
         self.shmode_socket_running = 0
         self.shmode_started = 0
-        self.shmode_maxprice = 500
+        self.shmode_maxprice = 1000 # 500
         self.shmode_costweighted = -10
         self.shmode_costfactor = 1
         self.shmode_poolweighted = -30
         self.shmode_poolfactor = 100
         self.shmode_interval1 = 20
         self.shmode_interval2 = 90
+        self.shmode_extracooldown = 300
         try:
             interval1  = 20
             interval2 = 160
@@ -1493,6 +1494,8 @@ class Bot(commands.Bot):
             #if 'shmode_interval2' in botconfig['crowdcontrol']:
             #    self.shmode_timeleft = int(botconfig['crowdcontrol']['shmode_interval2'])
             effectAmount = 1
+            amountSpent = 0
+
             if 'amount' in chosenEffect:
                 effectAmount = chosenEffect['amount']
             print(f":: chosenEffect : " + json.dumps(chosenEffect))
@@ -1515,6 +1518,8 @@ class Bot(commands.Bot):
                         if not(result):
                             self.logger.error(f'ERR:ccinteract.poolToEffect: Failed')
                         else:
+                            if missingAmount > 0:
+                                amountSpent = amountSpent + missingAmount
                             effectApplied = True #  OK
                         #    def poolToEffect(self,game_session_id, effectObject, effectQuantity=1, amountValue=1):
                 except Exception as xerr:
@@ -1525,12 +1530,21 @@ class Bot(commands.Bot):
                     print(f'Requesting effect activation: {chosenEffect["d"]["name"]}')
                     try:
                         result = self.ccinteract.requestEffect(self.cc_game_session_id, chosenEffect['d']['ccobject'], effectAmount  )
+                        amountSpent = amountSpent + int(chosenEffect['d']['ccobject']['price']) * effectAmount
+                        if amountSpent < 0 :
+                            amountSpent = 0
                         if not(result):
                             self.logger.error(f'ERR:ccinteract.requestEffect: Failed')
                         else:
                             self.logger.info(f'Applied effect')
                     except Exception as xerr:
                         self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
+                #
+                if amountSpent > 100 and self.shmode_timeleft == self.shmode_interval2:
+                    additional_cooldown_calc =  int((amountSpent * self.shmode_extracooldown) / 1000)
+                    if additional_cooldown_calc > 0:
+                        self.shmode_timeleft = self.shmode_timeleft + additional_cooldown_calc
+                    pass
 
         if self.shmode == 1 and self.shmode_stage == 1 and self.shmode_timeleft > 0:
             print(f'Shuffle-mode 1 Stage 1:  Time_Left: {self.shmode_timeleft}')
@@ -2814,6 +2828,39 @@ class Bot(commands.Bot):
         else:
             await ctx.send(f'Usage:!shpweight <integer({self.shmode_poolweighted}x{self.shmode_poolfactor})>')
             pass
+
+    @commands.command(name='shcooldown')
+    @commands.cooldown(2,1)
+    async def cmd_cshcooldown_2(self,ctx):
+        if await self.cmd_privilege_level(ctx.message.author) < 20:
+            await ctx.send(f'@{ctx.author.name} - Sorry, that command is Mod+ {await self.cmd_privilege_level(ctx.message.author)}/20')
+            return
+        text = str(ctx.message.content)
+        text = re.sub('[^ +!_a-zA-z0-9-]','_', str(text))
+        paramResult = re.match(r'^!schcooldown( +(-?\d+)(x-?\d+)?)|', text)
+        if paramResult != None:
+            try:
+                if paramResult.group(2) == None: # or paramResult.group(3) == None :
+                    await ctx.send(f'Usage: !shcooldown <integer{self.shmode_interval2}x{self.shmode_extracooldown}>')
+                else:
+                    value  = int(paramResult.group(2))
+                    factor = 1
+                    if len(paramResult.groups()) >= 3 and paramResult.group(3):
+                        factor = int(paramResult.groups(3)[1:])
+                        if factor < 120:
+                            factor = 120
+                        if factor > 900:
+                            factor = 900
+
+                    self.shmode_interval2 = value
+                    self.shmode_extracooldown = factor
+                    await ctx.send(f'@{ctx.author.name} - cooldown interval2={self.shmode_interval2} extra delay:{self.shmode_extracooldown} per 1k')
+            except Exception as rex1:
+                self.logger.debug('ERR:shcooldown:rex1:' + str(rex1))
+        else:
+            await ctx.send(f'Usage:!shcooldown <integer({self.shmode_interval2}x{self.shmode_extracooldown})>')
+            pass
+
 
 
 
