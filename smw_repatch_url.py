@@ -37,7 +37,7 @@ def repatch_url_function(args,ccrom=False,noexit=False):
     filename = os.path.join(path_prefix,os.path.join("temp","in.zip"))
     
     bpsurl = (args[1])
-    if re.search('http:', bpsurl):
+    if re.search(r'https?:', bpsurl):
         req = requests.get(bpsurl)
         if not(req.status_code == 200):
             sys.stderr.write(f'ERR: HTTP Response {req.status_code} for URL')

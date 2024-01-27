@@ -1627,8 +1627,17 @@ class Bot(commands.Bot):
                     if 'ccobject' in entry['d'] and 'quantity' in entry['d']['ccobject']:
                         minimum_qty = entry['d']['ccobject']['quantity']['min']
                         maximum_qty = entry['d']['ccobject']['quantity']['max']
+                        priceval = int(entry['d']['ccobject']['price'])
                         delta = maximum_qty - minimum_qty
-                        xoff = int(random.randint(0,int(delta * 0.10)))
+                        if priceval > 0 and  priceval*maximum_qty > self.shmode_maxprice and self.shmode_maxprice > 1:
+                            maximum_qty_2 = int(self.shmode_maxprice / priceval)
+                            if maximum_qty_2 >= minimum_qty:
+                                delta = maximum_qty_2 - minimum_qty
+                            else:
+                                delta = 0
+                        xoff = int(random.randint(0,int(delta * 0.50)))
+                        #else:
+                        #    xoff = int(random.randint(0,int(delta * 0.10)))
                         entry['amount'] = xoff + minimum_qty
                         entry['text'] = entry['text'] + f' (x{entry["amount"]})'
                 except Exception as xerr1:
