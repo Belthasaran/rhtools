@@ -274,6 +274,11 @@ class mysnes(SnesLink):
         await self.PutAddress([(0xF50000 + 0xF34D, value)])
 
     async def z3_setbook(self, value=b'\x01'):
+        #a = (await snes.GetAddress(0xF5F379,1))[0]
+        #if value == b'\x01':
+        #    a = a | (1<<6)
+        #else:
+        #    a = a & ~(1<<6)
         await self.PutAddress([(0xF50000 + 0xF34E, value)])
 
     async def z3_setredcane(self, value=b'\x01'):
@@ -292,8 +297,18 @@ class mysnes(SnesLink):
         # 1 = power glove, 2 = titan mitt
         await self.PutAddress([(0xF50000 + 0xF354, value)])
 
+    async def z3_getabilities(self):
+        return await snes.GetAddress(0xF5F379,1)
+
+
     async def z3_setboots(self, value=b'\x01'):
-        await self.PutAddress([(0xF50000 + 0xF355, value)])
+        a = (await snes.GetAddress(0xF5F379,1))[0]
+        if value == b'\x01':
+            a = a | (1<<2)
+        else:
+            a = a & ~(1<<2)
+        await self.PutAddress([(0xF50000 + 0xF355, value),
+                               (0xF50000 + 0xF379, bytes([a]))])
 
     async def z3_setflippers(self, value=b'\x01'):
         await self.PutAddress([(0xF50000 + 0xF356, value)])
