@@ -221,6 +221,313 @@ class SMWUSBTest(SnesLink):
                                  (0xF50F32, bytes([tens]) ),
                                  (0xF50F33, bytes([ones]) )])
 
+    async def z3_setrupees(self,value):
+        await self.PutAddress([(0xF5F360, value)])
+
+    async def z3_setmagic(self,value):
+        await self.PutAddress([(0xF5F36E, value)])
+
+    async def z3_damage(self,value=b'\x02'):
+        await self.PutAddress([(0xF50373, value)])
+
+    async def z3_setbow(self, value=b'\x02'):
+        # 0 none
+        # 1 bow
+        # 2 bow+arrow
+        # 
+        # 4 bow+silver
+        #
+        await self.PutAddress([(0xF5F340, value)])
+
+    async def z3_setboomerang(self, value=b'\x02'):
+        # 0 empty 1 blue 2 red
+        await self.PutAddress([(0xF5F341, value)])
+
+
+    async def z3_sethookshot(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F342, value)])
+
+    async def z3_setbombs(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F343, value)])
+
+    async def z3_setmushroom(self, value=b'\x02'):
+        await self.PutAddress([(0xF5F344, value)])
+
+    async def z3_setfirerod(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F345, value)])
+
+    async def z3_seticerod(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F346, value)])
+
+    async def z3_setbombos(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F347, value)])
+
+    async def z3_setether(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F348, value)])
+
+    async def z3_setquake(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F349, value)])
+
+    async def z3_setlamp(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F34A, value)])
+
+    async def z3_sethammer(self, value=b'\x01'):
+        await self.PutAddress([(0xF5F34B, value)])
+
+    async def z3_setflute(self, value=b'\x01'):
+        # 0=Empty, 1=Shovel,  2=Flute Present but No Bird,  3=Flute, Activated
+        await self.PutAddress([(0xF5F34C, value)])
+
+    # Bug Net - F34D,  Book - F34E,  F350 - Cane of Somaria, F351 - Staff of Bryna
+    async def z3_setbugnet(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF34D, value)])
+
+    async def z3_c5(self, value=b'\x00'):
+        await self.PutAddress([(0xF650C5, value) ] )
+        #await snes.PutAddress([(0xF650C0, b'\x01'), (0xF5F359, b'\x02'), (0xF5012F, b'\x0f'), (0xF650C5, b'\x03') ] )
+        pass
+
+    async def z3_ohko(self, value=b'\x01'):
+        await self.PutAddress([ (0xF650CC, value)   ])
+
+    async def z3_controls_b(self, value=b'\x01'):
+        # x00 normal
+        # x01 invert dpad
+        # x02 invert buttons
+        # x03 invert dpad + buttons
+        # x04 swap dpad + buttons
+        await self.PutAddress([ (0xF650CB, value)   ])
+
+    async def z3_controls(self, dpad=False, buttons=False, swap=False):
+        value = 0
+        if dpad:
+            value = value | (1 << 0)
+        if buttons:
+            value = value | (1 << 1)
+        if swap:
+            value = value | (1 << 2)
+        await self.PutAddress([ (0xF650CB, bytearray([value]))   ])
+
+
+    async def z3_setbook(self, value=b'\x01'):
+        #a = (await self.GetAddress(0xF5F379,1))[0]
+        #if value == b'\x01':
+        #    a = a | (1<<6)
+        #else:
+        #    a = a & ~(1<<6)
+        await self.PutAddress([(0xF50000 + 0xF34E, value)])
+
+    # 0xF650CA --> 
+    async def z3_infinite_magic(self, value=b'\x01'):
+        await self.PutAddress([(0xF650CA, value)])
+
+    async def z3_infinite_arrows(self, value=b'\x01'):
+        await self.PutAddress([(0xF650C8, value)])
+
+    async def z3_infinite_b(self, value=b'\x01'):
+        await self.PutAddress([(0xF650C9, value)])
+
+    async def z3_setredcane(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF350, value)])
+
+    async def z3_setbluecane(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF351, value)])
+
+    async def z3_setcape(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF352, value)])
+
+    async def z3_setmirror(self, value=b'\x02'):
+        await self.PutAddress([(0xF50000 + 0xF353, value)])
+
+    async def z3_setglove(self, value=b'\x02'):
+        # 1 = power glove, 2 = titan mitt
+        await self.PutAddress([(0xF50000 + 0xF354, value)])
+
+    async def z3_getabilities(self):
+        return await self.GetAddress(0xF5F379,1)
+
+
+    async def z3_setboots(self, value=b'\x01'):
+        a = (await self.GetAddress(0xF5F379,1))[0]
+        if value == b'\x01':
+            a = a | (1<<2)
+        else:
+            a = a & ~(1<<2)
+        await self.PutAddress([(0xF50000 + 0xF355, value),
+                               (0xF50000 + 0xF379, bytes([a]))])
+
+    async def z3_setflippers(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF356, value)])
+
+    async def z3_setpearl(self, value=b'\x01'):
+        await self.PutAddress([(0xF50000 + 0xF357, value)])
+
+    # F358 ?
+
+    async def z3_setsword(self, value=b'\x04'):
+        # Sword: F359 0=None 01=Fighter 02=Master 03=Tempered 04=Yellow
+        await self.PutAddress([(0xF50000 + 0xF359, value)])
+
+
+    async def z3_setshield(self, value=b'\x04'):
+        # Shield: F35A 0=None, 1=Blue, 2=Red, 3=Mirror
+        await self.PutAddress([(0xF50000 + 0xF35A, value)])
+
+    async def z3_setarmor(self, value=b'\x02'):
+        # Armor: F35B 0=Green, 1=Blue, 2=Red
+        await self.PutAddress([(0xF50000 + 0xF35B, value)])
+
+           #Bottles - F34F  0=Empty  1=Has Bottles
+           #      F35C Bottle 1  0=None 1=?? 2=EmptyBottle 3=RedPotion 4=GreenPot 5=BluePot 6=Fairy 7=Bee 8=GoodBee
+           #      F35D Bottle 2  0=None 1=?? 2=EmptyBottle 3=RedPotion 4=GreenPot 5=BluePot 6=Fairy 7=Bee 8=GoodBee
+           #      F35E Bottle 3  0=None 1=?? 2=EmptyBottle 3=RedPotion 4=GreenPot 5=BluePot 6=Fairy 7=Bee 8=GoodBee
+           #      F35F Bottle 4  0=None 1=?? 2=EmptyBottle 3=RedPotion 4=GreenPot 5=BluePot 6=Fairy 7=Bee 8=GoodBee
+
+    async def z3_setbottle(self, value=b'\x06', num=1):
+        offset = 0
+        offset_list = { 1: 0, 2: 1, 3: 2, 4: 3 }
+        if num in offset_list:
+            offset = offset_list[num]
+        await self.PutAddress([(0xF50000 + 0xF35C + offset, value)])
+
+
+    # Rupees - F362-3 (Actual)    F360-1 (New rupee amount)
+    # F36B - Number of heart pieces (out of four) that Link has earned
+
+    # F36A - Wishing pond:  Number of Rupees in the pond.
+
+    #F364 - Dungeon compass1  BitVector
+    #                bit-2=Ganon Tower, bit-3=TurtleRock, bit-4=Blinds,  bit-5=Hera, bit-6=Ice, bit-7=SkullWoods
+
+    #F365 - Dungeon compass2  BitVector
+    #               bit-0=Mire, bit-1=POD, bit-2=Swamp, bit-3=?, bit-4=Desert, bit-5=EasternPalace
+
+    #F366 - BigKey1 BitVector
+                    #bit-2=Ganon Tower, bit-3=TurtleRock, bit-4=Blinds,  bit-5=Hera, bit-6=Ice, bit-7=SkullWoods
+
+    #F367 - Bigkey2 BitVector
+                    #bit-0=Mire, bit-1=POD, bit-2=Swamp, bit-4=Desert, bit-5=EasternPalace, bit-6=Hyrule
+    #
+    #F368 - DungeonMaps1 BitVector 
+    # bit-2=Ganon Tower, bit-3=TurtleRock, bit-4=Blinds,  bit-5=Hera, bit-6=Ice, bit-7=SkullWoods
+    #F369 - DungeonMaps2 BitVector
+    # bit-0=Mire, bit-1=POD, bit-2=Swamp, bit-4=Desert, bit-5=EasternPalace, bit-6=Hyrule
+
+    #F37A - Crystals bit-0=Mire, bit-1=POD, bit-2=Ice, bit-3=TurtleRock, bit-4=Swamp, bit-5=Blinds, Bit-6=SkullWoods
+    # 
+
+    #Small Key Counts: F37C-Sewer, F37D-Hyrule, F37E-Eastern, F37F-Desert, F380-Hyrule 2, F381-Swamp,
+    #       F382- POD, F383- Mire, F384- SkullWoods, F385- Ice, F386- Hera, F387- Blinds, F388- TurtleRock, F389- GannonTower
+    #       F38A-????,  F38B-????
+
+
+    #$0CF4[0x01] - Activates bomb or snake trap overlords when set to a nonzero value.
+    #$57[0x01] - Modifier for Link's movement speed. 0 - normal,
+    #0x01 to 0x0F - slow,  0x10 and up - fast.  Negative values actually reverse your direction!
+
+    #$04C5[0x01] - State dealing with Ganon's fight = 2 - you can hit him,
+    # 1 - he's translucent, 0 - he’s invisible.
+
+
+    #Flippers: $356. 0 - nothing. 1 - flippers. Having this allows you to swim, but doesn't make
+    # the swim ability text show up by itself. See $379
+    # ** Unlike the boots, the ability is granted, as long as you have this item.**
+
+    #Bunny Link
+    # 005D(01)  = Link handler  17=permabunny 1C=tempbunny
+    #02E0 = bunny link picture?
+    #03F5 = link tempbunny timer set to 0x100 when a yellow hunter hits him and 03F6 = (set to 1)
+    #$0458[0x02]  0 - in dark room, 1 in dark room have lantern
+    #$045A[0x01] - Seems to be the number of torches that are lit in a dark room.
+    #    Torch objects during load can be set to be permanently lit,
+    #    so this can affect how the room's lighting behaves.
+    #
+    #Always shoot sword beams regardless of heart level 0x39E7B - ?? ??  Change to EA EA
+    #
+    #Bosses don't drop hearts - 2F14C : D0 07 (or something similar) ?? ??  Change to EA EA
+    #
+    #02E0
+    #03F5
+    #set 03F6=0x30
+    #0x7e03f6=0x30,  0x7e03f7=0x01
+    #Write 0x30 to WRAM address 0x7e03f6 and 0x01 to 0x7e03f7.
+
+    #Create Temp Bunny
+    # 03F6  When 03F6==0x00 and 03F5==0x00  then  set 03F6=0x30
+     #   and    set these to 0x00 
+    #    STZ $036C STZ $031C STZ $031D STZ $0315 STZ $03EF STZ $02E3
+        # STZ $02F6 STZ $0301 STZ $037A STZ $020B STZ $0350 STZ $030D
+        # STZ $030E STZ $030A STZ $3B STZ $3A STZ $3C STZ $0308 STZ $0309
+        # STZ $0376 STZ $50 STZ $4D STZ $46 STZ $0360 STZ $02DA STZ $55
+       # STZ $037B #STZ $0300 STZ $037E STZ $02EC STZ $0314 STZ $03F8 STZ $02FA
+
+        # Create Perm Bunny:  When 05D   set 05D to 0x17 and 
+        # 02E0  and $056
+        # F379==0xFF
+        # ; Link no longer has to be changed into a bunny.
+        # STZ $03F7
+
+    #0f=1111
+
+    #F3C5  = 01 after uncle
+    #F36D =  cur hearts?  18=FULL 4
+    #F36F = Number keys cur. dungeon?
+    # F373 = Magic Refill amount ; 10=small 
+    #0373 = Subtract heart amount?
+    #037B = spike immunity
+    #02E0 = bunny link picture?
+    #03F5 = link tempbunny timer set to 0x100 when a yellow hunter hits him
+    #03F6 = (set to 1)
+    # $0458[0x02]  0 - in dark room, 1 in dark room have lantern
+    # Always shoot sword beams regardless of heart level 0x39E7B - ?? ??  Change to EA EA
+
+    #GameGenie:7E 045A 03 - Dark rooms are always lit
+    #$0CF4[0x01] - Activates bomb or snake trap overlords when set to a nonzero value.
+
+    #$57[0x01] - Modifier for Link's movement speed.
+    # 0 normal, 0x01 to 0x0F - slow, , 0x10 and up - fast.
+    # Negative values actually reverse your direction!
+    #  $04C5[0x01] - State dealing with Ganon's fight = 2 - you can hit him,
+    #   1 - he's translucent, 2- he's invisible
+
+    #005D(01)  = Link handler  17=permabunny 1C=tempbunny
+
+    #Ability Flags:      $379. Bit 0:
+    #                       Bit 1: Swim
+    #                       Bit 2: Run / Dash
+    #                       Bit 3: Pull
+    #                       Bit 4: ----
+    #                       Bit 5: Talk
+    #                       Bit 6: Read
+    #                       Bit 7: ----
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def addtime(self,seconds):
          seconds = 0
          hundreds = await self.GetAddress(0xF50F31, 1)
@@ -390,10 +697,11 @@ class SMWUSBTest(SnesLink):
 
 
 async def runsnes():
+    #test = SmwEffectRunner()
     ohash = loadsmwrh.get_local_options()
 
     #snes = py2snes.snes()
-    snes = mysnes()
+    snes = SMWUSBTest()
     #snes = SnesLink()
     await snes.readyup()
     #await snes.connect(address=ohash['wsaddress']) # ws://hostname:8080
