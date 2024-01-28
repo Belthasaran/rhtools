@@ -273,13 +273,50 @@ class mysnes(SnesLink):
     async def z3_setbugnet(self, value=b'\x01'):
         await self.PutAddress([(0xF50000 + 0xF34D, value)])
 
+    async def z3_c5(self, value=b'\x00'):
+        await self.PutAddress([(0xF650C5, value) ] )
+        #await snes.PutAddress([(0xF650C0, b'\x01'), (0xF5F359, b'\x02'), (0xF5012F, b'\x0f'), (0xF650C5, b'\x03') ] )
+        pass
+
+    async def z3_ohko(self, value=b'\x01'):
+        await self.PutAddress([ (0xF650CC, value)   ])
+
+    async def z3_controls_b(self, value=b'\x01'):
+        # x00 normal
+        # x01 invert dpad
+        # x02 invert buttons
+        # x03 invert dpad + buttons
+        # x04 swap dpad + buttons
+        await self.PutAddress([ (0xF650CB, value)   ])
+
+    async def z3_controls(self, dpad=False, buttons=False, swap=False):
+        value = 0
+        if dpad:
+            value = value | (1 << 0)
+        if buttons:
+            value = value | (1 << 1)
+        if swap:
+            value = value | (1 << 2)
+        await self.PutAddress([ (0xF650CB, bytearray([value]))   ])
+
+
     async def z3_setbook(self, value=b'\x01'):
-        #a = (await snes.GetAddress(0xF5F379,1))[0]
+        #a = (await self.GetAddress(0xF5F379,1))[0]
         #if value == b'\x01':
         #    a = a | (1<<6)
         #else:
         #    a = a & ~(1<<6)
         await self.PutAddress([(0xF50000 + 0xF34E, value)])
+
+    # 0xF650CA --> 
+    async def z3_infinite_magic(self, value=b'\x01'):
+        await self.PutAddress([(0xF650CA, value)])
+
+    async def z3_infinite_arrows(self, value=b'\x01'):
+        await self.PutAddress([(0xF650C8, value)])
+
+    async def z3_infinite_b(self, value=b'\x01'):
+        await self.PutAddress([(0xF650C9, value)])
 
     async def z3_setredcane(self, value=b'\x01'):
         await self.PutAddress([(0xF50000 + 0xF350, value)])
@@ -298,11 +335,11 @@ class mysnes(SnesLink):
         await self.PutAddress([(0xF50000 + 0xF354, value)])
 
     async def z3_getabilities(self):
-        return await snes.GetAddress(0xF5F379,1)
+        return await self.GetAddress(0xF5F379,1)
 
 
     async def z3_setboots(self, value=b'\x01'):
-        a = (await snes.GetAddress(0xF5F379,1))[0]
+        a = (await self.GetAddress(0xF5F379,1))[0]
         if value == b'\x01':
             a = a | (1<<2)
         else:
@@ -622,14 +659,14 @@ class mysnes(SnesLink):
         await self.PutAddress( [ (0xF60007, value) ] )
 
     async def sfx_midway(self):
-        await snes.PutAddress([(0xF51DF9, b'\x05')])
+        await self.PutAddress([(0xF51DF9, b'\x05')])
 
     async def c_midway(self, value=b'\x01'):
-        if snes.inlevel():
+        if self.inlevel():
             if value == b'\x01':
-                await snes.PutAddress([(0xF513CE, b'\x01'), (0xF51DF9, b'\x05')])
+                await self.PutAddress([(0xF513CE, b'\x01'), (0xF51DF9, b'\x05')])
             else:
-                await snes.PutAddress([(0xF513CE, value), (0xF51DF9, b'\x10')])
+                await self.PutAddress([(0xF513CE, value), (0xF51DF9, b'\x10')])
 
     async def setmarioYpos(self, value=b'\x00'):
         await self.PutAddress([(0xF50096, b'\x00')])

@@ -356,14 +356,14 @@ class SMWUSBTest(SnesLink):
         await self.PutAddress( [ (0xF60007, value) ] )
 
     async def sfx_midway(self):
-        await snes.PutAddress([(0xF51DF9, b'\x05')])
+        await self.PutAddress([(0xF51DF9, b'\x05')])
 
     async def c_midway(self, value=b'\x01'):
-        if snes.inlevel():
+        if self.inlevel():
             if value == b'\x01':
-                await snes.PutAddress([(0xF513CE, b'\x01'), (0xF51DF9, b'\x05')])
+                await self.PutAddress([(0xF513CE, b'\x01'), (0xF51DF9, b'\x05')])
             else:
-                await snes.PutAddress([(0xF513CE, value), (0xF51DF9, b'\x10')])
+                await self.PutAddress([(0xF513CE, value), (0xF51DF9, b'\x10')])
 
     async def setmarioYpos(self, value=b'\x00'):
         await self.PutAddress([(0xF50096, b'\x00')])
