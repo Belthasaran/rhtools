@@ -1539,6 +1539,9 @@ class Bot(commands.Bot):
                             self.logger.info(f'Applied effect')
                     except Exception as xerr:
                         self.logger.error(f'ccinteract.requestEffect:exception ERR: {xerr}')
+                        await asyncio.sleep(30) # 30 second extra backoff delay after error
+                        if self.shmode_timeleft == self.shmode_interval2:
+                            self.shmode_timeleft = self.shmode_timeleft + 60*3
                 #
                 if amountSpent > 100 and self.shmode_timeleft == self.shmode_interval2:
                     additional_cooldown_calc =  int((amountSpent * self.shmode_extracooldown) / 1000)
@@ -1767,6 +1770,7 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.name} - Tried, but error occured finding the ccinteract session ')
             self.logger.debug(f'shstart:1:ERR {xerr0}')
             traceback.print_exc()
+            await asnycio.sleep(60 * 1) #fail to start
             return
 
 
