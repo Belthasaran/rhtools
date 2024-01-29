@@ -281,6 +281,20 @@ class mysnes(SnesLink):
     async def z3_ohko(self, value=b'\x01'):
         await self.PutAddress([ (0xF650CC, value)   ])
 
+    async def z3_nodamage(self, value=b'\x01'):
+        await self.PutAddress( [ (0xF5037B, value   )  ] )
+
+    #z3 no menu addr0x7E0FFC
+
+    async def z3_clock_hours(self, value=b'\x01'):
+        await self.PutAddress( [ (0xF5BE90, value   )  ] ) 
+    async def z3_clock_minutes(self, value=b'\x01'):
+        await self.PutAddress( [ (0xF5BE90+4, value   )  ] )
+    async def z3_clock_seconds(self, value=b'\x01'):
+        await self.PutAddress( [ (0xF5BE90+8, value   )  ] )
+
+
+
     async def z3_controls_b(self, value=b'\x01'):
         # x00 normal
         # x01 invert dpad
@@ -689,6 +703,10 @@ class mysnes(SnesLink):
         return run_game and game_unpaused and noanimation and no_endlevel_keyhole and no_endlevel_timer and normal_level
 
      #14AF onoffstatus
+
+     #In [60]: await snes.PutAddress([(0xF5BE9C,b'\x02'),(0xF5F454,b'\x03'),(0xF5F454,b'\x02'),(0xF5F454+1,b'\x02'),(0xF5F454+2,b'\x6
+#    ...: 0'),(0xF600CC,b'\x00')])
+#Out[60]: True
 
 
 
