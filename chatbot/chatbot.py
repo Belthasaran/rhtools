@@ -319,31 +319,36 @@ class Bot(commands.Bot):
 
     async def handle_wslistener(self, websocket, pa):
         while True:
-            message = await websocket.recv()
-            answer = { 'status' : 'error' }
             try:
-                data = json.loads(message)
-                if data['query'] == 'shmode' :
-                    answer['headline'] = self.headline
-                    if self.rhinfo:
-                        answer['rhinfo'] = self.rhinfo
-                    if self.ccmode:
-                        answer['ccmode'] = self.ccmode
-                    else:
-                        answer['ccmode'] = False
-                    answer['shmode'] = self.shmode
-                    answer['shmode_stage'] = self.shmode_stage
-                    answer['shmode_timeleft'] = self.shmode_timeleft
-                    answer['shmode_active'] = 0
-                    answer['interact_link'] = botconfig['crowdcontrol']['interact_link']
-                    answer['status'] = 'ok'
-                    if self.shmode == 0 :
-                        answer['effectlist_v'] = []
-                    elif self.shmode == 1 :
-                        answer['effectlist_v'] = self.effectlist_v
-            except Exception as xerr:
-                answer = { 'status' : 'error',  'note' : str(xerr) }
-            await websocket.send(json.dumps(answer))
+                message = await websocket.recv()
+                answer = { 'status' : 'error' }
+                try:
+                    data = json.loads(message)
+                    if data['query'] == 'shmode' :
+                        answer['headline'] = self.headline
+                        if self.rhinfo:
+                            answer['rhinfo'] = self.rhinfo
+                        if self.ccmode:
+                            answer['ccmode'] = self.ccmode
+                        else:
+                            answer['ccmode'] = False
+                        answer['shmode'] = self.shmode
+                        answer['shmode_stage'] = self.shmode_stage
+                        answer['shmode_timeleft'] = self.shmode_timeleft
+                        answer['shmode_active'] = 0
+                        answer['interact_link'] = botconfig['crowdcontrol']['interact_link']
+                        answer['status'] = 'ok'
+                        if self.shmode == 0 :
+                            answer['effectlist_v'] = []
+                        elif self.shmode == 1 :
+                            answer['effectlist_v'] = self.effectlist_v
+                except Exception as xerr:
+                    answer = { 'status' : 'error',  'note' : str(xerr) }
+                await websocket.send(json.dumps(answer))
+            except Exception as xerr0:
+                self.logger.error(f'handle_wslistern:err {xerr0}')
+                traceback.print_exc()
+                await asyncio.sleep(5)
 
 
 
