@@ -97,14 +97,16 @@ class SMWUSBTest(SnesLink):
     async def setspring(self):
        await self.PutAddress( [ (0xF51EEB, 0) ] )
     async def setautumn(self):
-       await self.PutAddress( [ (0xF51EEB, 0) ] )
+       # flag set after finishing special world
+       await self.PutAddress( [ (0xF51EEB, 1) ] )
 
     async def setgamemode(self, value) :
        # 0=reset b=ow f=enter level
        await self.PutAddress( [ (0xF50100, value) ])
 
     async def setgamemode_b(self):
-        await snes.setgamemode(b'\x0b')
+        # gamemode \x0b : return to overworld
+        await self.setgamemode(b'\x0b')
 
     async def e_xmario(self):
         await self.settime(2)
@@ -163,9 +165,13 @@ class SMWUSBTest(SnesLink):
     async def moretime(self):
          await self.PutAddress([  (0xF50F31, b"\x09") ])
     async def powerdown(self):
+         # shrink mario
          await self.PutAddress([ ( 0xF50019, b'\x00' ) ])
     async def setpowerup(self, value=b'\x01'):
+         # change powerup status, default=none
          await self.PutAddress([ ( 0xF50019, value ) ])
+    async def supermario(self):
+         await self.PutAddress([ ( 0xF50019, b'\x01' ) ])
     async def firepower(self):
          await self.PutAddress([ ( 0xF50019, b'\x03' ) ])
     async def capepower(self):
@@ -284,7 +290,7 @@ class SMWUSBTest(SnesLink):
 
     async def z3_c5(self, value=b'\x00'):
         await self.PutAddress([(0xF650C5, value) ] )
-        #await snes.PutAddress([(0xF650C0, b'\x01'), (0xF5F359, b'\x02'), (0xF5012F, b'\x0f'), (0xF650C5, b'\x03') ] )
+        #await self.PutAddress([(0xF650C0, b'\x01'), (0xF5F359, b'\x02'), (0xF5012F, b'\x0f'), (0xF650C5, b'\x03') ] )
         pass
 
     async def z3_ohko(self, value=b'\x01'):
@@ -529,6 +535,7 @@ class SMWUSBTest(SnesLink):
 
 
     async def addtime(self,seconds):
+         # add time to the timer
          seconds = 0
          hundreds = await self.GetAddress(0xF50F31, 1)
          tens = await self.GetAddress(0xF50F32, 1)
