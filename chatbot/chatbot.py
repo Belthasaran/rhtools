@@ -1549,7 +1549,13 @@ class Bot(commands.Bot):
                             self.shmode_timeleft = self.shmode_timeleft + 60*3
                 #
                 if amountSpent > 100 and self.shmode_timeleft == self.shmode_interval2:
+                    ###
                     additional_cooldown_calc =  int((amountSpent * self.shmode_extracooldown) / 1000)
+                    if effectAmount > 20:
+                        additional_cooldown_calc = int(0.50 * additional_cooldown_calc)
+                    elif effectAmount > 10:
+                        additional_cooldown_calc = int(0.75 * additional_cooldown_calc)
+                    ###
                     if additional_cooldown_calc > 0:
                         self.shmode_timeleft = self.shmode_timeleft + additional_cooldown_calc
                     pass
