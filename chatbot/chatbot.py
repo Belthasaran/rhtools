@@ -1444,7 +1444,7 @@ class Bot(commands.Bot):
                             self.logger.error(f'CrowdConrol Websocket Error: {xerr}')
                             traceback.print_exc()
                             pass
-                    print(response)
+                    ##print(response)
                 await asyncio.sleep(60)
             #
         except Exception as xerr:
@@ -2846,7 +2846,7 @@ class Bot(commands.Bot):
             return
         text = str(ctx.message.content)
         text = re.sub('[^ +!_a-zA-z0-9-]','_', str(text))
-        paramResult = re.match(r'^!schcooldown( +(-?\d+)(x-?\d+)?)|', text)
+        paramResult = re.match(r'^!shcooldown( +(-?\d+)(x-?\d+)?)|', text)
         if paramResult != None:
             try:
                 if paramResult.group(2) == None: # or paramResult.group(3) == None :
@@ -2855,7 +2855,7 @@ class Bot(commands.Bot):
                     value  = int(paramResult.group(2))
                     factor = 1
                     if len(paramResult.groups()) >= 3 and paramResult.group(3):
-                        factor = int(paramResult.groups(3)[1:])
+                        factor = int(paramResult.group(3)[1:])
                         if factor < 120:
                             factor = 120
                         if factor > 900:
