@@ -92,7 +92,7 @@
 			  $("#xya").text(" ");
 			  if (data["shmode"] == 0 || data["shmode_stage"] == 0) {
 					  // $("#shmodediv").hide()
-					   textval = ("Websocket ws://127.1.0.10:11889<br>Connected: Currently in standby mode " +
+					   textval = ("Overlay websocket reconnected<br>Waiting for data " +
 						               (Date.now()+""))
 					   $("#shmodediv").html(textval)
 					   return
@@ -192,8 +192,8 @@
 	 <div id="gamediv">
 	 </div>
 	 <div id="shmodediv">
-		 Attempting to connect<br>
-		 ws://127.1.0.10:11889
+		 Overlay, Startup<br>
+		 Waiting for websocket connection.
 	 </div>
 	 <div id="xya">O</div>
 
