@@ -5,6 +5,10 @@ const path = require('path');
 const process = require('process');
 const crypto = require('crypto');
 const zlib = require('zlib'); // For decompression (LZMA would require a specific library)
+//const  lzma = require('node-liblzma');
+//const lzma = require('@poeticode/js-lzma')
+
+//
 const { promisify } = require('util');
 const decompress = promisify(zlib.unzip); // Simplified example using unzip
 const { parse } = require('json5'); // To handle JSON with comments or non-standard syntax
@@ -12,6 +16,16 @@ const { parse } = require('json5'); // To handle JSON with comments or non-stand
 const fernet = require('fernet');
 const lzma = require('lzma-native');
 const { Buffer } = require('buffer');
+
+//
+var CryptoJS = require('crypto-js/core');
+var AES = require('crypto-js/aes');
+var Utf8 = require('crypto-js/enc-utf8');
+var Latin1 = require('crypto-js/enc-latin1');
+var Hex = require('crypto-js/enc-hex');
+var Base64 = require('crypto-js/enc-base64');
+var HmacSHA256 = require('crypto-js/hmac-sha256');
+var URLBase64 = require('urlsafe-base64');
 
 
 // Dummy function for key retrieval, replace with actual logic
@@ -85,6 +99,19 @@ async function decryptFernet(encryptedData, key) {
     return token.decode();
 }
 
+function atob(bstr) {
+	return Buffer.from(bstr, 'base64').toString();
+}
+
+function base64ToArrayBuffer(base64) {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
 async function getHacklistData(filename) {
     if (!filename) {
         filename = rhmd_path();
@@ -101,8 +128,12 @@ async function getHacklistData(filename) {
 
         // Use LZMA decompression or equivalent
         //const decrypted = await decryptFernet(Buffer.from(fileContent.substring(1), 'base64'), key);
-	const decrypted = await decryptFernet(fileContent, key);
-        const decompressed = await decompress(decrypted);
+	decrypted = await decryptFernet(fileContent, key);
+	    //console.log("X:"+decrypted);
+	    //
+        const decompressed = await lzma.decompress(Buffer.from(decrypted, 'base64'));
+	//console.log(decompressed.toString('utf8'));
+
         hacklist = JSON.parse(decompressed.toString('utf8'));
     } else if (fileContent[0] === '[' || fileContent[0] === '{') {
         if (fileContent[0] === '{') {
