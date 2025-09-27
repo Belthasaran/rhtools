@@ -241,6 +241,10 @@ async function getHackPatchBlob(hackinfo)
 	   rbsha224 = sha224(rawblob)
 	   console.log('Expected patchblob1_sha224 = ' + pblob_sha224)
 	   console.log('sha224(rawblob) = ' + rbsha224)
+	   if (rbsha224 != pblob_sha224) {
+		   console.log('ERROR: Patchblob integrity check failed sha224 of patchblob does not match')
+		   return null
+	   }
 
 	   decomp1 = await decompressLZMA(rawblob)
 
@@ -253,30 +257,19 @@ async function getHackPatchBlob(hackinfo)
 	   //console.log(`Decrypt: ${data}`)
            console.log(`expected patch_sha224 = ${hackinfo.pat_sha224}`)
 	   //console.log(`X=${ sha224(data) }`)
-	   decomp2 = await decompressLZMA(atob(data))
+	   //
+	   //        const decompressedData = await lzma.decompress(Buffer.from(decryptedData, 'base64'));
+	   decomp2 = await decompressLZMA(Buffer.from(data, 'base64'))
 
 	   console.log(`expected patch_sha224 = ${hackinfo.pat_sha224}`)
 	   console.log(`sha224(decoded_blob) = ${ sha224(decomp2) }`)
 	   // incomplete
-
-	   return 1
-
-	   /*
-
-        comp = Compressor()
-        comp.use_lzma()
-        decoded_blob = comp.decompress(decrypted_blob)
-        #frn_sha224 = hashlib.sha224(comp_frndata).hexdigest()
-        print('Expected pat_sha224 = ' + hackinfo["pat_sha224"]  )
-        print('sha224(decoded_blob) = ' + hashlib.sha224(decoded_blob).hexdigest())
-        if hashlib.sha224(decoded_blob).hexdigest() ==  hackinfo["pat_sha224"]:
-            return decoded_blob
-        print('Error: Decoded patch does not match expected file checksum - possible data corruption.')
-        return None
-
-    print('[*] Error: Possible file corruption: Sha224 data checksum of received file does not match')
-    return None
-	    */
+	   //
+	   if (hackinfo.pat_sha224 != sha224(decomp2)) {
+		   console.log('ERROR: Patch data integrity check failed. sha224 of decoded patch blob does not match pat_sha224')
+		   return null
+	   }
+	   return decomp2
    }
    return null
 }
