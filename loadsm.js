@@ -112,7 +112,7 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-async function getHacklistData(filename) {
+async function getHackListData(filename) {
     if (!filename) {
         filename = rhmd_path();
     }
@@ -197,13 +197,134 @@ async function getGenListData(filename, fernetKey) {
     return hacklist;
 }
 
+//def get_patch_blob(hackid, blobinfo=None):
+async function getHackInfo(hacklist, hackid) 
+{
+     var result = hacklist.filter(x => x.id === ('' + hackid))
+
+     return result[result.length - 1]
+}
+
+async function getPatchRawBlob( blob_name, blobinfo )
+{
+      const directPath = path.join(getPathPrefix(), "blobs", blob_name);
+
+      if (fs.existsSync(directPath)) {
+         return fs.readFileSync(directPath)
+      }
+}
+
+function sha224(buffer) {
+  return crypto.createHash("sha224").update(buffer).digest("hex");
+}
+
+async function decompressLZMA(buffer) {
+	return await lzma.decompress(buffer)
+}
+
+async function getHackPatchBlob(hackinfo) 
+{  //  Object.keys(b.xdata).filter(x => x.match('^patchblob.*_name'))
+   blob_namekeys = Object.keys(hackinfo.xdata).filter(x => x.match('^patchblob1_name'))
+   if (blob_namekeys.length == 1) {
+	   pblob_name = hackinfo.xdata.patchblob1_name
+	   pblob_key  = hackinfo.xdata.patchblob1_key
+	   pblob_kn   = hackinfo.xdata.patchblob1_kn
+	   pblob_sha224 = hackinfo.xdata.patchblob1_sha224
+
+	   /*blobinfo = {
+		   // patchblob1_url:
+		   patchblob1_kn: pblob_kn,
+		   // patchblob1_ipfs_hash:
+		   // patchblob1_ipfs_url
+	   }*/
+	   rawblob = await getPatchRawBlob( pblob_name, null )
+	   rbsha224 = sha224(rawblob)
+	   console.log('Expected patchblob1_sha224 = ' + pblob_sha224)
+	   console.log('sha224(rawblob) = ' + rbsha224)
+
+	   decomp1 = await decompressLZMA(rawblob)
+
+	   console.log(`pblob_key = ${pblob_key}`)
+	   
+	   key = UrlBase64.encode(atob(pblob_key)).toString()  //btoa(pblob_key)
+	   console.log(`key = ${key}`)
+
+	   data = await decryptFernet( Buffer.from(decomp1).toString(), key)
+	   //console.log(`Decrypt: ${data}`)
+           console.log(`expected patch_sha224 = ${hackinfo.pat_sha224}`)
+	   //console.log(`X=${ sha224(data) }`)
+	   decomp2 = await decompressLZMA(atob(data))
+
+	   console.log(`expected patch_sha224 = ${hackinfo.pat_sha224}`)
+	   console.log(`sha224(decoded_blob) = ${ sha224(decomp2) }`)
+	   // incomplete
+
+	   return 1
+
+	   /*
+
+        comp = Compressor()
+        comp.use_lzma()
+        decoded_blob = comp.decompress(decrypted_blob)
+        #frn_sha224 = hashlib.sha224(comp_frndata).hexdigest()
+        print('Expected pat_sha224 = ' + hackinfo["pat_sha224"]  )
+        print('sha224(decoded_blob) = ' + hashlib.sha224(decoded_blob).hexdigest())
+        if hashlib.sha224(decoded_blob).hexdigest() ==  hackinfo["pat_sha224"]:
+            return decoded_blob
+        print('Error: Decoded patch does not match expected file checksum - possible data corruption.')
+        return None
+
+    print('[*] Error: Possible file corruption: Sha224 data checksum of received file does not match')
+    return None
+	    */
+   }
+   return null
+}
+
+/*
+    idstr = str(hackid)
+    rawblob = get_patch_raw_blob(hackid, blobinfo)
+    hackinfo = get_hack_info(hackid, True)
+    #print(json.dumps(hackinfo, indent=4))
+    print('Expected patchblob1_sha224 = ' + str(hackinfo["patchblob1_sha224"]))
+    print('sha224(rawblob) = ' + hashlib.sha224(rawblob).hexdigest())
+    if hashlib.sha224(rawblob).hexdigest() == hackinfo["patchblob1_sha224"]:
+        comp = Compressor()
+        comp.use_lzma()
+        decomp_blob = comp.decompress(rawblob)
+
+        key = base64.urlsafe_b64decode( bytes(hackinfo["patchblob1_key"], 'ascii') )
+        frn = Fernet(key)
+        decrypted_blob  = frn.decrypt(decomp_blob)
+
+        comp = Compressor()
+        comp.use_lzma()
+        decoded_blob = comp.decompress(decrypted_blob)
+        #frn_sha224 = hashlib.sha224(comp_frndata).hexdigest()
+        print('Expected pat_sha224 = ' + hackinfo["pat_sha224"]  )
+        print('sha224(decoded_blob) = ' + hashlib.sha224(decoded_blob).hexdigest())
+        if hashlib.sha224(decoded_blob).hexdigest() ==  hackinfo["pat_sha224"]:
+            return decoded_blob
+        print('Error: Decoded patch does not match expected file checksum - possible data corruption.')
+        return None
+
+    print('[*] Error: Possible file corruption: Sha224 data checksum of received file does not match')
+    return None
+
+	*/
+
 module.exports = {
     getGenListData,
-    getHacklistData
+    getHackListData, 
+    getHackInfo,
+    getHackPatchBlob
 };
 
 
-var hld = getHacklistData();
+var hld = getHackListData();
+
+
+
 
 
 
