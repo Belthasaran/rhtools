@@ -36,6 +36,7 @@
       </div>
 
       <div class="right-actions">
+        <button @click="openRunModal">Prepare Run</button>
         <button @click="startSelected" :disabled="!exactlyOneSelected">Start</button>
         <button @click="editNotes" :disabled="!exactlyOneSelected">Edit notes</button>
         <button @click="setMyRating" :disabled="!exactlyOneSelected">My rating</button>
@@ -173,6 +174,111 @@
       </aside>
     </section>
   </main>
+  
+  <!-- Prepare Run Modal -->
+  <div v-if="runModalOpen" class="modal-backdrop" @click.self="closeRunModal">
+    <div class="modal">
+      <header class="modal-header">
+        <h3>Prepare Run</h3>
+        <div class="modal-header-actions">
+          <button @click="stageRun('save')" :disabled="runEntries.length === 0">Stage and Save</button>
+          <button @click="stageRun('upload')" :disabled="runEntries.length === 0">Stage and Upload</button>
+          <button class="close" @click="closeRunModal">✕</button>
+        </div>
+      </header>
+
+      <section class="modal-toolbar">
+        <div class="left">
+          <button @click="checkAllRun">Check All</button>
+          <button @click="uncheckAllRun">Uncheck All</button>
+          <button @click="removeCheckedRun" :disabled="checkedRunCount === 0">Remove</button>
+        </div>
+        <div class="right add-random">
+          <label>
+            Filter Type
+            <select v-model="randomFilter.type">
+              <option value="any">Any</option>
+              <option value="standard">Standard</option>
+              <option value="kaizo">Kaizo</option>
+              <option value="traditional">Traditional</option>
+            </select>
+          </label>
+          <label>
+            Difficulty
+            <select v-model="randomFilter.difficulty">
+              <option value="any">Any</option>
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="expert">Expert</option>
+            </select>
+          </label>
+          <input class="pattern" v-model="randomFilter.pattern" type="text" placeholder="Optional filter pattern" />
+          <button @click="addRandomGameToRun">Add Random Game</button>
+        </div>
+      </section>
+
+      <section class="modal-body">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="col-check">
+                  <input type="checkbox" :checked="allRunChecked" @change="toggleCheckAllRun($event)" />
+                </th>
+                <th>ID</th>
+                <th>Entry Type</th>
+                <th>Name</th>
+                <th>Stage #</th>
+                <th>Stage name</th>
+                <th>Count</th>
+                <th>Filter difficulty</th>
+                <th>Filter type</th>
+                <th>Filter pattern</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(entry, idx) in runEntries" :key="entry.key">
+                <td class="col-check">
+                  <input type="checkbox" v-model="runEntryCheckedRecord[entry.key]" />
+                </td>
+                <td>{{ entry.id }}</td>
+                <td>
+                  <select v-model="entry.entryType">
+                    <option value="game">Game</option>
+                    <option value="stage">Stage</option>
+                  </select>
+                </td>
+                <td><input v-model="entry.name" /></td>
+                <td><input v-model="entry.stageNumber" /></td>
+                <td><input v-model="entry.stageName" /></td>
+                <td><input type="number" min="1" v-model.number="entry.count" /></td>
+                <td>
+                  <select v-model="entry.filterDifficulty">
+                    <option value="">—</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                </td>
+                <td>
+                  <select v-model="entry.filterType">
+                    <option value="">—</option>
+                    <option value="standard">Standard</option>
+                    <option value="kaizo">Kaizo</option>
+                    <option value="traditional">Traditional</option>
+                  </select>
+                </td>
+                <td><input v-model="entry.filterPattern" /></td>
+              </tr>
+              <tr v-if="runEntries.length === 0">
+                <td class="empty" colspan="10">Run is empty. Add entries or use Add Random Game.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
   
 </template>
 
@@ -411,6 +517,87 @@ function setStageRating() {
   if (Number.isNaN(n) || n < 0 || n > 5) return;
   for (const st of currentStages.value) if (selectedStageIds.value.has(st.key)) st.myRating = n;
 }
+
+// Prepare Run modal state and logic
+type RunEntry = {
+  key: string;
+  id: string;
+  entryType: 'game' | 'stage';
+  name: string;
+  stageNumber?: string;
+  stageName?: string;
+  count: number;
+  filterDifficulty?: '' | 'beginner' | 'intermediate' | 'expert';
+  filterType?: '' | 'standard' | 'kaizo' | 'traditional';
+  filterPattern?: string;
+};
+
+const runModalOpen = ref(false);
+const runEntries = reactive<RunEntry[]>([]);
+const checkedRun = ref<Set<string>>(new Set());
+
+const runEntryCheckedRecord = computed<Record<string, boolean>>({
+  get() {
+    const rec: Record<string, boolean> = {};
+    for (const e of runEntries) rec[e.key] = checkedRun.value.has(e.key);
+    return rec;
+  },
+  set(next) {
+    const s = new Set<string>();
+    for (const [k, v] of Object.entries(next)) if (v) s.add(k);
+    checkedRun.value = s;
+  },
+});
+
+const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
+const checkedRunCount = computed(() => checkedRun.value.size);
+
+function openRunModal() {
+  runModalOpen.value = true;
+}
+function closeRunModal() {
+  runModalOpen.value = false;
+}
+function toggleCheckAllRun(e: Event) {
+  const target = e.target as HTMLInputElement;
+  if (target.checked) {
+    for (const e of runEntries) checkedRun.value.add(e.key);
+  } else {
+    for (const e of runEntries) checkedRun.value.delete(e.key);
+  }
+}
+function checkAllRun() {
+  for (const e of runEntries) checkedRun.value.add(e.key);
+}
+function uncheckAllRun() {
+  checkedRun.value.clear();
+}
+function removeCheckedRun() {
+  if (checkedRun.value.size === 0) return;
+  const keep = runEntries.filter((e) => !checkedRun.value.has(e.key));
+  runEntries.splice(0, runEntries.length, ...keep);
+  checkedRun.value.clear();
+}
+
+const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '' });
+function addRandomGameToRun() {
+  const key = `rand-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  runEntries.push({
+    key,
+    id: '(random)',
+    entryType: 'game',
+    name: 'Random Game',
+    count: 1,
+    filterDifficulty: randomFilter.difficulty === 'any' ? '' : (randomFilter.difficulty as any),
+    filterType: randomFilter.type === 'any' ? '' : (randomFilter.type as any),
+    filterPattern: randomFilter.pattern || '',
+  });
+}
+
+function stageRun(mode: 'save' | 'upload') {
+  console.log('Stage run', mode, runEntries);
+  // Placeholder: integrate with backend/IPC later
+}
 </script>
 
 <style>
@@ -446,5 +633,17 @@ html, body, #app { height: 100%; margin: 0; }
 .empty { text-align: center; color: #6b7280; padding: 16px; }
 
 button { padding: 6px 10px; }
+
+/* Modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+.modal { width: 1000px; max-width: 95vw; max-height: 90vh; background: #fff; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
+.modal-header-actions { display: flex; gap: 8px; align-items: center; }
+.modal-header .close { font-size: 16px; }
+.modal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+.modal-toolbar .add-random { display: flex; align-items: center; gap: 8px; }
+.modal-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
+.modal-toolbar .pattern { min-width: 220px; padding: 6px 8px; }
+.modal-body { padding: 0; overflow: auto; }
 </style>
 
