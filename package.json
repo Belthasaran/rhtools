@@ -1,0 +1,22 @@
+{
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:start": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.js",
+    "renderer:dev": "npm --prefix electron/renderer run dev",
+    "renderer:build": "npm --prefix electron/renderer run build",
+    "app:dev": "run-p renderer:dev electron:start",
+    "app:build": "npm run renderer:build"
+  },
+  "dependencies": {
+    "@poeticode/js-lzma": "^1.0.0",
+    "fernet": "^0.3.2",
+    "lzma-native": "^8.0.6",
+    "node-liblzma": "^1.1.9",
+    "urlsafe-base64": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "cross-env": "^7.0.3",
+    "npm-run-all": "^4.1.5"
+  }
+}
