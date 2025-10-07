@@ -238,11 +238,11 @@
                 <th>Name</th>
                 <th>Stage #</th>
                 <th>Stage name</th>
-                <th>Count</th>
+                <th class="col-count">Count</th>
                 <th>Filter difficulty</th>
                 <th>Filter type</th>
-                <th>Filter pattern</th>
-                <th>Seed</th>
+                <th class="col-pattern">Filter pattern</th>
+                <th class="col-seed">Seed</th>
               </tr>
             </thead>
             <tbody>
@@ -260,7 +260,7 @@
                 <td>{{ entry.name }}</td>
                 <td>{{ entry.stageNumber ?? '' }}</td>
                 <td>{{ entry.stageName ?? '' }}</td>
-                <td><input type="number" min="1" v-model.number="entry.count" /></td>
+                <td class="col-count"><input type="number" min="1" v-model.number="entry.count" /></td>
                 <td>
                   <select v-model="entry.filterDifficulty">
                     <option value="">—</option>
@@ -277,8 +277,8 @@
                     <option value="traditional">Traditional</option>
                   </select>
                 </td>
-                <td><input v-model="entry.filterPattern" /></td>
-                <td><input v-model="entry.seed" /></td>
+                <td class="col-pattern"><input v-model="entry.filterPattern" /></td>
+                <td class="col-seed"><input v-model="entry.seed" /></td>
               </tr>
               <tr v-if="runEntries.length === 0">
                 <td class="empty" colspan="10">Run is empty. Add entries or use Add Random Game.</td>
@@ -667,5 +667,13 @@ button { padding: 6px 10px; }
 .modal-toolbar .count { width: 80px; padding: 6px 8px; }
 .modal-toolbar .seed { min-width: 160px; padding: 6px 8px; }
 .modal-body { padding: 0; overflow: auto; }
+
+/* Column sizing in modal table */
+.data-table th.col-count, .data-table td.col-count { width: 72px; }
+.data-table th.col-seed, .data-table td.col-seed { width: 100px; }
+.data-table th.col-pattern, .data-table td.col-pattern { width: 220px; }
+.data-table td.col-count input { width: 60px; }
+.data-table td.col-seed input { width: 90px; }
+.data-table td.col-pattern input { width: 200px; }
 </style>
 
