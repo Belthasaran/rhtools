@@ -1,10 +1,14 @@
 blobs/*
 smw.sfc
 *.sfc
+*.sfc.new
+*.sfcjson.new
 smwpicker_auth.json
 rhmd_sample2.dat
 patch/*
 temp/*
+rom/*
+rom_meta/*
 
 rhtools_options.dat
 rhtools_options.dattmp
@@ -21,3 +25,8 @@ __pycache__
 *.sfcjson
 *.hex
 *.swp
+_curhack.html
+*.bak
+*.old2
+*.lock
+
