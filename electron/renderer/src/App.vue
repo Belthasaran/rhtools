@@ -257,9 +257,9 @@
                     <option value="stage">Stage</option>
                   </select>
                 </td>
-                <td><input v-model="entry.name" /></td>
-                <td><input v-model="entry.stageNumber" /></td>
-                <td><input v-model="entry.stageName" /></td>
+                <td>{{ entry.name }}</td>
+                <td>{{ entry.stageNumber ?? '' }}</td>
+                <td>{{ entry.stageName ?? '' }}</td>
                 <td><input type="number" min="1" v-model.number="entry.count" /></td>
                 <td>
                   <select v-model="entry.filterDifficulty">
