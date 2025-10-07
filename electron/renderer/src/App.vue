@@ -213,7 +213,15 @@
             </select>
           </label>
           <input class="pattern" v-model="randomFilter.pattern" type="text" placeholder="Optional filter pattern" />
-          <button @click="addRandomGameToRun">Add Random Game</button>
+          <label>
+            Count
+            <input class="count" v-model.number="randomFilter.count" type="number" min="1" max="100" />
+          </label>
+          <label>
+            Seed
+            <input class="seed" v-model="randomFilter.seed" type="text" placeholder="(random by default)" />
+          </label>
+          <button @click="addRandomGameToRun" :disabled="!isRandomAddValid">Add Random Game</button>
         </div>
       </section>
 
@@ -234,6 +242,7 @@
                 <th>Filter difficulty</th>
                 <th>Filter type</th>
                 <th>Filter pattern</th>
+                <th>Seed</th>
               </tr>
             </thead>
             <tbody>
@@ -269,6 +278,7 @@
                   </select>
                 </td>
                 <td><input v-model="entry.filterPattern" /></td>
+                <td><input v-model="entry.seed" /></td>
               </tr>
               <tr v-if="runEntries.length === 0">
                 <td class="empty" colspan="10">Run is empty. Add entries or use Add Random Game.</td>
@@ -530,6 +540,7 @@ type RunEntry = {
   filterDifficulty?: '' | 'beginner' | 'intermediate' | 'expert';
   filterType?: '' | 'standard' | 'kaizo' | 'traditional';
   filterPattern?: string;
+  seed?: string;
 };
 
 const runModalOpen = ref(false);
@@ -553,6 +564,8 @@ const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((
 const checkedRunCount = computed(() => checkedRun.value.size);
 
 function openRunModal() {
+  if (!randomFilter.seed) randomFilter.seed = Math.random().toString(36).slice(2, 10);
+  if (!randomFilter.count) randomFilter.count = 1;
   runModalOpen.value = true;
 }
 function closeRunModal() {
@@ -579,18 +592,24 @@ function removeCheckedRun() {
   checkedRun.value.clear();
 }
 
-const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '' });
+const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '', count: 1 as number | null, seed: '' });
+const isRandomAddValid = computed(() => typeof randomFilter.count === 'number' && randomFilter.count >= 1 && randomFilter.count <= 100);
 function addRandomGameToRun() {
+  if (!isRandomAddValid.value) return;
   const key = `rand-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const seed = (randomFilter.seed && randomFilter.seed.trim().length > 0)
+    ? randomFilter.seed.trim()
+    : Math.random().toString(36).slice(2, 10);
   runEntries.push({
     key,
     id: '(random)',
     entryType: 'game',
     name: 'Random Game',
-    count: 1,
+    count: (randomFilter.count as number) || 1,
     filterDifficulty: randomFilter.difficulty === 'any' ? '' : (randomFilter.difficulty as any),
     filterType: randomFilter.type === 'any' ? '' : (randomFilter.type as any),
     filterPattern: randomFilter.pattern || '',
+    seed,
   });
 }
 
@@ -644,6 +663,8 @@ button { padding: 6px 10px; }
 .modal-toolbar .add-random { display: flex; align-items: center; gap: 8px; }
 .modal-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
 .modal-toolbar .pattern { min-width: 220px; padding: 6px 8px; }
+.modal-toolbar .count { width: 80px; padding: 6px 8px; }
+.modal-toolbar .seed { min-width: 160px; padding: 6px 8px; }
 .modal-body { padding: 0; overflow: auto; }
 </style>
 
