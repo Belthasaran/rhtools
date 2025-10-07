@@ -655,12 +655,13 @@ button { padding: 6px 10px; }
 
 /* Modal */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
-.modal { width: 1000px; max-width: 95vw; max-height: 90vh; background: #fff; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.modal { width: 1200px; max-width: 98vw; max-height: 90vh; background: #fff; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
 .modal-header-actions { display: flex; gap: 8px; align-items: center; }
 .modal-header .close { font-size: 16px; }
-.modal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; border-bottom: 1px solid #e5e7eb; }
-.modal-toolbar .add-random { display: flex; align-items: center; gap: 8px; }
+.modal-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+.modal-toolbar .add-random { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.modal-toolbar .add-random > * { flex: 0 0 auto; }
 .modal-toolbar label { display: inline-flex; align-items: center; gap: 6px; }
 .modal-toolbar .pattern { min-width: 220px; padding: 6px 8px; }
 .modal-toolbar .count { width: 80px; padding: 6px 8px; }
