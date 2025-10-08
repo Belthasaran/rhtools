@@ -195,6 +195,8 @@
           <button @click="checkAllRun">Check All</button>
           <button @click="uncheckAllRun">Uncheck All</button>
           <button @click="removeCheckedRun" :disabled="checkedRunCount === 0">Remove</button>
+          <button @click="moveCheckedUp" :disabled="!canMoveCheckedUp">↑ Move Up</button>
+          <button @click="moveCheckedDown" :disabled="!canMoveCheckedDown">↓ Move Down</button>
         </div>
         <div class="right add-random">
           <label>
@@ -236,6 +238,8 @@
                 <th class="col-check">
                   <input type="checkbox" :checked="allRunChecked" @change="toggleCheckAllRun($event)" />
                 </th>
+                <th class="col-seq">#</th>
+                <th class="col-actions">Actions</th>
                 <th>ID</th>
                 <th>Entry Type</th>
                 <th>Name</th>
@@ -249,9 +253,23 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(entry, idx) in runEntries" :key="entry.key">
+              <tr 
+                v-for="(entry, idx) in runEntries" 
+                :key="entry.key"
+                draggable="true"
+                @dragstart="handleDragStart(idx, $event)"
+                @dragover.prevent="handleDragOver(idx, $event)"
+                @drop="handleDrop(idx, $event)"
+                @dragend="handleDragEnd"
+                :class="{ 'dragging': draggedIndex === idx }"
+              >
                 <td class="col-check">
                   <input type="checkbox" :checked="checkedRun.has(entry.key)" @change="toggleRunEntrySelection(entry.key, $event)" />
+                </td>
+                <td class="col-seq">{{ idx + 1 }}</td>
+                <td class="col-actions">
+                  <button class="btn-mini" @click="moveRowUp(idx)" :disabled="idx === 0" title="Move up">↑</button>
+                  <button class="btn-mini" @click="moveRowDown(idx)" :disabled="idx === runEntries.length - 1" title="Move down">↓</button>
                 </td>
                 <td>{{ entry.id }}</td>
                 <td>
@@ -284,7 +302,7 @@
                 <td class="col-seed"><input v-model="entry.seed" /></td>
               </tr>
               <tr v-if="runEntries.length === 0">
-                <td class="empty" colspan="10">Run is empty. Add entries or use Add Random Game.</td>
+                <td class="empty" colspan="13">Run is empty. Add entries or use Add Random Game.</td>
               </tr>
             </tbody>
           </table>
@@ -620,6 +638,94 @@ function toggleRunEntrySelection(key: string, e: Event) {
   }
 }
 
+// Row reordering
+const draggedIndex = ref<number | null>(null);
+
+function moveRowUp(index: number) {
+  if (index === 0) return;
+  const temp = runEntries[index];
+  runEntries[index] = runEntries[index - 1];
+  runEntries[index - 1] = temp;
+}
+
+function moveRowDown(index: number) {
+  if (index >= runEntries.length - 1) return;
+  const temp = runEntries[index];
+  runEntries[index] = runEntries[index + 1];
+  runEntries[index + 1] = temp;
+}
+
+function handleDragStart(index: number, e: DragEvent) {
+  draggedIndex.value = index;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  }
+}
+
+function handleDragOver(index: number, e: DragEvent) {
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move';
+  }
+}
+
+function handleDrop(dropIndex: number, e: DragEvent) {
+  e.preventDefault();
+  if (draggedIndex.value === null || draggedIndex.value === dropIndex) return;
+  
+  const dragIdx = draggedIndex.value;
+  const item = runEntries[dragIdx];
+  runEntries.splice(dragIdx, 1);
+  runEntries.splice(dropIndex, 0, item);
+}
+
+function handleDragEnd() {
+  draggedIndex.value = null;
+}
+
+// Bulk move operations
+const canMoveCheckedUp = computed(() => {
+  if (checkedRun.value.size === 0) return false;
+  // Can't move up if first item is checked
+  const firstCheckedIndex = runEntries.findIndex(e => checkedRun.value.has(e.key));
+  return firstCheckedIndex > 0;
+});
+
+const canMoveCheckedDown = computed(() => {
+  if (checkedRun.value.size === 0) return false;
+  // Can't move down if last item is checked
+  const lastCheckedIndex = runEntries.map((e, i) => checkedRun.value.has(e.key) ? i : -1)
+    .reduce((max, val) => Math.max(max, val), -1);
+  return lastCheckedIndex < runEntries.length - 1;
+});
+
+function moveCheckedUp() {
+  if (!canMoveCheckedUp.value) return;
+  
+  // Move from top to bottom to preserve relative order
+  for (let i = 1; i < runEntries.length; i++) {
+    if (checkedRun.value.has(runEntries[i].key) && !checkedRun.value.has(runEntries[i - 1].key)) {
+      const temp = runEntries[i];
+      runEntries[i] = runEntries[i - 1];
+      runEntries[i - 1] = temp;
+    }
+  }
+}
+
+function moveCheckedDown() {
+  if (!canMoveCheckedDown.value) return;
+  
+  // Move from bottom to top to preserve relative order
+  for (let i = runEntries.length - 2; i >= 0; i--) {
+    if (checkedRun.value.has(runEntries[i].key) && !checkedRun.value.has(runEntries[i + 1].key)) {
+      const temp = runEntries[i];
+      runEntries[i] = runEntries[i + 1];
+      runEntries[i + 1] = temp;
+    }
+  }
+}
+
 const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '', count: 1 as number | null, seed: '' });
 const isRandomAddValid = computed(() => typeof randomFilter.count === 'number' && randomFilter.count >= 1 && randomFilter.count <= 100);
 function addRandomGameToRun() {
@@ -699,11 +805,18 @@ button { padding: 6px 10px; }
 .modal-body { padding: 0; overflow: auto; }
 
 /* Column sizing in modal table */
+.data-table th.col-seq, .data-table td.col-seq { width: 40px; text-align: center; font-weight: bold; color: #6b7280; }
+.data-table th.col-actions, .data-table td.col-actions { width: 70px; text-align: center; }
 .data-table th.col-count, .data-table td.col-count { width: 72px; }
 .data-table th.col-seed, .data-table td.col-seed { width: 100px; }
 .data-table th.col-pattern, .data-table td.col-pattern { width: 220px; }
 .data-table td.col-count input { width: 60px; }
 .data-table td.col-seed input { width: 90px; }
 .data-table td.col-pattern input { width: 200px; }
+
+/* Row reordering */
+.btn-mini { padding: 2px 6px; font-size: 12px; margin: 0 2px; }
+.data-table tbody tr[draggable="true"] { cursor: move; }
+.data-table tbody tr.dragging { opacity: 0.5; background: #e0e7ff; }
 </style>
 
