@@ -71,7 +71,7 @@
               @click="rowClick(row)"
             >
               <td class="col-check">
-                <input type="checkbox" v-model="selectedIdsSetProxy[row.Id]" @click.stop />
+                <input type="checkbox" :checked="selectedIds.has(row.Id)" @change="toggleMainSelection(row.Id, $event)" @click.stop />
               </td>
               <td>{{ row.Id }}</td>
               <td class="name">{{ row.Name }}</td>
@@ -355,21 +355,6 @@ const allVisibleChecked = computed(() => {
   return filteredItems.value.every((it) => selectedIds.value.has(it.Id));
 });
 
-const selectedIdsSetProxy = computed<Record<string, boolean>>({
-  get() {
-    const record: Record<string, boolean> = {};
-    for (const it of filteredItems.value) record[it.Id] = selectedIds.value.has(it.Id);
-    return record;
-  },
-  set(next) {
-    const newSet = new Set<string>();
-    for (const [id, checked] of Object.entries(next)) {
-      if (checked) newSet.add(id);
-    }
-    selectedIds.value = newSet;
-  },
-});
-
 function toggleCheckAll(e: Event) {
   const target = e.target as HTMLInputElement;
   if (target.checked) {
@@ -383,6 +368,15 @@ function rowClick(row: Item) {
   const has = selectedIds.value.has(row.Id);
   selectedIds.value.clear();
   if (!has) selectedIds.value.add(row.Id);
+}
+
+function toggleMainSelection(id: string, e: Event) {
+  const checked = (e.target as HTMLInputElement).checked;
+  if (checked) {
+    selectedIds.value.add(id);
+  } else {
+    selectedIds.value.delete(id);
+  }
 }
 
 function clearFilters() {
