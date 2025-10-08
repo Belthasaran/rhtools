@@ -311,6 +311,202 @@
       </section>
     </div>
   </div>
+
+  <!-- Settings Modal -->
+  <div v-if="settingsModalOpen" class="modal-backdrop" @click.self="closeSettings">
+    <div class="modal settings-modal">
+      <header class="modal-header">
+        <h3>Settings</h3>
+        <button class="close" @click="closeSettings">✕</button>
+      </header>
+
+      <section class="modal-body settings-body">
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">
+              <span class="status-icon">{{ settings.vanillaRomValid ? '✓' : '' }}</span>
+              Import required Vanilla SMW ROM
+            </label>
+            <div class="setting-control">
+              <div 
+                class="drop-zone"
+                @dragover.prevent
+                @drop.prevent="handleRomDrop"
+              >
+                Drag ROM file here
+              </div>
+              <button @click="browseRomFile">Browse</button>
+            </div>
+          </div>
+          <div class="setting-caption">
+            You must have a legally-obtained SMW SFC file that you are authorized to play with, required to proceed.<br>
+            The acceptable file has a sha224 sum of <code>fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08</code><br>
+            OR sha-1: <code>6b47bb75d16514b6a476aa0c73a683a2a4c18765</code>, Or Md5: <code>cdd3c8c37322978ca8669b34bc89c804</code>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">
+              <span class="status-icon">{{ settings.flipsValid ? '✓' : '' }}</span>
+              Import FLIPS executable
+            </label>
+            <div class="setting-control">
+              <div 
+                class="drop-zone"
+                @dragover.prevent
+                @drop.prevent="handleFlipsDrop"
+              >
+                Drag FLIPS file here
+              </div>
+              <button @click="browseFlipsFile">Browse</button>
+            </div>
+          </div>
+          <div class="setting-caption">
+            Floating IPS <a href="https://www.gamebrew.org/wiki/Floating_IPS" target="_blank">https://www.gamebrew.org/wiki/Floating_IPS</a>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">Game launch method</label>
+            <div class="setting-control">
+              <select v-model="settings.launchMethod">
+                <option value="manual">Launch Manually</option>
+                <option value="program">Run Launch Program</option>
+                <option value="usb2snes">Launch from USB2Snes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">Launch Program</label>
+            <div class="setting-control">
+              <input type="text" v-model="settings.launchProgram" placeholder="Path to launch program" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">Launch Program Arguments</label>
+            <div class="setting-control">
+              <input type="text" v-model="settings.launchProgramArgs" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">USB2snes Websocket address</label>
+            <div class="setting-control">
+              <input type="text" v-model="settings.usb2snesAddress" />
+            </div>
+          </div>
+          <div class="setting-caption warning">
+            ⚠ USB2SNES launch requires a USB2SNES server running. <a href="https://usb2snes.com/" target="_blank">https://usb2snes.com/</a>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">USB2SNES Enabled</label>
+            <div class="setting-control">
+              <select v-model="settings.usb2snesEnabled">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">USB2SNES Launch Preference</label>
+            <div class="setting-control">
+              <select v-model="settings.usb2snesLaunchPref">
+                <option value="auto">Launch Automatically</option>
+                <option value="manual">Manual Launch (Do nothing)</option>
+                <option value="reset">Manual Launch (Reset console)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">USB2SNES Upload Preference</label>
+            <div class="setting-control">
+              <select v-model="settings.usb2snesUploadPref">
+                <option value="manual">Manual Transfer (do not upload)</option>
+                <option value="check">Check first and Upload</option>
+                <option value="always">Always Upload</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">USB2SNES Upload Directory</label>
+            <div class="setting-control">
+              <input type="text" v-model="settings.usb2snesUploadDir" />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">
+              <span class="status-icon">{{ settings.asarValid ? '✓' : '' }}</span>
+              Import ASAR executable
+            </label>
+            <div class="setting-control">
+              <div 
+                class="drop-zone"
+                @dragover.prevent
+                @drop.prevent="handleAsarDrop"
+              >
+                Drag ASAR file here
+              </div>
+              <button @click="browseAsarFile">Browse</button>
+            </div>
+          </div>
+          <div class="setting-caption">
+            Download ASAR from <a href="https://smwc.me/s/37443" target="_blank">https://smwc.me/s/37443</a>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">
+              <span class="status-icon">{{ settings.uberAsmValid ? '✓' : '' }}</span>
+              Import UberASM executable
+            </label>
+            <div class="setting-control">
+              <div 
+                class="drop-zone"
+                @dragover.prevent
+                @drop.prevent="handleUberAsmDrop"
+              >
+                Drag UberASM file here
+              </div>
+              <button @click="browseUberAsmFile">Browse</button>
+            </div>
+          </div>
+          <div class="setting-caption">
+            Download UberASM from <a href="https://smwc.me/s/39036" target="_blank">https://smwc.me/s/39036</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="modal-footer">
+        <button @click="saveSettings" class="btn-primary">Save Changes and Close</button>
+      </footer>
+    </div>
+  </div>
   
 </template>
 
@@ -504,8 +700,92 @@ function setMyRating() {
   if (!Number.isNaN(n) && n >= 0 && n <= 5) it.Myrating = n;
 }
 
+// Settings modal state and logic
+const settingsModalOpen = ref(false);
+const settings = reactive({
+  vanillaRomValid: false,
+  flipsValid: false,
+  asarValid: false,
+  uberAsmValid: false,
+  launchMethod: 'manual' as 'manual' | 'program' | 'usb2snes',
+  launchProgram: '',
+  launchProgramArgs: '%file',
+  usb2snesAddress: 'ws://localhost:64213',
+  usb2snesEnabled: 'no' as 'yes' | 'no',
+  usb2snesLaunchPref: 'auto' as 'auto' | 'manual' | 'reset',
+  usb2snesUploadPref: 'manual' as 'manual' | 'check' | 'always',
+  usb2snesUploadDir: '/work',
+});
+
 function openSettings() {
-  console.log('Open settings');
+  settingsModalOpen.value = true;
+}
+
+function closeSettings() {
+  settingsModalOpen.value = false;
+}
+
+function saveSettings() {
+  console.log('Saving settings:', settings);
+  // TODO: Persist settings via IPC
+  closeSettings();
+}
+
+// File import handlers (placeholders for IPC integration)
+function handleRomDrop(e: DragEvent) {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    console.log('ROM file dropped:', files[0].name);
+    // TODO: Validate and import via IPC
+  }
+}
+
+function browseRomFile() {
+  console.log('Browse ROM file');
+  // TODO: Open file picker via IPC
+}
+
+function handleFlipsDrop(e: DragEvent) {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    console.log('FLIPS file dropped:', files[0].name);
+    // TODO: Import via IPC
+  }
+}
+
+function browseFlipsFile() {
+  console.log('Browse FLIPS file');
+  // TODO: Open file picker via IPC
+}
+
+function handleAsarDrop(e: DragEvent) {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    console.log('ASAR file dropped:', files[0].name);
+    // TODO: Import via IPC
+  }
+}
+
+function browseAsarFile() {
+  console.log('Browse ASAR file');
+  // TODO: Open file picker via IPC
+}
+
+function handleUberAsmDrop(e: DragEvent) {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    console.log('UberASM file dropped:', files[0].name);
+    // TODO: Import via IPC
+  }
+}
+
+function browseUberAsmFile() {
+  console.log('Browse UberASM file');
+  // TODO: Open file picker via IPC
 }
 
 // Right-side panels state and helpers
@@ -827,5 +1107,26 @@ button { padding: 6px 10px; }
 .btn-mini { padding: 2px 6px; font-size: 12px; margin: 0 2px; }
 .data-table tbody tr[draggable="true"] { cursor: move; }
 .data-table tbody tr.dragging { opacity: 0.5; background: #e0e7ff; }
+
+/* Settings Modal */
+.settings-modal { width: 800px; max-width: 95vw; }
+.settings-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
+.settings-section { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+.settings-section:last-child { border-bottom: none; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.setting-label { flex: 0 0 280px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.status-icon { color: #10b981; font-weight: bold; font-size: 18px; width: 20px; }
+.setting-control { flex: 1; display: flex; gap: 8px; align-items: center; }
+.setting-control input[type="text"], .setting-control select { flex: 1; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 4px; }
+.setting-caption { font-size: 12px; color: #6b7280; margin-top: 4px; margin-left: 300px; line-height: 1.5; }
+.setting-caption.warning { color: #d97706; }
+.setting-caption code { background: #f3f4f6; padding: 2px 4px; border-radius: 2px; font-size: 11px; }
+.setting-caption a { color: #3b82f6; text-decoration: none; }
+.setting-caption a:hover { text-decoration: underline; }
+.drop-zone { flex: 1; border: 2px dashed #d1d5db; border-radius: 4px; padding: 12px; text-align: center; color: #6b7280; background: #f9fafb; cursor: pointer; transition: all 0.2s; }
+.drop-zone:hover { border-color: #3b82f6; background: #eff6ff; color: #3b82f6; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb; }
+.btn-primary { padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
+.btn-primary:hover { background: #2563eb; }
 </style>
 
