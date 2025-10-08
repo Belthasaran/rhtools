@@ -248,7 +248,7 @@
             <tbody>
               <tr v-for="(entry, idx) in runEntries" :key="entry.key">
                 <td class="col-check">
-                  <input type="checkbox" v-model="runEntryCheckedRecord[entry.key]" />
+                  <input type="checkbox" :checked="checkedRun.has(entry.key)" @change="toggleRunEntrySelection(entry.key, $event)" />
                 </td>
                 <td>{{ entry.id }}</td>
                 <td>
@@ -547,19 +547,6 @@ const runModalOpen = ref(false);
 const runEntries = reactive<RunEntry[]>([]);
 const checkedRun = ref<Set<string>>(new Set());
 
-const runEntryCheckedRecord = computed<Record<string, boolean>>({
-  get() {
-    const rec: Record<string, boolean> = {};
-    for (const e of runEntries) rec[e.key] = checkedRun.value.has(e.key);
-    return rec;
-  },
-  set(next) {
-    const s = new Set<string>();
-    for (const [k, v] of Object.entries(next)) if (v) s.add(k);
-    checkedRun.value = s;
-  },
-});
-
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
 
@@ -590,6 +577,15 @@ function removeCheckedRun() {
   const keep = runEntries.filter((e) => !checkedRun.value.has(e.key));
   runEntries.splice(0, runEntries.length, ...keep);
   checkedRun.value.clear();
+}
+
+function toggleRunEntrySelection(key: string, e: Event) {
+  const checked = (e.target as HTMLInputElement).checked;
+  if (checked) {
+    checkedRun.value.add(key);
+  } else {
+    checkedRun.value.delete(key);
+  }
 }
 
 const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '', count: 1 as number | null, seed: '' });
