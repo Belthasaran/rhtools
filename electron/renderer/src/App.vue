@@ -14,6 +14,7 @@
 
         <button @click="checkAllVisible" :disabled="filteredItems.length === 0">Check all</button>
         <button @click="uncheckAll">Uncheck all</button>
+        <button @click="checkRandom" :disabled="filteredItems.length === 0">Check random</button>
         <button @click="addSelectedToRun" :disabled="numChecked === 0">Add to Run</button>
         <button @click="hideChecked" :disabled="numChecked === 0">Hide checked</button>
         <button @click="unhideChecked" :disabled="numChecked === 0">Unhide checked</button>
@@ -447,6 +448,14 @@ function checkAllVisible() {
 
 function uncheckAll() {
   selectedIds.value.clear();
+}
+
+function checkRandom() {
+  if (filteredItems.value.length === 0) return;
+  const randomIndex = Math.floor(Math.random() * filteredItems.value.length);
+  const randomItem = filteredItems.value[randomIndex];
+  selectedIds.value.clear();
+  selectedIds.value.add(randomItem.Id);
 }
 
 function hideChecked() {
