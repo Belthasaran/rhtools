@@ -14,6 +14,7 @@
 
         <button @click="checkAllVisible" :disabled="filteredItems.length === 0">Check all</button>
         <button @click="uncheckAll">Uncheck all</button>
+        <button @click="addSelectedToRun" :disabled="numChecked === 0">Add to Run</button>
         <button @click="hideChecked" :disabled="numChecked === 0">Hide checked</button>
         <button @click="unhideChecked" :disabled="numChecked === 0">Unhide checked</button>
 
@@ -51,6 +52,7 @@
               <th class="col-check">
                 <input type="checkbox" :checked="allVisibleChecked" @change="toggleCheckAll($event)" />
               </th>
+              <th>Action</th>
               <th>Id</th>
               <th>Name</th>
               <th>Type</th>
@@ -73,8 +75,9 @@
               <td class="col-check">
                 <input type="checkbox" :checked="selectedIds.has(row.Id)" @change="toggleMainSelection(row.Id, $event)" @click.stop />
               </td>
+              <td class="action">{{ isInRun(row.Id) ? '*' : '' }}</td>
               <td>{{ row.Id }}</td>
-              <td class="name">{{ row.Name }}</td>
+              <td class="name" :class="{ 'in-run': isInRun(row.Id) }">{{ row.Name }}</td>
               <td>{{ row.Type }}</td>
               <td>{{ row.Author }}</td>
               <td>{{ row.Length }}</td>
@@ -85,7 +88,7 @@
               <td class="notes">{{ row.Mynotes ?? '' }}</td>
             </tr>
             <tr v-if="filteredItems.length === 0">
-              <td class="empty" colspan="11">No items match your filters.</td>
+              <td class="empty" colspan="12">No items match your filters.</td>
             </tr>
           </tbody>
         </table>
@@ -379,6 +382,41 @@ function toggleMainSelection(id: string, e: Event) {
   }
 }
 
+function isInRun(gameId: string): boolean {
+  return runEntries.some(entry => entry.entryType === 'game' && entry.id === gameId);
+}
+
+function addSelectedToRun() {
+  const selectedGames = items.filter(item => selectedIds.value.has(item.Id));
+  let addedCount = 0;
+  
+  for (const game of selectedGames) {
+    // Skip if already in run
+    if (isInRun(game.Id)) continue;
+    
+    const key = `game-${game.Id}-${Date.now()}`;
+    runEntries.push({
+      key,
+      id: game.Id,
+      entryType: 'game',
+      name: game.Name,
+      stageNumber: '',
+      stageName: '',
+      count: 1,
+      filterDifficulty: '',
+      filterType: '',
+      filterPattern: '',
+      seed: Math.random().toString(36).slice(2, 10),
+    });
+    addedCount++;
+  }
+  
+  // Uncheck all games after adding
+  selectedIds.value.clear();
+  
+  console.log(`Added ${addedCount} games to run`);
+}
+
 function clearFilters() {
   searchQuery.value = '';
   hideFinished.value = false;
@@ -635,7 +673,9 @@ html, body, #app { height: 100%; margin: 0; }
 .data-table tbody td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 .data-table tbody tr:hover { background: #fafafa; }
 .data-table .col-check { width: 36px; text-align: center; }
+.data-table .action { width: 40px; text-align: center; font-weight: bold; }
 .data-table .name { font-weight: 600; }
+.data-table .name.in-run { font-weight: 700; }
 .data-table .notes { color: #374151; }
 .data-table tbody tr.hidden { opacity: 0.6; }
 .data-table tbody tr.finished .name { text-decoration: line-through; color: #6b7280; }
