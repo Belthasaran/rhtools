@@ -1064,7 +1064,7 @@ html, body, #app { height: 100%; margin: 0; }
 .kv-table td { padding: 6px; }
 .kv-table input[type="text"], .kv-table input[type="number"], .kv-table textarea, .kv-table select { width: 100%; box-sizing: border-box; padding: 6px; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.data-table thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 1; text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+.data-table thead th { position: sticky; top: 0; background: #f3f4f6; z-index: 10; text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
 .data-table tbody td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
 .data-table tbody tr:hover { background: #fafafa; }
 .data-table .col-check { width: 36px; text-align: center; }
@@ -1079,7 +1079,7 @@ html, body, #app { height: 100%; margin: 0; }
 button { padding: 6px 10px; }
 
 /* Modal */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal { width: 1200px; max-width: 98vw; max-height: 90vh; background: #fff; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb; }
 .modal-header-actions { display: flex; gap: 8px; align-items: center; }

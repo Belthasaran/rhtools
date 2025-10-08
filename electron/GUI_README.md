@@ -15,7 +15,7 @@ Purpose: Primary controls for filtering, selection, and bulk operations
 
 #### Left Controls Section
 - **Open settings** button
-  - Purpose: Opens settings dialog (placeholder)
+  - Purpose: Opens Settings modal dialog
   
 - **Search/filter** text input
   - Purpose: Live search/filter of game list by any attribute
@@ -167,6 +167,100 @@ Purpose: Manage individual stages/exits within selected game
 5. **Rating** - Public/community rating
 6. **My notes** - User notes for this stage
 7. **My rating** - User rating for this stage
+
+---
+
+## Settings Modal Dialog
+
+### Modal Structure
+- **Header**
+  - Title: "Settings"
+  - Close (✕) button - Closes modal without saving
+
+### Settings Sections
+
+#### 1. Import required Vanilla SMW ROM
+- **Purpose**: Import the base Super Mario World ROM file required for patching
+- **Controls**:
+  - Drag-and-drop zone for file import
+  - Browse button to open file picker
+- **Validation**: Green checkmark (✓) shown when valid ROM found
+- **Caption**: Legal notice and acceptable file checksums
+  - SHA-224: `fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08`
+  - SHA-1: `6b47bb75d16514b6a476aa0c73a683a2a4c18765`
+  - MD5: `cdd3c8c37322978ca8669b34bc89c804`
+
+#### 2. Import FLIPS executable
+- **Purpose**: Import Floating IPS patcher for applying patches
+- **Controls**: Drag-and-drop zone + Browse button
+- **Validation**: Green checkmark (✓) when found
+- **Link**: https://www.gamebrew.org/wiki/Floating_IPS
+
+#### 3. Game launch method
+- **Purpose**: Choose how games are launched
+- **Options**:
+  - Launch Manually
+  - Run Launch Program
+  - Launch from USB2Snes
+
+#### 4. Launch Program
+- **Purpose**: Path to external launch program
+- **Type**: Text input
+- **Default**: Empty
+
+#### 5. Launch Program Arguments
+- **Purpose**: Command-line arguments for launch program
+- **Type**: Text input
+- **Default**: `%file` (placeholder for ROM file path)
+
+#### 6. USB2snes Websocket address
+- **Purpose**: WebSocket URL for USB2SNES server connection
+- **Type**: Text input
+- **Default**: `ws://localhost:64213`
+- **Warning**: Requires USB2SNES server running (https://usb2snes.com/)
+
+#### 7. USB2SNES Enabled
+- **Purpose**: Enable/disable USB2SNES functionality
+- **Options**: Yes, No
+- **Default**: No
+
+#### 8. USB2SNES Launch Preference
+- **Purpose**: Control how games are launched via USB2SNES
+- **Options**:
+  - Launch Automatically
+  - Manual Launch (Do nothing)
+  - Manual Launch (Reset console)
+- **Default**: Launch Automatically
+
+#### 9. USB2SNES Upload Preference
+- **Purpose**: Control file upload behavior to console
+- **Options**:
+  - Manual Transfer (do not upload)
+  - Check first and Upload
+  - Always Upload
+- **Default**: Manual Transfer
+
+#### 10. USB2SNES Upload Directory
+- **Purpose**: Target directory on console for uploads
+- **Type**: Text input
+- **Default**: `/work`
+
+#### 11. Import ASAR executable
+- **Purpose**: Import ASAR assembler for custom ASM patches
+- **Controls**: Drag-and-drop zone + Browse button
+- **Validation**: Green checkmark (✓) when found
+- **Link**: https://smwc.me/s/37443
+
+#### 12. Import UberASM executable
+- **Purpose**: Import UberASM tool for level-specific code
+- **Controls**: Drag-and-drop zone + Browse button
+- **Validation**: Green checkmark (✓) when found
+- **Link**: https://smwc.me/s/39036
+
+### Footer
+- **Save Changes and Close** button
+  - Purpose: Saves all settings and closes modal
+  - Style: Primary blue button
 
 ---
 
@@ -355,6 +449,22 @@ Purpose: Manage individual stages/exits within selected game
 - `hideFinished`: Boolean toggle
 - `selectedStageIds`: Set of selected stage keys
 
+### Settings Modal State
+- `settingsModalOpen`: Boolean visibility flag
+- `settings`: Object containing all configuration values
+  - `vanillaRomValid`: Boolean - ROM file validation status
+  - `flipsValid`: Boolean - FLIPS executable validation status
+  - `asarValid`: Boolean - ASAR executable validation status
+  - `uberAsmValid`: Boolean - UberASM executable validation status
+  - `launchMethod`: 'manual' | 'program' | 'usb2snes'
+  - `launchProgram`: String - Path to launch program
+  - `launchProgramArgs`: String - Launch arguments (default: '%file')
+  - `usb2snesAddress`: String - WebSocket URL (default: 'ws://localhost:64213')
+  - `usb2snesEnabled`: 'yes' | 'no'
+  - `usb2snesLaunchPref`: 'auto' | 'manual' | 'reset'
+  - `usb2snesUploadPref`: 'manual' | 'check' | 'always'
+  - `usb2snesUploadDir`: String - Upload directory (default: '/work')
+
 ### Run Modal State
 - `runModalOpen`: Boolean visibility flag
 - `runEntries`: Array of run entries (ordered)
@@ -421,8 +531,11 @@ Purpose: Manage individual stages/exits within selected game
 
 ## Version Notes
 - Current implementation uses demo/mock data
-- Backend integration (IPC) is placeholder
+- Backend integration (IPC) is placeholder for:
+  - File import and validation (ROM, FLIPS, ASAR, UberASM)
+  - Settings persistence
+  - Game launching
+  - USB2SNES communication
 - "Start" functionality not yet implemented
-- Settings dialog not yet implemented
 - Stage and Save/Upload actions are placeholders
 
