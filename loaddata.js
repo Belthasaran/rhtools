@@ -84,23 +84,54 @@ function findChangedAttributes(prevRecord, newRecord) {
   if (!prevRecord) return null;
   
   const changed = [];
-  const allKeys = new Set([...Object.keys(prevRecord), ...Object.keys(newRecord)]);
   
-  // Exclude meta fields from comparison
-  const excludeFields = [
-    'gvuuid', 'version', 'gvjsondata', 'gvchange_attributes', 
-    'gvchanges', 'gvimport_time', 'removed', 'obsoleted'
+  // Fields to compare (actual gameversions table fields)
+  const compareFields = [
+    'section', 'gametype', 'name', 'time', 'added', 'moderated', 
+    'author', 'authors', 'submitter', 'demo', 'featured', 'length', 
+    'difficulty', 'url', 'download_url', 'name_href', 'author_href', 
+    'obsoleted_by', 'patchblob1_name', 'pat_sha224', 'size', 
+    'description', 'tags', 'tags_href'
   ];
   
-  allKeys.forEach(key => {
-    if (excludeFields.includes(key)) return;
+  // Normalize new record values
+  const normalizedNew = {
+    gametype: newRecord.type || newRecord.gametype,
+    name: newRecord.name,
+    author: newRecord.author,
+    authors: newRecord.authors,
+    demo: newRecord.demo,
+    length: newRecord.length,
+    difficulty: newRecord.difficulty,
+    url: newRecord.url,
+    download_url: newRecord.download_url,
+    description: newRecord.description,
+    patchblob1_name: newRecord.patchblob1_name,
+    pat_sha224: newRecord.pat_sha224,
+    size: newRecord.size,
+    section: newRecord.section,
+    time: newRecord.time,
+    added: newRecord.added,
+    moderated: newRecord.moderated,
+    submitter: newRecord.submitter,
+    featured: newRecord.featured,
+    name_href: newRecord.name_href,
+    author_href: newRecord.author_href,
+    obsoleted_by: newRecord.obsoleted_by,
+    tags: Array.isArray(newRecord.tags) ? JSON.stringify(newRecord.tags) : newRecord.tags,
+    tags_href: newRecord.tags_href
+  };
+  
+  compareFields.forEach(field => {
+    const prevVal = prevRecord[field];
+    const newVal = normalizedNew[field];
     
-    const prevVal = prevRecord[key];
-    const newVal = newRecord[key];
+    // Normalize for comparison (treat undefined/null/empty as equivalent)
+    const prevNorm = (prevVal === null || prevVal === undefined || prevVal === '') ? null : prevVal;
+    const newNorm = (newVal === null || newVal === undefined || newVal === '') ? null : newVal;
     
-    // Compare values (handle null/undefined)
-    if (JSON.stringify(prevVal) !== JSON.stringify(newVal)) {
-      changed.push(key);
+    if (JSON.stringify(prevNorm) !== JSON.stringify(newNorm)) {
+      changed.push(field);
     }
   });
   
