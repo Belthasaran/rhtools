@@ -5,10 +5,12 @@
     "renderer:dev": "npm --prefix electron/renderer run dev",
     "renderer:build": "npm --prefix electron/renderer run build",
     "app:dev": "run-p renderer:dev electron:start",
-    "app:build": "npm run renderer:build"
+    "app:build": "npm run renderer:build",
+    "loaddata": "node loaddata.js"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
     "fernet": "^0.3.2",
     "lzma-native": "^8.0.6",
     "node-liblzma": "^1.1.9",
