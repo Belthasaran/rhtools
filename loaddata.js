@@ -1,5 +1,32 @@
 #!/usr/bin/env node
 
+/**
+ * loaddata.js - Load JSON game data into the rhdata.db SQLite database
+ * 
+ * Usage:
+ *   node loaddata.js <json-file>
+ *   npm run loaddata <json-file>
+ * 
+ * Examples:
+ *   node loaddata.js electron/example-rhmd/10012
+ *   node loaddata.js mydata.json
+ * 
+ * Features:
+ * - Supports single JSON objects or arrays of objects
+ * - Inserts records into gameversions, rhpatches, and patchblobs tables
+ * - Automatically tracks version numbers for each gameid
+ * - Detects and skips duplicate records
+ * - Tracks changed attributes between versions
+ * - Stores optimized JSON in gvjsondata and pbjsondata fields
+ * 
+ * Input JSON structure:
+ * - Each record can be a single object or an array of objects
+ * - Required fields: id (or gameid), name
+ * - Optional fields map to gameversions table columns
+ * - If patchblob1_name, patchblob1_key, and patchblob1_sha224 exist, creates patchblob entry
+ * - If patch field exists, creates rhpatches entry
+ */
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

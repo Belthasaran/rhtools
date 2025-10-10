@@ -22,6 +22,7 @@ CREATE TABLE gameversions (
   name_href varchar(255),
   author_href varchar(255),
   obsoleted_by varchar(255),
+  patchblob1_name varchar(255),
   pat_sha224 varchar(255),
   size varchar(255),
   description text,

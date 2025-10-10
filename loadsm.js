@@ -224,12 +224,29 @@ async function decompressLZMA(buffer) {
 
 async function getHackPatchBlob(hackinfo) 
 {  //  Object.keys(b.xdata).filter(x => x.match('^patchblob.*_name'))
-   blob_namekeys = Object.keys(hackinfo.xdata).filter(x => x.match('^patchblob1_name'))
+   blob_namekeys = []
+
+   if (hackinfo.xdata) {
+       blob_namekeys = Object.keys(hackinfo.xdata).filter(x => x.match('^patchblob1_name'))
+   }
+
+   if (blob_namekeys.length == 0) {
+	      blob_namekeys = Object.keys(hackinfo).filter(x => x.match('^patchblob1_name'))
+
+   }
+
    if (blob_namekeys.length == 1) {
+	   if (hackinfo.xdata && hackinfo.xdata.patchblob1_name) {
 	   pblob_name = hackinfo.xdata.patchblob1_name
 	   pblob_key  = hackinfo.xdata.patchblob1_key
 	   pblob_kn   = hackinfo.xdata.patchblob1_kn
 	   pblob_sha224 = hackinfo.xdata.patchblob1_sha224
+	   } else {
+		   pblob_name = hackinfo.patchblob1_name
+           pblob_key  = hackinfo.patchblob1_key
+           pblob_kn   = hackinfo.patchblob1_kn
+           pblob_sha224 = hackinfo.patchblob1_sha224
+	   }
 
 	   /*blobinfo = {
 		   // patchblob1_url:
