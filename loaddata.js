@@ -137,10 +137,14 @@ function insertGameVersion(db, record) {
   const prevVersion = getPreviousVersion(db, gameid);
   const changedAttributes = findChangedAttributes(prevVersion, record);
   
+  // Calculate next version number
+  const nextVersion = prevVersion ? (prevVersion.version || 0) + 1 : 1;
+  
   // Prepare data for insertion
   const data = {
     gvuuid: generateUUID(),
     gameid: gameid,
+    version: nextVersion,
     section: record.section,
     gametype: record.type || record.gametype,
     name: record.name,
