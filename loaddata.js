@@ -2,7 +2,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const Database = require('better-sqlite3');
+
+/**
+ * Generate a UUID v4
+ */
+function generateUUID() {
+  return crypto.randomUUID();
+}
 
 // Database path
 const DB_PATH = path.join(__dirname, 'electron', 'rhdata.db');
@@ -39,16 +47,20 @@ function isDuplicate(db, record) {
   const params = {};
   
   DUPLICATE_CHECK_FIELDS.forEach(field => {
-    if (record[field] !== undefined) {
+    if (record[field] !== undefined && record[field] !== null) {
       whereClauses.push(`${field} = @${field}`);
       params[field] = record[field];
     } else {
-      whereClauses.push(`${field} IS NULL`);
+      whereClauses.push(`(${field} IS NULL OR ${field} = '')`);
     }
   });
   
   const query = `SELECT COUNT(*) as count FROM gameversions WHERE ${whereClauses.join(' AND ')}`;
+  // Debug: uncomment to see the query
+  // console.log('Duplicate check query:', query);
+  // console.log('Params:', params);
   const result = db.prepare(query).get(params);
+  // console.log('Duplicate check result:', result);
   return result.count > 0;
 }
 
@@ -108,8 +120,15 @@ function optimizeJSON(obj) {
 function insertGameVersion(db, record) {
   const gameid = record.gameid || record.id;
   
+  // Normalize the record for duplicate checking
+  const normalizedRecord = {
+    ...record,
+    gameid: gameid,
+    gametype: record.type || record.gametype
+  };
+  
   // Check for duplicates
-  if (isDuplicate(db, { ...record, gameid })) {
+  if (isDuplicate(db, normalizedRecord)) {
     console.log(`Skipping duplicate record: ${gameid} - ${record.name}`);
     return null;
   }
@@ -120,6 +139,7 @@ function insertGameVersion(db, record) {
   
   // Prepare data for insertion
   const data = {
+    gvuuid: generateUUID(),
     gameid: gameid,
     section: record.section,
     gametype: record.type || record.gametype,
@@ -139,6 +159,7 @@ function insertGameVersion(db, record) {
     name_href: record.name_href,
     author_href: record.author_href,
     obsoleted_by: record.obsoleted_by,
+    patchblob1_name: record.patchblob1_name,
     pat_sha224: record.pat_sha224,
     size: record.size,
     description: record.description,
@@ -167,12 +188,9 @@ function insertGameVersion(db, record) {
   `;
   
   const result = db.prepare(query).run(values);
-  console.log(`Inserted gameversion: ${gameid} - ${record.name} (rowid: ${result.lastInsertRowid})`);
+  console.log(`Inserted gameversion: ${gameid} - ${record.name} (gvuuid: ${data.gvuuid})`);
   
-  // Get the gvuuid of the inserted record
-  const insertedRecord = db.prepare('SELECT gvuuid FROM gameversions WHERE rowid = ?').get(result.lastInsertRowid);
-  
-  return insertedRecord.gvuuid;
+  return data.gvuuid;
 }
 
 /**
@@ -183,12 +201,16 @@ function insertRhPatch(db, gameid, patchName) {
   
   try {
     const query = `
-      INSERT INTO rhpatches (gameid, patch_name) 
-      VALUES (@gameid, @patch_name)
+      INSERT INTO rhpatches (rhpuuid, gameid, patch_name) 
+      VALUES (@rhpuuid, @gameid, @patch_name)
       ON CONFLICT(patch_name) DO NOTHING
     `;
     
-    db.prepare(query).run({ gameid, patch_name: patchName });
+    db.prepare(query).run({ 
+      rhpuuid: generateUUID(),
+      gameid, 
+      patch_name: patchName 
+    });
     console.log(`  - Inserted rhpatch: ${patchName}`);
   } catch (error) {
     console.log(`  - Skipped rhpatch (already exists): ${patchName}`);
@@ -204,6 +226,7 @@ function insertPatchBlob(db, gvuuid, record) {
   }
   
   const data = {
+    pbuuid: generateUUID(),
     gvuuid: gvuuid,
     patch_name: record.patch,
     pat_sha1: record.pat_sha1,
@@ -304,6 +327,9 @@ function main() {
   
   // Open database
   const db = new Database(DB_PATH);
+  
+  // Enable foreign keys (but we'll handle the constraints manually if needed)
+  db.pragma('foreign_keys = OFF');
   
   try {
     // Process data (single object or array)
