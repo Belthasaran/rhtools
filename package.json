@@ -26,7 +26,11 @@
     "mdserver:create-signer": "node mdserver/create_signer.js",
     "mdserver:sign-metadata": "node mdserver/sign_metadata.js",
     "mdserver:migrate-signatures": "node mdserver/migrate_signatures.js",
-    "mdserver:cleanup-signatures": "node mdserver/cleanup_signatures.js"
+    "mdserver:cleanup-signatures": "node mdserver/cleanup_signatures.js",
+    "client:migrate-apiserver": "node electron/migrate_apiservers.js",
+    "client:add-apiserver": "node electron/manage_apiserver.js add",
+    "client:list-apiservers": "node electron/manage_apiserver.js list",
+    "client:test-apiserver": "node electron/manage_apiserver.js test"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",

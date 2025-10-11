@@ -422,6 +422,34 @@ async function initializeIPFSGateways(customGateways, db = null) {
 }
 
 /**
+ * Generate alternate CID formats for IPFS search
+ * Converts between dag-pb (bafy) and raw (bafk) formats
+ */
+function getAlternateCIDs(cid) {
+  if (!cid) return [];
+  
+  const alternates = [cid]; // Always include original
+  
+  // Convert between bafy (dag-pb) and bafk (raw) formats
+  // These represent the same content but with different IPFS wrapping
+  // Format: base + version + codec + hash
+  //   bafy + be + hash (dag-pb, codec 0x70)
+  //   bafk + re + hash (raw, codec 0x55)
+  
+  if (cid.startsWith('bafybe')) {
+    // dag-pb → raw: bafybeXXX... → bafkreXXX...
+    const rawCid = 'bafkre' + cid.substring(6);
+    alternates.unshift(rawCid);
+  } else if (cid.startsWith('bafkre')) {
+    // raw → dag-pb: bafkreXXX... → bafybeXXX...
+    const dagPbCid = 'bafybe' + cid.substring(6);
+    alternates.unshift(dagPbCid);
+  }
+  
+  return alternates;
+}
+
+/**
  * Search IPFS using CIDs with multiple gateways
  */
 async function searchIPFS(attachment, options, verifiedGateways) {
@@ -437,44 +465,58 @@ async function searchIPFS(attachment, options, verifiedGateways) {
     return null;
   }
   
-  const cid = attachment.file_ipfs_cidv1 || attachment.file_ipfs_cidv0;
+  const primaryCid = attachment.file_ipfs_cidv1 || attachment.file_ipfs_cidv0;
   
-  // Try each gateway
-  for (let i = 0; i < verifiedGateways.length; i++) {
-    const gateway = verifiedGateways[i];
+  // Generate list of CIDs to try (original + alternates)
+  const cidsToTry = getAlternateCIDs(primaryCid);
+  
+  if (cidsToTry.length > 1) {
+    console.log(`    ⓘ Will try ${cidsToTry.length} CID formats (dag-pb/raw variants)`);
+  }
+  
+  // Try each CID format
+  for (const cid of cidsToTry) {
+    console.log(`    Trying CID: ${cid.substring(0, 20)}...`);
     
-    try {
-      const url = buildGatewayURL(gateway, cid);
-      console.log(`    Trying gateway ${i+1}/${verifiedGateways.length}: ${url}`);
+    // Try each gateway for this CID
+    for (let i = 0; i < verifiedGateways.length; i++) {
+      const gateway = verifiedGateways[i];
       
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(90000) // 30 second timeout
-      });
-      
-      if (!response.ok) {
-        console.log(`      HTTP ${response.status}`);
-        continue; // Try next gateway
+      try {
+        const url = buildGatewayURL(gateway, cid);
+        console.log(`      Gateway ${i+1}/${verifiedGateways.length}: ${gateway.substring(0, 30)}...`);
+        
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
+        
+        if (!response.ok) {
+          console.log(`        HTTP ${response.status}`);
+          continue; // Try next gateway
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const fileData = Buffer.from(arrayBuffer);
+        
+        const verification = verifyFileData(fileData, attachment);
+        if (verification.verified) {
+          console.log(`    ✓ Found via IPFS`);
+          console.log(`      CID: ${cid}`);
+          console.log(`      Gateway: ${gateway}`);
+          console.log(`      Verified with ${verification.method}`);
+          return { data: fileData, source: `ipfs:${cid}@${gateway}` };
+        } else {
+          console.log(`        Hash mismatch`);
+          continue; // Try next gateway
+        }
+      } catch (error) {
+        console.log(`        Error: ${error.message}`);
+        // Try next gateway
       }
-      
-      const arrayBuffer = await response.arrayBuffer();
-      const fileData = Buffer.from(arrayBuffer);
-      
-      const verification = verifyFileData(fileData, attachment);
-      if (verification.verified) {
-        console.log(`    ✓ Found via IPFS (gateway: ${gateway})`);
-        console.log(`      Verified with ${verification.method}`);
-        return { data: fileData, source: `ipfs:${cid}@${gateway}` };
-      } else {
-        console.log(`      Hash mismatch`);
-        continue; // Try next gateway
-      }
-    } catch (error) {
-      console.log(`      Error: ${error.message}`);
-      // Try next gateway
     }
   }
   
-  console.log(`    ✗ File not found on any IPFS gateway`);
+  console.log(`    ✗ File not found on any IPFS gateway (tried ${cidsToTry.length} CID format(s))`);
   return null;
 }
 
