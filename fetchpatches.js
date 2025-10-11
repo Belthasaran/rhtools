@@ -28,6 +28,58 @@ const PATCHBIN_DB_PATH = path.join(__dirname, 'electron', 'patchbin.db');
 const DEFAULT_GATEWAY = 'https://arweave.net:443';
 const PUBLIC_FOLDER_ID = '07b13d74-e426-4012-8c6d-cba0927012fb';
 
+// Default parameters for remote fetching
+const DEFAULT_FETCH_LIMIT = 20;
+const DEFAULT_FETCH_DELAY = 2000; // milliseconds
+const MIN_FETCH_DELAY = 500; // minimum 500ms to avoid server overload
+
+/**
+ * Sleep for specified milliseconds
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Parse command line arguments for fetch parameters
+ */
+function parseArguments(args) {
+  const params = {
+    mode: null,
+    fetchLimit: DEFAULT_FETCH_LIMIT,
+    fetchDelay: DEFAULT_FETCH_DELAY,
+    extraArgs: []
+  };
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg.startsWith('--fetchlimit=')) {
+      const value = parseInt(arg.split('=')[1], 10);
+      if (isNaN(value) || value < 1) {
+        console.error(`Invalid fetchlimit value: ${arg.split('=')[1]}`);
+        console.error('fetchlimit must be a positive integer');
+        process.exit(1);
+      }
+      params.fetchLimit = value;
+    } else if (arg.startsWith('--fetchdelay=')) {
+      const value = parseInt(arg.split('=')[1], 10);
+      if (isNaN(value) || value < MIN_FETCH_DELAY) {
+        console.error(`Invalid fetchdelay value: ${arg.split('=')[1]}`);
+        console.error(`fetchdelay must be at least ${MIN_FETCH_DELAY}ms`);
+        process.exit(1);
+      }
+      params.fetchDelay = value;
+    } else if (i === 0) {
+      params.mode = arg.toLowerCase();
+    } else {
+      params.extraArgs.push(arg);
+    }
+  }
+  
+  return params;
+}
+
 /**
  * Initialize ArDrive anonymous client
  */
@@ -183,10 +235,14 @@ function matchFileToAttachment(ardriveFile, attachments) {
 /**
  * Mode 1: Populate ArDrive metadata for attachments with missing ArDrive info
  */
-async function mode1_populateArDriveMetadata() {
+async function mode1_populateArDriveMetadata(fetchLimit = DEFAULT_FETCH_LIMIT, fetchDelay = DEFAULT_FETCH_DELAY) {
   console.log('='.repeat(70));
   console.log('MODE 1: Populate ArDrive Metadata');
   console.log('='.repeat(70));
+  console.log();
+  console.log(`Configuration:`);
+  console.log(`  Fetch Limit: ${fetchLimit} attachments per run`);
+  console.log(`  Fetch Delay: ${fetchDelay}ms between each attachment`);
   console.log();
   
   // Check if databases exist
@@ -232,6 +288,7 @@ async function mode1_populateArDriveMetadata() {
     console.log('\n' + '='.repeat(70));
     console.log('Processing attachments...\n');
     
+    let processed = 0;
     let matched = 0;
     let verified = 0;
     let updated = 0;
@@ -251,8 +308,19 @@ async function mode1_populateArDriveMetadata() {
         continue;
       }
       
+      // Check if we've reached the fetch limit
+      if (processed >= fetchLimit) {
+        console.log(`\n⚠ Reached fetch limit of ${fetchLimit} attachments`);
+        console.log(`  Stopping to avoid server overload`);
+        console.log(`  Run the script again to process more attachments`);
+        break;
+      }
+      
       matched++;
-      console.log(`\n[${matched}] Matched: ${ardriveFile.name}`);
+      processed++;
+      
+      const remaining = fetchLimit - processed;
+      console.log(`\n[${processed}/${fetchLimit}] Matched: ${ardriveFile.name} (${remaining} remaining)`);
       console.log(`  ArDrive Path: ${ardriveFile.path}`);
       console.log(`  File ID: ${ardriveFile.entityId}`);
       console.log(`  Attachment: ${attachment.file_name} (auuid: ${attachment.auuid})`);
@@ -312,17 +380,29 @@ async function mode1_populateArDriveMetadata() {
         console.error(`  Attachment: ${attachment.file_name}, auuid: ${attachment.auuid}`);
         failed++;
       }
+      
+      // Add delay between processing attachments (if not the last one)
+      if (processed < fetchLimit && remaining > 0) {
+        console.log(`  ⏱ Waiting ${fetchDelay}ms before next download...`);
+        await sleep(fetchDelay);
+      }
     }
     
     // Summary
     console.log('\n' + '='.repeat(70));
     console.log('\nSummary:');
-    console.log(`  Total attachments checked: ${attachments.length}`);
-    console.log(`  Files matched by name:     ${matched}`);
-    console.log(`  Files verified by hash:    ${verified}`);
-    console.log(`  Records updated:           ${updated}`);
-    console.log(`  Failed:                    ${failed}`);
-    console.log(`  Still missing metadata:    ${attachments.length - updated}`);
+    console.log(`  Total attachments needing metadata: ${attachments.length}`);
+    console.log(`  Attachments processed this run:     ${processed}`);
+    console.log(`  Files matched by name:              ${matched}`);
+    console.log(`  Files verified by hash:             ${verified}`);
+    console.log(`  Records updated:                    ${updated}`);
+    console.log(`  Failed:                             ${failed}`);
+    console.log(`  Still missing metadata:             ${attachments.length - updated}`);
+    
+    if (processed >= fetchLimit && attachments.length > updated) {
+      console.log('\n💡 Tip: Run the script again to process more attachments');
+      console.log(`   ${attachments.length - updated} attachments still need metadata`);
+    }
     
   } catch (error) {
     console.error('\nFatal error:', error);
@@ -335,11 +415,16 @@ async function mode1_populateArDriveMetadata() {
 /**
  * Mode 2: Find and download missing attachment data (placeholder)
  */
-async function mode2_findAttachmentData() {
+async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchDelay = DEFAULT_FETCH_DELAY) {
   console.log('='.repeat(70));
   console.log('MODE 2: Find Attachment Data');
   console.log('='.repeat(70));
-  console.log('\n⚠ Mode 2 not yet implemented');
+  console.log();
+  console.log(`Configuration:`);
+  console.log(`  Fetch Limit: ${fetchLimit} attachments per run`);
+  console.log(`  Fetch Delay: ${fetchDelay}ms between each attachment`);
+  console.log();
+  console.log('⚠ Mode 2 not yet implemented');
   console.log('This mode will search for and download missing file_data');
   console.log('from local filesystem, ArDrive, and IPFS.\n');
 }
@@ -365,30 +450,46 @@ async function main() {
   if (args.length === 0) {
     console.log('fetchpatches.js - Fetch and manage patch attachments\n');
     console.log('Usage:');
-    console.log('  node fetchpatches.js mode1          # Populate ArDrive metadata');
-    console.log('  node fetchpatches.js mode2          # Find missing attachment data');
-    console.log('  node fetchpatches.js mode3 [args]   # Retrieve specific attachment');
+    console.log('  node fetchpatches.js mode1 [options]          # Populate ArDrive metadata');
+    console.log('  node fetchpatches.js mode2 [options]          # Find missing attachment data');
+    console.log('  node fetchpatches.js mode3 [args]             # Retrieve specific attachment');
+    console.log();
+    console.log('Options for modes that query remote servers (mode1, mode2):');
+    console.log(`  --fetchlimit=N    Limit number of attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
+    console.log(`  --fetchdelay=MS   Delay in milliseconds between downloads (default: ${DEFAULT_FETCH_DELAY}ms, min: ${MIN_FETCH_DELAY}ms)`);
+    console.log();
+    console.log('Examples:');
+    console.log('  node fetchpatches.js mode1');
+    console.log('  node fetchpatches.js mode1 --fetchlimit=50 --fetchdelay=1000');
+    console.log('  node fetchpatches.js mode1 --fetchlimit=100');
     console.log();
     process.exit(0);
   }
   
-  const mode = args[0].toLowerCase();
+  // Parse arguments
+  const params = parseArguments(args);
   
-  switch (mode) {
+  if (!params.mode) {
+    console.error('Error: No mode specified');
+    console.error('Valid modes: mode1, mode2, mode3');
+    process.exit(1);
+  }
+  
+  switch (params.mode) {
     case 'mode1':
-      await mode1_populateArDriveMetadata();
+      await mode1_populateArDriveMetadata(params.fetchLimit, params.fetchDelay);
       break;
     
     case 'mode2':
-      await mode2_findAttachmentData();
+      await mode2_findAttachmentData(params.fetchLimit, params.fetchDelay);
       break;
     
     case 'mode3':
-      await mode3_retrieveAttachment(args.slice(1));
+      await mode3_retrieveAttachment(params.extraArgs);
       break;
     
     default:
-      console.error(`Unknown mode: ${mode}`);
+      console.error(`Unknown mode: ${params.mode}`);
       console.error('Valid modes: mode1, mode2, mode3');
       process.exit(1);
   }
