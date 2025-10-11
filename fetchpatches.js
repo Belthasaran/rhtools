@@ -30,7 +30,7 @@ const PUBLIC_FOLDER_ID = '07b13d74-e426-4012-8c6d-cba0927012fb';
 
 // Default parameters for remote fetching
 const DEFAULT_FETCH_LIMIT = 20;
-const DEFAULT_FETCH_DELAY = 1000; // milliseconds
+const DEFAULT_FETCH_DELAY = 100; // milliseconds
 const MIN_FETCH_DELAY = 500; // minimum 500ms to avoid server overload
 
 /**
