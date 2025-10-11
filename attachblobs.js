@@ -328,7 +328,7 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
     const placeholders = fields.map(f => `@${f}`);
     
     const query = `
-      INSERT INTO attachments (${fields.join(', ')}) 
+      REPLACE INTO attachments (${fields.join(', ')}) 
       VALUES (${placeholders.join(', ')})
     `;
     

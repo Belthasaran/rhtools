@@ -30,7 +30,7 @@ const PUBLIC_FOLDER_ID = '07b13d74-e426-4012-8c6d-cba0927012fb';
 
 // Default parameters for remote fetching
 const DEFAULT_FETCH_LIMIT = 20;
-const DEFAULT_FETCH_DELAY = 100; // milliseconds
+const DEFAULT_FETCH_DELAY = 1000; // milliseconds
 const MIN_FETCH_DELAY = 500; // minimum 500ms to avoid server overload
 
 /**
@@ -413,20 +413,213 @@ async function mode1_populateArDriveMetadata(fetchLimit = DEFAULT_FETCH_LIMIT, f
 }
 
 /**
- * Mode 2: Find and download missing attachment data (placeholder)
+ * Mode 2: Find and download missing attachment data
  */
-async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchDelay = DEFAULT_FETCH_DELAY) {
+async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchDelay = DEFAULT_FETCH_DELAY, extraArgs = []) {
+  // Load Mode 2 implementation
+  const mode2 = require('./fetchpatches_mode2');
+  
   console.log('='.repeat(70));
   console.log('MODE 2: Find Attachment Data');
   console.log('='.repeat(70));
   console.log();
+  
+  // Parse Mode 2 specific options
+  const searchOptions = mode2.parseMode2Arguments(extraArgs);
+  
   console.log(`Configuration:`);
-  console.log(`  Fetch Limit: ${fetchLimit} attachments per run`);
+  console.log(`  Search Max: ${searchOptions.searchMax} attachments per run`);
   console.log(`  Fetch Delay: ${fetchDelay}ms between each attachment`);
+  console.log(`  Max File Size: ${(searchOptions.maxFileSize / (1024 * 1024)).toFixed(0)}MB`);
   console.log();
-  console.log('⚠ Mode 2 not yet implemented');
-  console.log('This mode will search for and download missing file_data');
-  console.log('from local filesystem, ArDrive, and IPFS.\n');
+  console.log(`Search Options:`);
+  console.log(`  Local Search: ${searchOptions.searchLocal ? 'Yes' : 'No'}`);
+  if (searchOptions.searchLocalPaths.length > 0) {
+    console.log(`  Local Paths: ${searchOptions.searchLocalPaths.join(', ')}`);
+  }
+  console.log(`  ArDrive: ${searchOptions.searchArDrive ? 'Yes' : 'No'}`);
+  console.log(`  IPFS: ${searchOptions.searchIPFS ? 'Yes' : 'No'}`);
+  console.log(`  Download URLs: ${searchOptions.searchDownload ? 'Yes' : 'No'}`);
+  console.log(`  Ignore Filename: ${searchOptions.ignoreFilename ? 'Yes' : 'No'}`);
+  console.log();
+  
+  // Check if database exists
+  if (!fs.existsSync(PATCHBIN_DB_PATH)) {
+    console.error(`Error: patchbin.db not found at ${PATCHBIN_DB_PATH}`);
+    process.exit(1);
+  }
+  
+  // Open database
+  const db = new Database(PATCHBIN_DB_PATH);
+  
+  try {
+    // Initialize ArDrive if needed
+    let arDrive = null;
+    if (searchOptions.searchArDrive || searchOptions.searchAllArDrive) {
+      console.log('Initializing ArDrive client...');
+      arDrive = initArDrive();
+    }
+    
+    // Query attachments needing file_data
+    console.log('Querying attachments with missing file_data...');
+    const query = `
+      SELECT auuid, pbuuid, gvuuid, resuuid,
+             file_name, file_size,
+             file_hash_sha224, file_hash_sha256,
+             file_ipfs_cidv0, file_ipfs_cidv1,
+             arweave_file_name, arweave_file_id, arweave_file_path,
+             download_urls, last_search
+      FROM attachments
+      WHERE file_data IS NULL
+        AND (file_hash_sha224 IS NOT NULL OR file_hash_sha256 IS NOT NULL)
+        AND file_size IS NOT NULL
+      ORDER BY last_search ASC NULLS FIRST
+      LIMIT ?
+    `;
+    
+    const attachments = db.prepare(query).all(searchOptions.searchMax);
+    console.log(`Found ${attachments.length} attachments needing file_data\n`);
+    
+    if (attachments.length === 0) {
+      console.log('✓ No attachments need file_data!\n');
+      return;
+    }
+    
+    console.log('='.repeat(70));
+    console.log('Processing attachments...\n');
+    
+    let processed = 0;
+    let found = 0;
+    let updated = 0;
+    let notFound = 0;
+    
+    // Prepare database statements
+    const updateDataStmt = db.prepare(`
+      UPDATE attachments
+      SET file_data = ?,
+          updated_time = CURRENT_TIMESTAMP,
+          last_search = CURRENT_TIMESTAMP
+      WHERE auuid = ?
+    `);
+    
+    const updateSearchStmt = db.prepare(`
+      UPDATE attachments
+      SET last_search = CURRENT_TIMESTAMP
+      WHERE auuid = ?
+    `);
+    
+    // Build search paths
+    const searchPaths = [...mode2.DEFAULT_SEARCH_PATHS];
+    if (searchOptions.searchLocalPaths.length > 0) {
+      searchPaths.push(...searchOptions.searchLocalPaths);
+    }
+    
+    // Process each attachment
+    for (const attachment of attachments) {
+      processed++;
+      const remaining = searchOptions.searchMax - processed;
+      
+      console.log(`[${processed}/${searchOptions.searchMax}] ${attachment.file_name} (${remaining} remaining)`);
+      console.log(`  auuid: ${attachment.auuid}`);
+      console.log(`  size: ${attachment.file_size} bytes`);
+      console.log(`  hashes: SHA256=${attachment.file_hash_sha256 ? 'yes' : 'no'}, SHA224=${attachment.file_hash_sha224 ? 'yes' : 'no'}`);
+      
+      let result = null;
+      
+      // Try each search option in order
+      try {
+        // Option A & B: Local search
+        if ((searchOptions.searchLocal || searchOptions.searchLocalPaths.length > 0) && !result) {
+          result = await mode2.searchLocal(attachment, searchPaths, searchOptions);
+        }
+        
+        // Option C: ArDrive
+        if (searchOptions.searchArDrive && !result && arDrive) {
+          result = await mode2.searchArDrive(attachment, arDrive, searchOptions);
+        }
+        
+        // Option D: IPFS
+        if (searchOptions.searchIPFS && !result) {
+          result = await mode2.searchIPFS(attachment, searchOptions);
+        }
+        
+        // Option F: Download URLs
+        if (searchOptions.searchDownload && !result) {
+          result = await mode2.searchDownloadUrls(attachment, searchOptions);
+        }
+        
+        // If found, update database
+        if (result) {
+          console.log(`  ✓ Found file data from: ${result.source}`);
+          console.log(`    Size: ${result.data.length} bytes`);
+          
+          try {
+            updateDataStmt.run(result.data, attachment.auuid);
+            console.log(`  ✓ Updated database record\n`);
+            found++;
+            updated++;
+          } catch (error) {
+            console.error(`  ✗ Database update error: ${error.message}\n`);
+          }
+        } else {
+          console.log(`  ✗ File not found in any source`);
+          
+          try {
+            updateSearchStmt.run(attachment.auuid);
+            console.log(`  ⏱ Updated last_search timestamp\n`);
+            notFound++;
+          } catch (error) {
+            console.error(`  ✗ Database update error: ${error.message}\n`);
+          }
+        }
+        
+      } catch (error) {
+        console.error(`  ✗ Error: ${error.message}\n`);
+        // Update last_search anyway
+        try {
+          updateSearchStmt.run(attachment.auuid);
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
+      // Add delay between processing
+      if (processed < searchOptions.searchMax && remaining > 0) {
+        console.log(`  ⏱ Waiting ${fetchDelay}ms before next search...`);
+        await sleep(fetchDelay);
+      }
+    }
+    
+    // Summary
+    console.log('='.repeat(70));
+    console.log('\nSummary:');
+    console.log(`  Total attachments checked:     ${processed}`);
+    console.log(`  Files found and verified:      ${found}`);
+    console.log(`  Records updated with data:     ${updated}`);
+    console.log(`  Files not found:               ${notFound}`);
+    
+    // Check remaining
+    const remainingQuery = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM attachments 
+      WHERE file_data IS NULL 
+        AND (file_hash_sha224 IS NOT NULL OR file_hash_sha256 IS NOT NULL)
+        AND file_size IS NOT NULL
+    `).get();
+    
+    console.log(`  Still missing file_data:       ${remainingQuery.count}`);
+    
+    if (remainingQuery.count > 0) {
+      console.log('\n💡 Tip: Run the script again to process more attachments');
+      console.log(`   Consider adding more search options: --searchipfs, --searchardrive, --download`);
+    }
+    
+  } catch (error) {
+    console.error('\nFatal error:', error);
+    throw error;
+  } finally {
+    db.close();
+  }
 }
 
 /**
@@ -570,14 +763,30 @@ async function main() {
     console.log('  node fetchpatches.js mode3 [args]             # Retrieve specific attachment');
     console.log('  node fetchpatches.js addsizes                 # Populate file_size from file_data');
     console.log();
-    console.log('Options for modes that query remote servers (mode1, mode2):');
-    console.log(`  --fetchlimit=N    Limit number of attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
-    console.log(`  --fetchdelay=MS   Delay in milliseconds between downloads (default: ${DEFAULT_FETCH_DELAY}ms, min: ${MIN_FETCH_DELAY}ms)`);
+    console.log('General Options (mode1, mode2):');
+    console.log(`  --fetchlimit=N    Limit attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
+    console.log(`  --fetchdelay=MS   Delay between downloads (default: ${DEFAULT_FETCH_DELAY}ms, min: ${MIN_FETCH_DELAY}ms)`);
+    console.log();
+    console.log('Mode 2 Options:');
+    console.log('  --searchmax=N              Max attachments to search (default: 20)');
+    console.log('  --maxfilesize=SIZE         Max file size to download (default: 200MB)');
+    console.log('  --nosearchlocal            Disable default local search');
+    console.log('  --searchlocalpath=PATH     Add local search path (can repeat)');
+    console.log('  --searchardrive            Search ArDrive by ID/name/path');
+    console.log('  --searchipfs               Search IPFS using CIDs');
+    console.log('  --ipfsgateway=URL          IPFS gateway URL (default: https://ipfs.io)');
+    console.log('  --download                 Search download_urls from database');
+    console.log('  --ignorefilename           Search all files by hash only');
+    console.log('  --allardrive               Broader ArDrive search');
+    console.log('  --apisearch                Use private API search');
+    console.log('  --apiurl=URL               API endpoint URL');
     console.log();
     console.log('Examples:');
     console.log('  node fetchpatches.js mode1');
-    console.log('  node fetchpatches.js mode1 --fetchlimit=50 --fetchdelay=1000');
-    console.log('  node fetchpatches.js mode1 --fetchlimit=100');
+    console.log('  node fetchpatches.js mode1 --fetchlimit=50');
+    console.log('  node fetchpatches.js mode2');
+    console.log('  node fetchpatches.js mode2 --searchmax=10 --searchipfs');
+    console.log('  node fetchpatches.js mode2 --searchlocalpath=../backup --download');
     console.log('  node fetchpatches.js addsizes');
     console.log();
     process.exit(0);
@@ -598,7 +807,7 @@ async function main() {
       break;
     
     case 'mode2':
-      await mode2_findAttachmentData(params.fetchLimit, params.fetchDelay);
+      await mode2_findAttachmentData(params.fetchLimit, params.fetchDelay, params.extraArgs);
       break;
     
     case 'mode3':
