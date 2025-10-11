@@ -460,6 +460,23 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
       arDrive = initArDrive();
     }
     
+    // Initialize and verify IPFS gateways if IPFS search is enabled
+    let verifiedIPFSGateways = [];
+    if (searchOptions.searchIPFS) {
+      console.log('\nInitializing IPFS gateways...');
+      verifiedIPFSGateways = await mode2.initializeIPFSGateways(
+        searchOptions.ipfsGateways,
+        db
+      );
+      
+      if (verifiedIPFSGateways.length === 0) {
+        console.log('  ⚠ No working IPFS gateways available');
+        console.log('  IPFS search will be skipped');
+        searchOptions.searchIPFS = false;
+      }
+      console.log();
+    }
+    
     // Query attachments needing file_data
     console.log('Querying attachments with missing file_data...');
     const query = `
@@ -540,7 +557,7 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
         
         // Option D: IPFS
         if (searchOptions.searchIPFS && !result) {
-          result = await mode2.searchIPFS(attachment, searchOptions);
+          result = await mode2.searchIPFS(attachment, searchOptions, verifiedIPFSGateways);
         }
         
         // Option F: Download URLs
@@ -774,7 +791,7 @@ async function main() {
     console.log('  --searchlocalpath=PATH     Add local search path (can repeat)');
     console.log('  --searchardrive            Search ArDrive by ID/name/path');
     console.log('  --searchipfs               Search IPFS using CIDs');
-    console.log('  --ipfsgateway=URL          IPFS gateway URL (default: https://ipfs.io)');
+    console.log('  --ipfsgateway=URL          IPFS gateway URL (can repeat, supports %CID%)');
     console.log('  --download                 Search download_urls from database');
     console.log('  --ignorefilename           Search all files by hash only');
     console.log('  --allardrive               Broader ArDrive search');
@@ -787,6 +804,8 @@ async function main() {
     console.log('  node fetchpatches.js mode2');
     console.log('  node fetchpatches.js mode2 --searchmax=10 --searchipfs');
     console.log('  node fetchpatches.js mode2 --searchlocalpath=../backup --download');
+    console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://ipfs.io/ipfs/%CID%');
+    console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://gateway1.com --ipfsgateway=https://gateway2.com');
     console.log('  node fetchpatches.js addsizes');
     console.log();
     process.exit(0);

@@ -12,7 +12,10 @@
     "fetchpatches:mode1": "node fetchpatches.js mode1",
     "fetchpatches:mode2": "node fetchpatches.js mode2",
     "fetchpatches:mode3": "node fetchpatches.js mode3",
-    "fetchpatches:addsizes": "node fetchpatches.js addsizes"
+    "fetchpatches:addsizes": "node fetchpatches.js addsizes",
+    "migrate:ipfsgateways": "node migrate_ipfsgateways.js",
+    "update:ipfsgateways": "node update_ipfs_gateways.js",
+    "test:mode2": "cd tests && node test_mode2.js"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",

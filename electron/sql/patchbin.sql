@@ -10,9 +10,11 @@ CREATE TABLE signers (
 CREATE TABLE ipfsgateways (
 	gwuuid varchar(255),
 	url varchar(255),
+	priority INTEGER DEFAULT 100,
 	notworking_timestamp TIMESTAMP,
 	lastsuccess_timesteamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	error text,
+	notes text,
 	PRIMARY KEY(gwuuid),
 	UNIQUE(url)
 );
