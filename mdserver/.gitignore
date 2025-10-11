@@ -1,0 +1,17 @@
+# Sensitive files
+admin_credentials.txt
+*_credentials.txt
+environment
+
+# Databases (contain user data)
+mdserverdata.db
+rhdata.db
+patchbin.db
+
+# Backups
+*.db-*
+*.bak
+
+# Logs
+*.log
+logs/
