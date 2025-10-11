@@ -280,6 +280,13 @@ async function mode1_populateArDriveMetadata() {
       
       // Update database with ArDrive metadata
       try {
+        // Convert values to strings and handle potential undefined/null
+        // This ensures SQLite compatibility (only accepts strings, numbers, buffers, null)
+        const arweaveName = String(ardriveFile.name || '');
+        const arweaveId = String(ardriveFile.entityId || '');
+        const arweavePath = String(ardriveFile.path || '');
+        const auuid = String(attachment.auuid || '');
+        
         const updateQuery = `
           UPDATE attachments
           SET arweave_file_name = ?,
@@ -290,10 +297,10 @@ async function mode1_populateArDriveMetadata() {
         `;
         
         db.prepare(updateQuery).run(
-          ardriveFile.name,
-          ardriveFile.entityId,
-          ardriveFile.path,
-          attachment.auuid
+          arweaveName,
+          arweaveId,
+          arweavePath,
+          auuid
         );
         
         console.log(`  ✓ Updated database record`);
@@ -301,6 +308,8 @@ async function mode1_populateArDriveMetadata() {
         
       } catch (error) {
         console.error(`  ✗ Database update error: ${error.message}`);
+        console.error(`  ArDrive file: ${ardriveFile.name}, ID: ${ardriveFile.entityId}`);
+        console.error(`  Attachment: ${attachment.file_name}, auuid: ${attachment.auuid}`);
         failed++;
       }
     }
