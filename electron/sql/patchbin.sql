@@ -7,6 +7,16 @@ CREATE TABLE signers (
 	primary key(signeruuid)
 );
 
+CREATE TABLE ipfsgateways (
+	gwuuid varchar(255),
+	url varchar(255),
+	notworking_timestamp TIMESTAMP,
+	lastsuccess_timesteamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	error text,
+	PRIMARY KEY(gwuuid),
+	UNIQUE(url)
+);
+
 CREATE TABLE donotsearch (
 	entryuuid varchar(255),
         url varchar(255),
