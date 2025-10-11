@@ -32,6 +32,7 @@ CREATE TABLE gameversions (
   tags text,
   tags_href text,
   gvimport_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  siglistuuid varchar(255),
   UNIQUE(gameid, version)
   );
 
@@ -44,6 +45,7 @@ CREATE TABLE rhpatches (
         rhpuuid varchar(255) primary key DEFAULT (uuid()),
         gameid varchar(255) references gameversions (gameid),
         patch_name varchar(255),
+        siglistuuid varchar(255),
 	UNIQUE(patch_name)
 );
 
@@ -64,6 +66,7 @@ CREATE TABLE patchblobs (
    pbjsondata text,
    pblobdata blob,
    pbimport_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+   siglistuuid varchar(255),
    UNIQUE(patchblob1_name)
 );
 

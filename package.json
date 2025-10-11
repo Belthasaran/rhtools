@@ -15,7 +15,12 @@
     "fetchpatches:addsizes": "node fetchpatches.js addsizes",
     "migrate:ipfsgateways": "node migrate_ipfsgateways.js",
     "update:ipfsgateways": "node update_ipfs_gateways.js",
-    "test:mode2": "cd tests && node test_mode2.js"
+    "test:mode2": "cd tests && node test_mode2.js",
+    "mdserver:start": "node mdserver/server.js",
+    "mdserver:create-client": "node mdserver/create_client.js",
+    "mdserver:setup": "node mdserver/setup.js",
+    "mdserver:create-signer": "node mdserver/create_signer.js",
+    "mdserver:sign-metadata": "node mdserver/sign_metadata.js"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
@@ -24,6 +29,8 @@
     "better-sqlite3": "^11.0.0",
     "crc": "^4.3.2",
     "crc-32": "^1.2.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
     "fernet": "^0.3.2",
     "lzma-native": "^8.0.6",
     "multiformats": "^9.9.0",

@@ -132,6 +132,52 @@ For production:
   5. Add rate limiting
 
 ================================================================================
+SERVER RESPONSE SIGNING (OPTIONAL)
+================================================================================
+
+To enable digital signatures on server responses:
+
+Step 1: Create Server Signer
+  cd mdserver
+  node create_signer.js
+  
+  Select type: 2 (server)
+  Enter name: "Production Server Signer"
+  Select algorithm: 1 (ED25519 recommended)
+
+Step 2: Add to Environment File
+  The create_signer.js tool will output the configuration.
+  Add to mdserver/environment:
+  
+  SERVER_SIGNER_UUID=<generated-uuid>
+  SERVER_SIGNER_ALGORITHM=ED25519
+  SERVER_PRIVATE_KEY_HEX=<generated-hex-key>
+
+Step 3: Restart Server
+  The server will automatically sign all JSON responses with server_signature
+
+Response Format with Signatures:
+  {
+    "data": {...},
+    "mdsignatures": {
+      "siglist-uuid-1": [
+        {
+          "signeruuid": "signer-1",
+          "signature": "hex...",
+          "signer_name": "Metadata Signer",
+          "signed_at": "2025-10-11..."
+        }
+      ]
+    },
+    "server_signature": {
+      "signeruuid": "server-signer-uuid",
+      "signature": "hex...",
+      "algorithm": "ED25519",
+      "hash": "sha256-hex..."
+    }
+  }
+
+================================================================================
 FILES TO READ
 ================================================================================
 

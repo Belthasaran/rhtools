@@ -1,10 +1,27 @@
 CREATE TABLE signers (
 	signeruuid varchar(255),
 	signer_name varchar(255),
+	signertype varchar(255),
 	publickey_type varchar(255) DEFAULT 'ED25519',
 	hashtype varchar(255) DEFAULT 'SHA256',
 	publickey varchar(255) NOT NULL,
 	primary key(signeruuid)
+);
+
+CREATE TABLE signaturelists(
+	siglistuuid varchar(255),
+	primary key(siglistuuid)
+);
+
+CREATE table signaturelistentries (
+	siglistentryuuid varchar(255),
+	siglistuuid varchar(255),
+	signeruuid varchar(255) references signers(signeruuid),
+	hash_type varchar(255),
+	hash_value varchar(255),
+	signature text,
+	primary key(siglistentryuuid),
+	unique(siglistuuid, signeruuid)
 );
 
 CREATE TABLE ipfsgateways (
@@ -34,6 +51,7 @@ CREATE TABLE attachments (
   pbuuid varchar(255),
   gvuuid varchar(255),
   resuuid varchar(255),
+  siglistuuid varchar(255) references signaturelists,
   file_crc16 varchar(255) NOT NULL,
   file_crc32 varchar(255) NOT NULL,
   locators text,

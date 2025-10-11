@@ -3,6 +3,12 @@ admin_credentials.txt
 *_credentials.txt
 environment
 
+# Signer key files (NEVER commit private keys!)
+signer_*.txt
+*_signer_*.txt
+*.pem
+*.key
+
 # Databases (contain user data)
 mdserverdata.db
 rhdata.db
@@ -15,3 +21,4 @@ patchbin.db
 # Logs
 *.log
 logs/
+server.log

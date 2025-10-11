@@ -21,10 +21,29 @@ require('dotenv').config({ path: path.join(__dirname, 'environment') });
 const app = express();
 const PORT = process.env.PORT || 3000;
 const VAULT_KEY = process.env.VAULT_KEY;
+const SERVER_SIGNER_UUID = process.env.SERVER_SIGNER_UUID;
+const SERVER_SIGNER_ALGORITHM = process.env.SERVER_SIGNER_ALGORITHM || 'ED25519';
+const SERVER_PRIVATE_KEY_HEX = process.env.SERVER_PRIVATE_KEY_HEX;
 
 if (!VAULT_KEY || VAULT_KEY.length !== 64) {
   console.error('Error: VAULT_KEY must be a 64-character hex string (256 bits)');
   process.exit(1);
+}
+
+// Server signing key is optional but recommended for production
+let serverPrivateKey = null;
+if (SERVER_PRIVATE_KEY_HEX && SERVER_SIGNER_UUID) {
+  try {
+    const keyBuffer = Buffer.from(SERVER_PRIVATE_KEY_HEX, 'hex');
+    serverPrivateKey = crypto.createPrivateKey({
+      key: keyBuffer,
+      format: 'der',
+      type: 'pkcs8'
+    });
+    console.log('✓ Server signing key loaded');
+  } catch (error) {
+    console.warn('⚠ Failed to load server signing key:', error.message);
+  }
 }
 
 // Database paths
@@ -208,6 +227,98 @@ function logRequest(clientuuid, endpoint, method, statusCode, requestData, respo
   } catch (error) {
     console.error('Logging error:', error);
   }
+}
+
+/**
+ * Load metadata signatures for records
+ */
+function loadMetadataSignatures(records, db) {
+  if (!Array.isArray(records)) {
+    records = [records];
+  }
+  
+  const mdsignatures = {};
+  
+  for (const record of records) {
+    if (!record.siglistuuid) continue;
+    
+    try {
+      const signatures = db.prepare(`
+        SELECT e.signeruuid, e.signature, e.signature_algorithm, e.hash_algorithm, e.signed_at,
+               s.signer_name, s.publickey_type
+        FROM signaturelistentries e
+        JOIN signers s ON e.signeruuid = s.signeruuid
+        WHERE e.siglistuuid = ?
+      `).all(record.siglistuuid);
+      
+      if (signatures.length > 0) {
+        mdsignatures[record.siglistuuid] = signatures;
+      }
+    } catch (error) {
+      // Ignore signature loading errors
+    }
+  }
+  
+  return Object.keys(mdsignatures).length > 0 ? mdsignatures : null;
+}
+
+/**
+ * Sign server response
+ */
+function signResponse(data) {
+  if (!serverPrivateKey || !SERVER_SIGNER_UUID) {
+    return null;
+  }
+  
+  try {
+    const dataString = JSON.stringify(data);
+    const hash = crypto.createHash('sha256').update(dataString).digest();
+    
+    let signature;
+    if (SERVER_SIGNER_ALGORITHM === 'ED25519') {
+      signature = crypto.sign(null, hash, serverPrivateKey);
+    } else if (SERVER_SIGNER_ALGORITHM === 'RSA') {
+      signature = crypto.sign('sha256', hash, {
+        key: serverPrivateKey,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING
+      });
+    } else {
+      return null;
+    }
+    
+    return {
+      signeruuid: SERVER_SIGNER_UUID,
+      signature: signature.toString('hex'),
+      algorithm: SERVER_SIGNER_ALGORITHM,
+      hash: hash.toString('hex')
+    };
+  } catch (error) {
+    console.error('Response signing error:', error);
+    return null;
+  }
+}
+
+/**
+ * Add signatures to response
+ */
+function addSignaturesToResponse(responseData, records, db) {
+  const response = { ...responseData };
+  
+  // Add metadata signatures if available
+  if (records) {
+    const mdsignatures = loadMetadataSignatures(records, db);
+    if (mdsignatures) {
+      response.mdsignatures = mdsignatures;
+    }
+  }
+  
+  // Add server signature
+  const serverSignature = signResponse(responseData);
+  if (serverSignature) {
+    response.server_signature = serverSignature;
+  }
+  
+  return response;
 }
 
 // Middleware
@@ -503,6 +614,11 @@ app.post('/api/search', authenticate, (req, res) => {
       params.push(searchParams.file_ipfs_cidv1);
     }
     
+    if (searchParams.auuid) {
+      query += ' AND auuid = ?';
+      params.push(searchParams.auuid);
+    }
+    
     query += ' LIMIT 10';
     
     const results = patchbinDb.prepare(query).all(...params);
@@ -521,13 +637,20 @@ app.post('/api/search', authenticate, (req, res) => {
     
     if (match.file_data) {
       // Return binary file data
+      // Note: Binary responses are not signed
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('X-File-Name', match.file_name);
       res.setHeader('X-File-Size', match.file_size || match.file_data.length);
+      
+      // Add signature headers if available
+      if (match.siglistuuid) {
+        res.setHeader('X-Signature-List-UUID', match.siglistuuid);
+      }
+      
       res.send(match.file_data);
     } else {
-      // Return metadata with URLs
-      res.json({
+      // Return metadata with URLs and signatures
+      const responseData = {
         found: true,
         data: {
           auuid: match.auuid,
@@ -537,9 +660,14 @@ app.post('/api/search', authenticate, (req, res) => {
           arweave_file_path: match.arweave_file_path,
           file_ipfs_cidv0: match.file_ipfs_cidv0,
           file_ipfs_cidv1: match.file_ipfs_cidv1,
-          download_urls: match.download_urls
+          download_urls: match.download_urls,
+          siglistuuid: match.siglistuuid
         }
-      });
+      };
+      
+      // Add signatures to response
+      const signedResponse = addSignaturesToResponse(responseData, match, patchbinDb);
+      res.json(signedResponse);
     }
   } catch (error) {
     console.error('Error:', error);
