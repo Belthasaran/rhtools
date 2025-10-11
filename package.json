@@ -6,15 +6,23 @@
     "renderer:build": "npm --prefix electron/renderer run build",
     "app:dev": "run-p renderer:dev electron:start",
     "app:build": "npm run renderer:build",
-    "loaddata": "node loaddata.js"
+    "loaddata": "node loaddata.js",
+    "attachblobs": "node attachblobs.js",
+    "fetchpatches": "node fetchpatches.js",
+    "fetchpatches:mode1": "node fetchpatches.js mode1",
+    "fetchpatches:mode2": "node fetchpatches.js mode2",
+    "fetchpatches:mode3": "node fetchpatches.js mode3"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
     "ardrive-cli": "^3.0.3",
     "ardrive-core-js": "^3.0.3",
     "better-sqlite3": "^11.0.0",
+    "crc": "^4.3.2",
+    "crc-32": "^1.2.2",
     "fernet": "^0.3.2",
     "lzma-native": "^8.0.6",
+    "multiformats": "^9.9.0",
     "node-jose": "^2.2.0",
     "node-liblzma": "^1.1.9",
     "urlsafe-base64": "^1.0.0"

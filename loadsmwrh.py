@@ -353,7 +353,7 @@ def save_hacklist_data(newhacklist,filename=None,docompress=True):
 
      listfile = open(filename+".new", 'w')
      if docompress:
-        listfile.write( '*' + ( bytearray(frn.encrypt(comp.compress(json.dumps(newhacklist)))) ).decode() )
+        listfile.write( '*' + ( bytearray(frn.encrypt( comp.compress(json.dumps(newhacklist)))) ).decode() )
      else: 
         listfile.write( base64.encodebytes( bytearray(json.dumps(newhacklist),'utf8') ).decode() )
 

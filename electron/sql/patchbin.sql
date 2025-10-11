@@ -23,6 +23,10 @@ CREATE TABLE attachments (
   decoded_hash_sha256 varchar(255) NOT NULL,
   updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   import_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  download_urls varchar(255),
+  arweave_file_name varchar(255),
+  arweave_file_id varchar(255),
+  arweave_file_path varchar(255),
   file_data blob,
   UNIQUE(file_name,file_hash_sha224)
 )
