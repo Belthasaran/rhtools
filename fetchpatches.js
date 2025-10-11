@@ -705,22 +705,47 @@ function calculateShake128Filename(data) {
  */
 function parseMode3Arguments(args) {
   const options = {
-    searchBy: null,  // gameid, file_name, gvuuid, pbuuid, patch_name
+    searchBy: null,  // gameid, file_name, gvuuid, pbuuid, patch_name (legacy single search)
     searchValue: null,
+    searchCriteria: [],  // Array of {type, value, exact, regex} for multiple -b options
     queryType: null,  // rawpblob, patch, gameversions
     outputType: null,  // print, file
     outputFile: null,
-    multiple: false,  // For gameversions query
+    outputFormat: null,  // json, binary, list (for -ot/--output-type)
+    versions: false,  // Include all versions (renamed from multiple)
+    multi: null,  // Return all entries but only highest version per gameid (null = auto-detect)
+    noMulti: false,  // Explicitly restrict to one gameid
+    matchVersion: 'latest',  // all, first, latest, previous
     mode2Options: []  // Options to pass to mode2 if needed
   };
+  
+  let nextIsExact = false;
+  let nextIsRegex = false;
   
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     
     if (arg === '-b' && i + 1 < args.length) {
-      options.searchBy = args[++i];
-    } else if (arg.startsWith('--by=')) {
-      options.searchBy = arg.split('=')[1];
+      // New multi-search syntax: -b TYPE VALUE
+      const type = args[++i];
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        const value = args[++i];
+        options.searchCriteria.push({
+          type: type,
+          value: value,
+          exact: nextIsExact,
+          regex: nextIsRegex
+        });
+        nextIsExact = false;
+        nextIsRegex = false;
+      } else {
+        console.error(`Error: -b ${type} requires a value`);
+        process.exit(1);
+      }
+    } else if (arg.startsWith('--b=')) {
+      // Legacy syntax: --b=TYPE (value expected as next positional arg)
+      const type = arg.split('=')[1];
+      options.searchBy = type;
     } else if (arg === '-q' && i + 1 < args.length) {
       options.queryType = args[++i];
     } else if (arg.startsWith('--query=')) {
@@ -733,11 +758,54 @@ function parseMode3Arguments(args) {
     } else if (arg.startsWith('--output=')) {
       options.outputType = 'file';
       options.outputFile = arg.split('=')[1];
-    } else if (arg === '--multiple') {
-      options.multiple = true;
-    } else if (!options.searchValue) {
-      // First non-option argument is the search value
+    } else if (arg === '--exact') {
+      nextIsExact = true;
+    } else if (arg === '--regex') {
+      nextIsRegex = true;
+    } else if (arg === '--multiple' || arg === '--versions') {
+      options.versions = true;
+    } else if (arg === '--multi') {
+      options.multi = true;
+    } else if (arg === '--nomulti') {
+      options.noMulti = true;
+      options.multi = false;
+    } else if (arg === '-ot' && i + 1 < args.length) {
+      const format = args[++i];
+      if (['json', 'binary', 'list'].includes(format)) {
+        options.outputFormat = format;
+      } else {
+        console.error(`Error: Invalid output format: ${format}`);
+        console.error('Valid formats: json, binary, list');
+        process.exit(1);
+      }
+    } else if (arg.startsWith('--output-type=')) {
+      const format = arg.split('=')[1];
+      if (['json', 'binary', 'list'].includes(format)) {
+        options.outputFormat = format;
+      } else {
+        console.error(`Error: Invalid output format: ${format}`);
+        console.error('Valid formats: json, binary, list');
+        process.exit(1);
+      }
+    } else if (arg.startsWith('--matchversion=')) {
+      const value = arg.split('=')[1];
+      if (['all', 'first', 'latest', 'previous'].includes(value)) {
+        options.matchVersion = value;
+      } else {
+        console.error(`Error: Invalid --matchversion value: ${value}`);
+        console.error('Valid values: all, first, latest, previous');
+        process.exit(1);
+      }
+    } else if (!options.searchValue && options.searchCriteria.length === 0 && !arg.startsWith('-')) {
+      // First non-option argument is the search value (legacy mode)
       options.searchValue = arg;
+    } else if (!arg.startsWith('-')) {
+      // Additional positional args for mode2 or legacy search value
+      if (options.searchBy && !options.searchValue) {
+        options.searchValue = arg;
+      } else {
+        options.mode2Options.push(arg);
+      }
     } else {
       // Collect remaining arguments for potential mode2 search
       options.mode2Options.push(arg);
@@ -745,15 +813,273 @@ function parseMode3Arguments(args) {
   }
   
   // Set defaults
-  if (!options.searchBy) {
-    options.searchBy = 'file_name';  // Default search by file_name
-  }
-  
   if (!options.queryType) {
     options.queryType = 'gameversions';  // Default query type
   }
   
+  // Legacy compatibility: convert old searchBy/searchValue to new searchCriteria
+  if (options.searchBy && options.searchValue && options.searchCriteria.length === 0) {
+    options.searchCriteria.push({
+      type: options.searchBy,
+      value: options.searchValue,
+      exact: false,
+      regex: false
+    });
+  }
+  
+  // Set default search if none provided
+  if (options.searchCriteria.length === 0) {
+    if (options.searchValue) {
+      options.searchCriteria.push({
+        type: 'file_name',
+        value: options.searchValue,
+        exact: false,
+        regex: false
+      });
+    }
+  }
+  
+  // Determine if this is an attribute search or direct ID search
+  const directIdSearchTypes = ['gameid', 'gvuuid', 'pbuuid', 'file_name'];
+  const hasDirectIdSearch = options.searchCriteria.some(c => directIdSearchTypes.includes(c.type));
+  const hasAttributeSearch = options.searchCriteria.some(c => !directIdSearchTypes.includes(c.type));
+  
+  // Set multi default based on search type (if not explicitly set)
+  if (options.multi === null && !options.noMulti) {
+    if (hasAttributeSearch && options.queryType === 'gameversions') {
+      // Attribute searches default to multi mode
+      options.multi = true;
+    } else {
+      options.multi = false;
+    }
+  }
+  
+  // Apply noMulti override
+  if (options.noMulti) {
+    options.multi = false;
+  }
+  
+  // Set output format defaults
+  if (!options.outputFormat) {
+    if (options.queryType === 'gameversions') {
+      // For gameversions queries
+      if (hasAttributeSearch && options.multi) {
+        // Attribute searches with multi default to list format
+        options.outputFormat = 'list';
+      } else {
+        // Direct ID searches default to json
+        options.outputFormat = 'json';
+      }
+    } else {
+      // For rawpblob and patch queries, default to binary
+      options.outputFormat = 'binary';
+    }
+  }
+  
   return options;
+}
+
+/**
+ * Format gameversions results as a list (similar to python3 search.py)
+ * @param {Array} gameversions - Array of gameversion records
+ * @returns {string} - Formatted list output
+ */
+function formatGameversionsList(gameversions) {
+  if (gameversions.length === 0) {
+    return 'No results found.';
+  }
+  
+  // Calculate column widths
+  const gameidWidth = Math.max(10, ...gameversions.map(gv => (gv.gameid || '').length));
+  const nameWidth = Math.max(30, ...gameversions.map(gv => (gv.name || '').length));
+  const gametypeWidth = Math.max(12, ...gameversions.map(gv => (gv.gametype || '').length));
+  const difficultyWidth = Math.max(12, ...gameversions.map(gv => (gv.difficulty || '').length));
+  
+  // Build header
+  const header = 
+    'Game ID'.padEnd(gameidWidth, ' ') + '  ' +
+    'Name'.padEnd(nameWidth, ' ') + '  ' +
+    'Type'.padEnd(gametypeWidth, ' ') + '  ' +
+    'Difficulty'.padEnd(difficultyWidth, ' ');
+  
+  const separator = '='.repeat(header.length);
+  
+  // Build rows
+  const rows = gameversions.map(gv => {
+    const gameid = (gv.gameid || '').padEnd(gameidWidth, ' ');
+    const name = (gv.name || '').padEnd(nameWidth, ' ');
+    const gametype = (gv.gametype || '').padEnd(gametypeWidth, ' ');
+    const difficulty = (gv.difficulty || '').padEnd(difficultyWidth, ' ');
+    
+    return gameid + '  ' + name + '  ' + gametype + '  ' + difficulty;
+  });
+  
+  // Combine all parts
+  return header + '\n' + separator + '\n' + rows.join('\n');
+}
+
+/**
+ * Match a value against search criteria
+ * @param {string|number} fieldValue - The value from the database field
+ * @param {string} searchValue - The search value
+ * @param {boolean} exact - Whether to do exact matching
+ * @param {boolean} regex - Whether to interpret searchValue as regex
+ * @returns {boolean} - Whether it matches
+ */
+function matchSearchValue(fieldValue, searchValue, exact, regex) {
+  // Handle null/undefined
+  if (fieldValue === null || fieldValue === undefined) {
+    return false;
+  }
+  
+  const fieldStr = String(fieldValue);
+  
+  // Regex matching
+  if (regex) {
+    try {
+      const regexObj = new RegExp(searchValue, 'i');
+      return regexObj.test(fieldStr);
+    } catch (e) {
+      console.error(`Invalid regex pattern: ${searchValue}`);
+      return false;
+    }
+  }
+  
+  // Exact matching
+  if (exact) {
+    return fieldStr.toLowerCase() === searchValue.toLowerCase();
+  }
+  
+  // Check for comparison operators for numbers/dates
+  if (searchValue.startsWith('>') || searchValue.startsWith('<')) {
+    const operator = searchValue[0];
+    const compareValue = searchValue.slice(1).trim();
+    
+    // Try numeric comparison
+    const fieldNum = parseFloat(fieldStr);
+    const compareNum = parseFloat(compareValue);
+    
+    if (!isNaN(fieldNum) && !isNaN(compareNum)) {
+      if (operator === '>') {
+        return fieldNum > compareNum;
+      } else if (operator === '<') {
+        return fieldNum < compareNum;
+      }
+    }
+    
+    // Try date/string comparison
+    if (operator === '>') {
+      return fieldStr > compareValue;
+    } else if (operator === '<') {
+      return fieldStr < compareValue;
+    }
+  }
+  
+  // Fuzzy matching (case-insensitive substring)
+  return fieldStr.toLowerCase().includes(searchValue.toLowerCase());
+}
+
+/**
+ * Check if record matches all search criteria
+ * @param {Object} record - Database record
+ * @param {Array} criteria - Array of search criteria
+ * @returns {boolean} - Whether record matches all criteria
+ */
+function matchesAllCriteria(record, criteria) {
+  for (const criterion of criteria) {
+    const { type, value, exact, regex } = criterion;
+    let matched = false;
+    
+    switch (type) {
+      case 'name':
+        matched = matchSearchValue(record.name, value, exact, regex);
+        break;
+        
+      case 'gametype':
+        matched = matchSearchValue(record.gametype, value, exact, regex);
+        break;
+        
+      case 'authors':
+        // Check both author and authors fields
+        matched = matchSearchValue(record.author, value, exact, regex) ||
+                  matchSearchValue(record.authors, value, exact, regex);
+        break;
+        
+      case 'difficulty':
+        matched = matchSearchValue(record.difficulty, value, exact, regex);
+        break;
+        
+      case 'added':
+        matched = matchSearchValue(record.added, value, exact, regex);
+        break;
+        
+      case 'section':
+        matched = matchSearchValue(record.section, value, exact, regex);
+        break;
+        
+      case 'version':
+        matched = matchSearchValue(record.version, value, exact, regex);
+        break;
+        
+      case 'tags': {
+        // Tags matching: check if all specified tags are in the record's tags
+        if (!record.tags) {
+          matched = false;
+        } else {
+          try {
+            // Parse tags if it's JSON
+            let recordTags = record.tags;
+            if (typeof recordTags === 'string') {
+              try {
+                recordTags = JSON.parse(recordTags);
+              } catch (e) {
+                // Not JSON, treat as plain string
+              }
+            }
+            
+            // Convert to array if needed
+            if (Array.isArray(recordTags)) {
+              // Check if tag is in array
+              matched = recordTags.some(tag => matchSearchValue(tag, value, exact, regex));
+            } else {
+              // Check as string
+              matched = matchSearchValue(recordTags, value, exact, regex);
+            }
+          } catch (e) {
+            matched = false;
+          }
+        }
+        break;
+      }
+      
+      case 'gameid':
+        matched = matchSearchValue(record.gameid, value, exact, regex);
+        break;
+        
+      case 'demo':
+        matched = matchSearchValue(record.demo, value, exact, regex);
+        break;
+        
+      case 'length':
+        matched = matchSearchValue(record.length, value, exact, regex);
+        break;
+        
+      default:
+        // Try to match against the field with same name as type
+        if (record[type] !== undefined) {
+          matched = matchSearchValue(record[type], value, exact, regex);
+        } else {
+          console.error(`Unknown search type: ${type}`);
+          matched = false;
+        }
+    }
+    
+    if (!matched) {
+      return false;  // Must match ALL criteria
+    }
+  }
+  
+  return true;
 }
 
 /**
@@ -770,51 +1096,137 @@ function searchRecords(rhdataDb, patchbinDb, options) {
   };
   
   try {
-    switch (options.searchBy) {
-      case 'gameid': {
-        // Search gameversions by gameid, get highest version
-        if (options.multiple) {
-          results.gameversions = rhdataDb.prepare(`
-            SELECT * FROM gameversions WHERE gameid = ?
-            ORDER BY version DESC
-          `).all(options.searchValue);
+    // Handle new multi-criteria search for gameversions
+    if (options.searchCriteria.length > 0) {
+      // Determine if we're searching gameversions or other tables
+      const hasGameversionsCriteria = options.searchCriteria.some(c => 
+        ['name', 'gametype', 'authors', 'difficulty', 'added', 'section', 'version', 'tags', 'gameid', 'demo', 'length'].includes(c.type)
+      );
+      
+      const hasDirectIdSearch = options.searchCriteria.some(c => 
+        ['gvuuid', 'pbuuid', 'file_name'].includes(c.type)
+      );
+      
+      if (hasDirectIdSearch) {
+        // Handle direct ID lookups
+        for (const criterion of options.searchCriteria) {
+          if (criterion.type === 'gvuuid') {
+            const gv = rhdataDb.prepare(`SELECT * FROM gameversions WHERE gvuuid = ?`).get(criterion.value);
+            if (gv) results.gameversions = [gv];
+          } else if (criterion.type === 'pbuuid') {
+            const pb = patchbinDb.prepare(`SELECT * FROM patchblobs WHERE pbuuid = ?`).get(criterion.value);
+            if (pb) results.patchblobs = [pb];
+          } else if (criterion.type === 'file_name') {
+            const attachments = patchbinDb.prepare(`SELECT * FROM attachments WHERE file_name = ?`).all(criterion.value);
+            results.attachments = attachments;
+          }
+        }
+      } else if (hasGameversionsCriteria) {
+        // Search gameversions with criteria
+        let allGameVersions = rhdataDb.prepare(`SELECT * FROM gameversions`).all();
+        
+        // Filter by criteria
+        const matchingVersions = allGameVersions.filter(gv => matchesAllCriteria(gv, options.searchCriteria));
+        
+        // Apply version filtering based on matchVersion option
+        if (options.matchVersion === 'latest' && !options.versions && !options.multi) {
+          // Group by gameid and keep only highest version
+          const grouped = {};
+          for (const gv of matchingVersions) {
+            if (!grouped[gv.gameid] || gv.version > grouped[gv.gameid].version) {
+              grouped[gv.gameid] = gv;
+            }
+          }
+          results.gameversions = Object.values(grouped);
+        } else if (options.matchVersion === 'first') {
+          // Group by gameid and keep only lowest version
+          const grouped = {};
+          for (const gv of matchingVersions) {
+            if (!grouped[gv.gameid] || gv.version < grouped[gv.gameid].version) {
+              grouped[gv.gameid] = gv;
+            }
+          }
+          results.gameversions = Object.values(grouped);
+        } else if (options.matchVersion === 'previous') {
+          // Group by gameid and keep second highest version
+          const grouped = {};
+          for (const gv of matchingVersions) {
+            if (!grouped[gv.gameid]) {
+              grouped[gv.gameid] = [];
+            }
+            grouped[gv.gameid].push(gv);
+          }
+          
+          for (const gameid in grouped) {
+            grouped[gameid].sort((a, b) => b.version - a.version);
+            if (grouped[gameid].length > 1) {
+              results.gameversions.push(grouped[gameid][1]);  // Second highest
+            } else if (grouped[gameid].length === 1) {
+              results.gameversions.push(grouped[gameid][0]);  // Only one version
+            }
+          }
+        } else if (options.multi) {
+          // Return all matching entries, but only highest version per gameid
+          const grouped = {};
+          for (const gv of matchingVersions) {
+            if (!grouped[gv.gameid] || gv.version > grouped[gv.gameid].version) {
+              grouped[gv.gameid] = gv;
+            }
+          }
+          results.gameversions = Object.values(grouped);
         } else {
+          // Return all matching versions (matchVersion === 'all' or versions === true)
+          results.gameversions = matchingVersions;
+        }
+      }
+    }
+    
+    // Legacy single-criterion search (backward compatibility)
+    else if (options.searchBy) {
+      switch (options.searchBy) {
+        case 'gameid': {
+          if (options.versions) {
+            results.gameversions = rhdataDb.prepare(`
+              SELECT * FROM gameversions WHERE gameid = ?
+              ORDER BY version DESC
+            `).all(options.searchValue);
+          } else {
+            const gv = rhdataDb.prepare(`
+              SELECT * FROM gameversions WHERE gameid = ?
+              ORDER BY version DESC LIMIT 1
+            `).get(options.searchValue);
+            if (gv) results.gameversions = [gv];
+          }
+          break;
+        }
+        
+        case 'gvuuid': {
           const gv = rhdataDb.prepare(`
-            SELECT * FROM gameversions WHERE gameid = ?
-            ORDER BY version DESC LIMIT 1
+            SELECT * FROM gameversions WHERE gvuuid = ?
           `).get(options.searchValue);
           if (gv) results.gameversions = [gv];
+          break;
         }
-        break;
+        
+        case 'pbuuid': {
+          const pb = patchbinDb.prepare(`
+            SELECT * FROM patchblobs WHERE pbuuid = ?
+          `).get(options.searchValue);
+          if (pb) results.patchblobs = [pb];
+          break;
+        }
+        
+        case 'file_name': {
+          const attachments = patchbinDb.prepare(`
+            SELECT * FROM attachments WHERE file_name = ?
+          `).all(options.searchValue);
+          results.attachments = attachments;
+          break;
+        }
+        
+        default:
+          throw new Error(`Unsupported search type: ${options.searchBy}`);
       }
-      
-      case 'gvuuid': {
-        const gv = rhdataDb.prepare(`
-          SELECT * FROM gameversions WHERE gvuuid = ?
-        `).get(options.searchValue);
-        if (gv) results.gameversions = [gv];
-        break;
-      }
-      
-      case 'pbuuid': {
-        const pb = patchbinDb.prepare(`
-          SELECT * FROM patchblobs WHERE pbuuid = ?
-        `).get(options.searchValue);
-        if (pb) results.patchblobs = [pb];
-        break;
-      }
-      
-      case 'file_name': {
-        // Search attachments by file_name
-        const attachments = patchbinDb.prepare(`
-          SELECT * FROM attachments WHERE file_name = ?
-        `).all(options.searchValue);
-        results.attachments = attachments;
-        break;
-      }
-      
-      default:
-        throw new Error(`Unsupported search type: ${options.searchBy}`);
     }
     
     // If we found gameversions, also get related patchblobs and attachments
@@ -883,34 +1295,82 @@ async function mode3_retrieveAttachment(args) {
   // Parse arguments
   const options = parseMode3Arguments(args);
   
-  if (!options.searchValue) {
-    console.error('Error: No search value provided');
+  if (options.searchCriteria.length === 0 && !options.searchValue) {
+    console.error('Error: No search criteria provided');
     console.error('\nUsage:');
-    console.error('  node fetchpatches.js mode3 <search_value> [options]');
-    console.error('\nOptions:');
-    console.error('  -b, --by=TYPE        Search by: gameid, file_name, gvuuid, pbuuid (default: file_name)');
+    console.error('  node fetchpatches.js mode3 -b TYPE VALUE [options]');
+    console.error('\nSearch Options:');
+    console.error('  -b TYPE VALUE        Search by field (can be used multiple times)');
+    console.error('                       Types: name, gametype, authors, difficulty, added,');
+    console.error('                              section, version, tags, gameid, demo, length,');
+    console.error('                              gvuuid, pbuuid, file_name');
+    console.error('  --exact              Use exact matching for next -b (not fuzzy)');
+    console.error('  --regex              Use regex matching for next -b');
+    console.error('\nQuery Options:');
     console.error('  -q, --query=TYPE     Query: rawpblob, patch, gameversions (default: gameversions)');
+    console.error('\nOutput Options:');
     console.error('  -p, --print          Print to stdout');
     console.error('  -o, --output=FILE    Save to file');
-    console.error('  --multiple           Include all versions (for gameversions query)');
+    console.error('  -ot FORMAT           Output format: json, binary, list');
+    console.error('  --output-type=FORMAT (default: list for attribute searches, json for ID searches)');
+    console.error('\nVersion Filtering:');
+    console.error('  --versions           Include all versions for each gameid');
+    console.error('  --multi              Return all entries, highest version per gameid (default for attributes)');
+    console.error('  --nomulti            Restrict results to one gameid');
+    console.error('  --matchversion=TYPE  Version to match: all, first, latest, previous');
     console.error('\nExamples:');
-    console.error('  node fetchpatches.js mode3 "Super Mario World" -b gameid -q gameversions');
-    console.error('  node fetchpatches.js mode3 test.bin -b file_name -q rawpblob -o output.bin');
-    console.error('  node fetchpatches.js mode3 <gvuuid> -b gvuuid -q patch');
+    console.error('  # Basic search');
+    console.error('  node fetchpatches.js mode3 -b gameid "Super Mario World" -q gameversions');
+    console.error('  node fetchpatches.js mode3 -b file_name test.bin -q rawpblob -o output.bin');
+    console.error('');
+    console.error('  # Multi-criteria search');
+    console.error('  node fetchpatches.js mode3 -b demo No -b authors KT --exact -b length "73"');
+    console.error('  node fetchpatches.js mode3 -b added 2024 -b difficulty Hard');
+    console.error('  node fetchpatches.js mode3 -b added ">2023" -b length "<10"');
     process.exit(1);
   }
   
   console.log('Search Configuration:');
-  console.log(`  Search By:    ${options.searchBy}`);
-  console.log(`  Search Value: ${options.searchValue}`);
+  
+  // Display search criteria
+  if (options.searchCriteria.length > 0) {
+    console.log('  Search Criteria:');
+    for (const criterion of options.searchCriteria) {
+      const flags = [];
+      if (criterion.exact) flags.push('exact');
+      if (criterion.regex) flags.push('regex');
+      const flagStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
+      console.log(`    -b ${criterion.type} "${criterion.value}"${flagStr}`);
+    }
+  } else if (options.searchBy) {
+    console.log(`  Search By:    ${options.searchBy}`);
+    console.log(`  Search Value: ${options.searchValue}`);
+  }
+  
   console.log(`  Query Type:   ${options.queryType}`);
   console.log(`  Output:       ${options.outputType || 'auto'}`);
+  console.log(`  Output Format: ${options.outputFormat}`);
+  
   if (options.outputFile) {
     console.log(`  Output File:  ${options.outputFile}`);
   }
-  if (options.multiple) {
-    console.log(`  Multiple:     Yes`);
+  
+  if (options.versions) {
+    console.log(`  Versions:     All versions`);
   }
+  
+  if (options.multi) {
+    console.log(`  Multi:        Highest version per gameid`);
+  }
+  
+  if (options.noMulti) {
+    console.log(`  NoMulti:      Restricted to one gameid`);
+  }
+  
+  if (options.matchVersion !== 'latest') {
+    console.log(`  Match Version: ${options.matchVersion}`);
+  }
+  
   console.log();
   
   // Open databases
@@ -949,9 +1409,14 @@ async function mode3_retrieveAttachment(args) {
     
     switch (options.queryType) {
       case 'gameversions': {
-        // Output gameversions as JSON
+        // Output gameversions based on output format
         isMetadata = true;
-        outputData = JSON.stringify(results.gameversions, null, 2);
+        if (options.outputFormat === 'list') {
+          outputData = formatGameversionsList(results.gameversions);
+        } else {
+          // json format (default for direct ID searches)
+          outputData = JSON.stringify(results.gameversions, null, 2);
+        }
         break;
       }
       
@@ -1355,12 +1820,32 @@ async function main() {
     console.log('  --apisecret=SECRET         API client secret');
     console.log();
     console.log('Mode 3 Options:');
-    console.log('  -b, --by=TYPE        Search by: gameid, file_name, gvuuid, pbuuid (default: file_name)');
-    console.log('  -q, --query=TYPE     Query: rawpblob, patch, gameversions (default: gameversions)');
-    console.log('  -p, --print          Print to stdout');
-    console.log('  -o, --output=FILE    Save to file');
-    console.log('  --multiple           Include all versions (for gameversions query)');
-    console.log('  + Mode 2 options     If file not found, all mode2 options available');
+    console.log('  Search Options:');
+    console.log('    -b TYPE VALUE         Search by field (can be used multiple times)');
+    console.log('                          Types: name, gametype, authors, difficulty, added,');
+    console.log('                                 section, version, tags, gameid, demo, length,');
+    console.log('                                 gvuuid, pbuuid, file_name');
+    console.log('    --exact               Use exact matching for next -b (not fuzzy)');
+    console.log('    --regex               Use regex matching for next -b');
+    console.log('');
+    console.log('  Query Options:');
+    console.log('    -q, --query=TYPE      Query: rawpblob, patch, gameversions (default: gameversions)');
+    console.log('');
+    console.log('  Output Options:');
+    console.log('    -p, --print           Print to stdout');
+    console.log('    -o, --output=FILE     Save to file');
+    console.log('    -ot FORMAT            Output format: json, binary, list');
+    console.log('    --output-type=FORMAT  (default: list for attribute searches, json for ID searches)');
+    console.log('');
+    console.log('  Version Filtering:');
+    console.log('    --versions            Include all versions for each gameid');
+    console.log('    --multi               Return all entries, highest version per gameid');
+    console.log('                          (default for attribute searches)');
+    console.log('    --nomulti             Restrict results to one gameid');
+    console.log('    --matchversion=TYPE   Version to match: all, first, latest, previous');
+    console.log('                          (default: latest)');
+    console.log('');
+    console.log('  + Mode 2 options        If file not found, all mode2 options available');
     console.log();
     console.log('Examples:');
     console.log('  # Mode 1');
@@ -1373,11 +1858,21 @@ async function main() {
     console.log('  node fetchpatches.js mode2 --searchlocalpath=../backup --download');
     console.log('  node fetchpatches.js mode2 --apisearch --apiurl=https://api.example.com/search --apiclient=xxx --apisecret=yyy');
     console.log();
-    console.log('  # Mode 3');
-    console.log('  node fetchpatches.js mode3 "Super Mario World" -b gameid -q gameversions --multiple');
-    console.log('  node fetchpatches.js mode3 test.bin -b file_name -q rawpblob -o output.bin');
-    console.log('  node fetchpatches.js mode3 <gvuuid> -b gvuuid -q patch --searchipfs');
-    console.log('  node fetchpatches.js mode3 <pbuuid> -b pbuuid -q patch -p');
+    console.log('  # Mode 3 - Basic searches');
+    console.log('  node fetchpatches.js mode3 -b gameid "Super Mario World" -q gameversions --versions');
+    console.log('  node fetchpatches.js mode3 -b file_name test.bin -q rawpblob -o output.bin');
+    console.log('  node fetchpatches.js mode3 -b gvuuid <gvuuid> -q patch --searchipfs');
+    console.log('');
+    console.log('  # Mode 3 - Advanced multi-criteria searches (list format)');
+    console.log('  node fetchpatches.js mode3 -b demo No -b authors KT -b length "73"');
+    console.log('  node fetchpatches.js mode3 -b name Kaizo -b difficulty Hard');
+    console.log('  node fetchpatches.js mode3 -b added 2024 -b section "Kaizo: Hard"');
+    console.log('  node fetchpatches.js mode3 -b added ">2023" -b length "<10"');
+    console.log('  node fetchpatches.js mode3 --regex -b name "^Super.*World$" -b tags vanilla');
+    console.log('');
+    console.log('  # Mode 3 - Override output format');
+    console.log('  node fetchpatches.js mode3 -b gametype Kaizo -ot json');
+    console.log('  node fetchpatches.js mode3 -b gameid "game_123" --output-type=list');
     console.log();
     console.log('  # Other');
     console.log('  node fetchpatches.js addsizes');
