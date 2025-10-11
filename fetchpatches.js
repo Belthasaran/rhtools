@@ -20,9 +20,9 @@ const Database = require('better-sqlite3');
 const arDriveCore = require('ardrive-core-js');
 const arweave = require('arweave');
 
-// Database paths
-const RHDATA_DB_PATH = path.join(__dirname, 'electron', 'rhdata.db');
-const PATCHBIN_DB_PATH = path.join(__dirname, 'electron', 'patchbin.db');
+// Database paths (can be overridden by --patchbindb and --rhdatadb)
+let RHDATA_DB_PATH = path.join(__dirname, 'electron', 'rhdata.db');
+let PATCHBIN_DB_PATH = path.join(__dirname, 'electron', 'patchbin.db');
 
 // ArDrive configuration
 const DEFAULT_GATEWAY = 'https://arweave.net:443';
@@ -70,6 +70,10 @@ function parseArguments(args) {
         process.exit(1);
       }
       params.fetchDelay = value;
+    } else if (arg.startsWith('--patchbindb=')) {
+      PATCHBIN_DB_PATH = arg.split('=')[1];
+    } else if (arg.startsWith('--rhdatadb=')) {
+      RHDATA_DB_PATH = arg.split('=')[1];
     } else if (i === 0) {
       params.mode = arg.toLowerCase();
     } else {
@@ -440,6 +444,11 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
   console.log(`  ArDrive: ${searchOptions.searchArDrive ? 'Yes' : 'No'}`);
   console.log(`  IPFS: ${searchOptions.searchIPFS ? 'Yes' : 'No'}`);
   console.log(`  Download URLs: ${searchOptions.searchDownload ? 'Yes' : 'No'}`);
+  console.log(`  API Search: ${searchOptions.searchAPI ? 'Yes' : 'No'}`);
+  if (searchOptions.searchAPI) {
+    console.log(`    API URL: ${searchOptions.apiUrl || 'Not set'}`);
+    console.log(`    API Client: ${searchOptions.apiClient ? 'Configured' : 'Not set'}`);
+  }
   console.log(`  Ignore Filename: ${searchOptions.ignoreFilename ? 'Yes' : 'No'}`);
   console.log();
   
@@ -542,6 +551,7 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
       console.log(`  hashes: SHA256=${attachment.file_hash_sha256 ? 'yes' : 'no'}, SHA224=${attachment.file_hash_sha224 ? 'yes' : 'no'}`);
       
       let result = null;
+      let apiCancelled = false;
       
       // Try each search option in order
       try {
@@ -565,10 +575,49 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
           result = await mode2.searchDownloadUrls(attachment, searchOptions);
         }
         
-        // If found, update database
+        // Option G: API Search
+        if (searchOptions.searchAPI && !result && !apiCancelled) {
+          const apiResult = await mode2.searchAPI(attachment, searchOptions, db);
+          
+          if (apiResult && apiResult.cancelEndpoint) {
+            console.log(`  ⚠ API endpoint cancelled - skipping for remaining attachments`);
+            apiCancelled = true;
+            searchOptions.searchAPI = false;
+          } else if (apiResult && apiResult.metadata) {
+            console.log(`  ⓘ API returned metadata with URLs - can try other sources`);
+            // Metadata received but no file_data, continue to other sources
+          } else {
+            result = apiResult;
+          }
+        }
+        
+        // If found, validate hash before storing
         if (result) {
           console.log(`  ✓ Found file data from: ${result.source}`);
           console.log(`    Size: ${result.data.length} bytes`);
+          
+          // CRITICAL: Validate file_data hash
+          console.log(`  🔒 Validating file_data hash...`);
+          const hashValidation = mode2.validateFileDataHash(result.data, attachment.file_hash_sha256);
+          
+          if (!hashValidation.valid) {
+            console.error(`  ✗ file_data hash validation FAILED: ${hashValidation.reason}`);
+            if (hashValidation.expected) {
+              console.error(`      Expected: ${hashValidation.expected}`);
+              console.error(`      Got:      ${hashValidation.actual}`);
+            }
+            console.error(`  ✗ REJECTING invalid file_data\n`);
+            
+            // Do not store invalid data, update last_search anyway
+            try {
+              updateSearchStmt.run(attachment.auuid);
+            } catch (e) {
+              // Ignore
+            }
+            continue;
+          }
+          
+          console.log(`  ✓ file_data hash verified`);
           
           try {
             updateDataStmt.run(result.data, attachment.auuid);
@@ -780,11 +829,13 @@ async function main() {
     console.log('  node fetchpatches.js mode3 [args]             # Retrieve specific attachment');
     console.log('  node fetchpatches.js addsizes                 # Populate file_size from file_data');
     console.log();
-    console.log('General Options (mode1, mode2):');
-    console.log(`  --fetchlimit=N    Limit attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
-    console.log(`  --fetchdelay=MS   Delay between downloads (default: ${DEFAULT_FETCH_DELAY}ms, min: ${MIN_FETCH_DELAY}ms)`);
+    console.log('General Options (all modes):');
+    console.log(`  --fetchlimit=N       Limit attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
+    console.log(`  --fetchdelay=MS      Delay between downloads (default: ${DEFAULT_FETCH_DELAY}ms, min: ${MIN_FETCH_DELAY}ms)`);
+    console.log('  --patchbindb=PATH    Path to patchbin.db (for testing)');
+    console.log('  --rhdatadb=PATH      Path to rhdata.db (for testing)');
     console.log();
-    console.log('Mode 2 Options:');
+    console.log('Mode 2 Search Options:');
     console.log('  --searchmax=N              Max attachments to search (default: 20)');
     console.log('  --maxfilesize=SIZE         Max file size to download (default: 200MB)');
     console.log('  --nosearchlocal            Disable default local search');
@@ -794,9 +845,11 @@ async function main() {
     console.log('  --ipfsgateway=URL          IPFS gateway URL (can repeat, supports %CID%)');
     console.log('  --download                 Search download_urls from database');
     console.log('  --ignorefilename           Search all files by hash only');
-    console.log('  --allardrive               Broader ArDrive search');
-    console.log('  --apisearch                Use private API search');
+    console.log('  --allardrive               Broader ArDrive search (future)');
+    console.log('  --apisearch                Use private metadata API search');
     console.log('  --apiurl=URL               API endpoint URL');
+    console.log('  --apiclient=ID             API client ID');
+    console.log('  --apisecret=SECRET         API client secret');
     console.log();
     console.log('Examples:');
     console.log('  node fetchpatches.js mode1');
@@ -806,7 +859,11 @@ async function main() {
     console.log('  node fetchpatches.js mode2 --searchlocalpath=../backup --download');
     console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://ipfs.io/ipfs/%CID%');
     console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://gateway1.com --ipfsgateway=https://gateway2.com');
+    console.log('  node fetchpatches.js mode2 --apisearch --apiurl=https://api.example.com/search --apiclient=xxx --apisecret=yyy');
     console.log('  node fetchpatches.js addsizes');
+    console.log();
+    console.log('Testing with alternate databases:');
+    console.log('  node fetchpatches.js mode2 --patchbindb=tests/test_data/test_patchbin.db --apisearch ...');
     console.log();
     process.exit(0);
   }

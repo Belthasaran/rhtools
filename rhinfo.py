@@ -14,7 +14,7 @@ if len(sys.argv)<=1:
    print('Usage: ' + sys.argv[0] + ' hackid ')
 if len(sys.argv)==2:
     hrecord = get_hack_info( sys.argv[1] )
-    print(",")
+    #print(",")
     print(json.dumps(hrecord, indent=4, sort_keys=True))
 if len(sys.argv)>2:
     hlist = []

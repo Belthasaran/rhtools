@@ -46,10 +46,21 @@ if (SERVER_PRIVATE_KEY_HEX && SERVER_SIGNER_UUID) {
   }
 }
 
-// Database paths
-const SERVER_DATA_DB = path.join(__dirname, 'mdserverdata.db');
-const RHDATA_DB = path.join(__dirname, 'rhdata.db');
-const PATCHBIN_DB = path.join(__dirname, 'patchbin.db');
+// Parse command line arguments for database paths
+const args = process.argv.slice(2);
+let SERVER_DATA_DB = path.join(__dirname, 'mdserverdata.db');
+let RHDATA_DB = path.join(__dirname, 'rhdata.db');
+let PATCHBIN_DB = path.join(__dirname, 'patchbin.db');
+
+for (const arg of args) {
+  if (arg.startsWith('--serverdatadb=')) {
+    SERVER_DATA_DB = arg.split('=')[1];
+  } else if (arg.startsWith('--rhdatadb=')) {
+    RHDATA_DB = arg.split('=')[1];
+  } else if (arg.startsWith('--patchbindb=')) {
+    PATCHBIN_DB = arg.split('=')[1];
+  }
+}
 
 // Initialize databases
 let serverDb, rhdataDb, patchbinDb;
@@ -312,8 +323,11 @@ function addSignaturesToResponse(responseData, records, db) {
     }
   }
   
-  // Add server signature
-  const serverSignature = signResponse(responseData);
+  // Add response timestamp (BEFORE signing, so it's included in signature)
+  response.response_timestamp = new Date().toISOString();
+  
+  // Add server signature (signs the complete response including timestamp)
+  const serverSignature = signResponse(response);
   if (serverSignature) {
     response.server_signature = serverSignature;
   }

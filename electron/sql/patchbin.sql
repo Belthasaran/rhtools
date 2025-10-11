@@ -5,6 +5,7 @@ CREATE TABLE signers (
 	publickey_type varchar(255) DEFAULT 'ED25519',
 	hashtype varchar(255) DEFAULT 'SHA256',
 	publickey varchar(255) NOT NULL,
+	siglistuuid varchar(255),
 	primary key(signeruuid)
 );
 

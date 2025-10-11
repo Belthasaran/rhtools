@@ -555,6 +555,8 @@ function parseMode2Arguments(args) {
     searchDownload: false,
     searchAPI: false,
     apiUrl: null,
+    apiClient: null,
+    apiSecret: null,
     ipfsGateways: [], // Changed to array to support multiple gateways
     ignoreFilename: false
   };
@@ -580,6 +582,11 @@ function parseMode2Arguments(args) {
       options.searchAPI = true;
     } else if (arg.startsWith('--apiurl=')) {
       options.apiUrl = arg.split('=')[1];
+      options.searchAPI = true;
+    } else if (arg.startsWith('--apiclient=')) {
+      options.apiClient = arg.split('=')[1];
+    } else if (arg.startsWith('--apisecret=')) {
+      options.apiSecret = arg.split('=')[1];
     } else if (arg.startsWith('--ipfsgateway=')) {
       // Support multiple --ipfsgateway options
       options.ipfsGateways.push(arg.split('=')[1]);
@@ -591,14 +598,19 @@ function parseMode2Arguments(args) {
   return options;
 }
 
+// Load Option G implementation
+const optionG = require('./fetchpatches_mode2_optionG');
+
 module.exports = {
   parseMode2Arguments,
   searchLocal,
   searchArDrive,
   searchIPFS,
   searchDownloadUrls,
+  searchAPI: optionG.searchAPI,
   parseFileSize,
   verifyFileData,
+  validateFileDataHash: optionG.validateFileDataHash,
   initializeIPFSGateways,
   verifyIPFSGateway,
   loadIPFSGatewaysFromDB,
