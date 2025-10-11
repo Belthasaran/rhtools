@@ -1,3 +1,22 @@
+CREATE TABLE signers (
+	signeruuid varchar(255),
+	signer_name varchar(255),
+	publickey_type varchar(255) DEFAULT 'ED25519',
+	hashtype varchar(255) DEFAULT 'SHA256',
+	publickey varchar(255) NOT NULL,
+	primary key(signeruuid)
+);
+
+CREATE TABLE donotsearch (
+	entryuuid varchar(255),
+        url varchar(255),
+	location varchar(255),
+	stop_time  int DEFAULT 17200,
+	server_response text,
+        since TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	primary key(entryuuid)
+);
+
 CREATE TABLE attachments (
   auuid varchar(255) primary key DEFAULT (uuid()),
   pbuuid varchar(255),
@@ -27,6 +46,8 @@ CREATE TABLE attachments (
   arweave_file_name varchar(255),
   arweave_file_id varchar(255),
   arweave_file_path varchar(255),
+  last_search TIMESTAMP DEFAULT NULL,
+  file_size bigint,
   file_data blob,
   UNIQUE(file_name,file_hash_sha224)
 )
