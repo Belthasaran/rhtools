@@ -689,15 +689,518 @@ async function mode2_findAttachmentData(fetchLimit = DEFAULT_FETCH_LIMIT, fetchD
 }
 
 /**
- * Mode 3: Retrieve specific attachment (placeholder)
+ * Calculate Shake128 hash for filename (compatible with repatch.py)
+ * Format: base64(shake128(data).digest(24), b"_-")
+ */
+function calculateShake128Filename(data) {
+  const shake = crypto.createHash('shake128', { outputLength: 24 });
+  shake.update(data);
+  const digest = shake.digest();
+  // Use URL-safe base64 encoding (+ → _, / → -)
+  return digest.toString('base64').replace(/\+/g, '_').replace(/\//g, '-').replace(/=/g, '');
+}
+
+/**
+ * Parse Mode 3 arguments
+ */
+function parseMode3Arguments(args) {
+  const options = {
+    searchBy: null,  // gameid, file_name, gvuuid, pbuuid, patch_name
+    searchValue: null,
+    queryType: null,  // rawpblob, patch, gameversions
+    outputType: null,  // print, file
+    outputFile: null,
+    multiple: false,  // For gameversions query
+    mode2Options: []  // Options to pass to mode2 if needed
+  };
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg === '-b' && i + 1 < args.length) {
+      options.searchBy = args[++i];
+    } else if (arg.startsWith('--by=')) {
+      options.searchBy = arg.split('=')[1];
+    } else if (arg === '-q' && i + 1 < args.length) {
+      options.queryType = args[++i];
+    } else if (arg.startsWith('--query=')) {
+      options.queryType = arg.split('=')[1];
+    } else if (arg === '-p' || arg === '--print') {
+      options.outputType = 'print';
+    } else if (arg === '-o' && i + 1 < args.length) {
+      options.outputType = 'file';
+      options.outputFile = args[++i];
+    } else if (arg.startsWith('--output=')) {
+      options.outputType = 'file';
+      options.outputFile = arg.split('=')[1];
+    } else if (arg === '--multiple') {
+      options.multiple = true;
+    } else if (!options.searchValue) {
+      // First non-option argument is the search value
+      options.searchValue = arg;
+    } else {
+      // Collect remaining arguments for potential mode2 search
+      options.mode2Options.push(arg);
+    }
+  }
+  
+  // Set defaults
+  if (!options.searchBy) {
+    options.searchBy = 'file_name';  // Default search by file_name
+  }
+  
+  if (!options.queryType) {
+    options.queryType = 'gameversions';  // Default query type
+  }
+  
+  return options;
+}
+
+/**
+ * Search for records based on criteria
+ * @param {Database} rhdataDb - rhdata.db (gameversions)
+ * @param {Database} patchbinDb - patchbin.db (patchblobs, attachments)
+ * @param {Object} options - Search options
+ */
+function searchRecords(rhdataDb, patchbinDb, options) {
+  const results = {
+    gameversions: [],
+    patchblobs: [],
+    attachments: []
+  };
+  
+  try {
+    switch (options.searchBy) {
+      case 'gameid': {
+        // Search gameversions by gameid, get highest version
+        if (options.multiple) {
+          results.gameversions = rhdataDb.prepare(`
+            SELECT * FROM gameversions WHERE gameid = ?
+            ORDER BY version DESC
+          `).all(options.searchValue);
+        } else {
+          const gv = rhdataDb.prepare(`
+            SELECT * FROM gameversions WHERE gameid = ?
+            ORDER BY version DESC LIMIT 1
+          `).get(options.searchValue);
+          if (gv) results.gameversions = [gv];
+        }
+        break;
+      }
+      
+      case 'gvuuid': {
+        const gv = rhdataDb.prepare(`
+          SELECT * FROM gameversions WHERE gvuuid = ?
+        `).get(options.searchValue);
+        if (gv) results.gameversions = [gv];
+        break;
+      }
+      
+      case 'pbuuid': {
+        const pb = patchbinDb.prepare(`
+          SELECT * FROM patchblobs WHERE pbuuid = ?
+        `).get(options.searchValue);
+        if (pb) results.patchblobs = [pb];
+        break;
+      }
+      
+      case 'file_name': {
+        // Search attachments by file_name
+        const attachments = patchbinDb.prepare(`
+          SELECT * FROM attachments WHERE file_name = ?
+        `).all(options.searchValue);
+        results.attachments = attachments;
+        break;
+      }
+      
+      default:
+        throw new Error(`Unsupported search type: ${options.searchBy}`);
+    }
+    
+    // If we found gameversions, also get related patchblobs and attachments
+    if (results.gameversions.length > 0) {
+      for (const gv of results.gameversions) {
+        if (gv.pbuuid) {
+          const pb = patchbinDb.prepare(`SELECT * FROM patchblobs WHERE pbuuid = ?`).get(gv.pbuuid);
+          if (pb && !results.patchblobs.find(p => p.pbuuid === pb.pbuuid)) {
+            results.patchblobs.push(pb);
+          }
+        }
+      }
+    }
+    
+    // If we found patchblobs, also get related attachments
+    if (results.patchblobs.length > 0) {
+      for (const pb of results.patchblobs) {
+        if (pb.auuid) {
+          const att = patchbinDb.prepare(`SELECT * FROM attachments WHERE auuid = ?`).get(pb.auuid);
+          if (att && !results.attachments.find(a => a.auuid === att.auuid)) {
+            results.attachments.push(att);
+          }
+        }
+      }
+    }
+    
+  } catch (error) {
+    throw new Error(`Search failed: ${error.message}`);
+  }
+  
+  return results;
+}
+
+/**
+ * Decrypt patchblob data
+ */
+function decryptPatchblob(encryptedData, patchblob) {
+  try {
+    // Get decryption key from patchblob
+    const key = patchblob.pbkey;
+    const iv = patchblob.pbiv;
+    
+    if (!key || !iv) {
+      throw new Error('Missing encryption key or IV');
+    }
+    
+    // Decrypt using AES-256-CBC
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), Buffer.from(iv, 'hex'));
+    let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+    
+    return decrypted;
+  } catch (error) {
+    throw new Error(`Decryption failed: ${error.message}`);
+  }
+}
+
+/**
+ * Mode 3: Retrieve and display/save specific attachment or metadata
  */
 async function mode3_retrieveAttachment(args) {
   console.log('='.repeat(70));
-  console.log('MODE 3: Retrieve Attachment');
+  console.log('MODE 3: Retrieve Attachment/Metadata');
   console.log('='.repeat(70));
-  console.log('\n⚠ Mode 3 not yet implemented');
-  console.log('This mode will retrieve and verify a specific attachment');
-  console.log('based on various identifiers (gameid, file_name, hashes, etc.).\n');
+  console.log();
+  
+  // Parse arguments
+  const options = parseMode3Arguments(args);
+  
+  if (!options.searchValue) {
+    console.error('Error: No search value provided');
+    console.error('\nUsage:');
+    console.error('  node fetchpatches.js mode3 <search_value> [options]');
+    console.error('\nOptions:');
+    console.error('  -b, --by=TYPE        Search by: gameid, file_name, gvuuid, pbuuid (default: file_name)');
+    console.error('  -q, --query=TYPE     Query: rawpblob, patch, gameversions (default: gameversions)');
+    console.error('  -p, --print          Print to stdout');
+    console.error('  -o, --output=FILE    Save to file');
+    console.error('  --multiple           Include all versions (for gameversions query)');
+    console.error('\nExamples:');
+    console.error('  node fetchpatches.js mode3 "Super Mario World" -b gameid -q gameversions');
+    console.error('  node fetchpatches.js mode3 test.bin -b file_name -q rawpblob -o output.bin');
+    console.error('  node fetchpatches.js mode3 <gvuuid> -b gvuuid -q patch');
+    process.exit(1);
+  }
+  
+  console.log('Search Configuration:');
+  console.log(`  Search By:    ${options.searchBy}`);
+  console.log(`  Search Value: ${options.searchValue}`);
+  console.log(`  Query Type:   ${options.queryType}`);
+  console.log(`  Output:       ${options.outputType || 'auto'}`);
+  if (options.outputFile) {
+    console.log(`  Output File:  ${options.outputFile}`);
+  }
+  if (options.multiple) {
+    console.log(`  Multiple:     Yes`);
+  }
+  console.log();
+  
+  // Open databases
+  if (!fs.existsSync(PATCHBIN_DB_PATH)) {
+    console.error(`Error: patchbin.db not found at ${PATCHBIN_DB_PATH}`);
+    process.exit(1);
+  }
+  
+  if (!fs.existsSync(RHDATA_DB_PATH)) {
+    console.error(`Error: rhdata.db not found at ${RHDATA_DB_PATH}`);
+    process.exit(1);
+  }
+  
+  const patchbinDb = new Database(PATCHBIN_DB_PATH);
+  const rhdataDb = new Database(RHDATA_DB_PATH, { readonly: true });
+  
+  try {
+    // Search for records
+    console.log('Searching...');
+    const results = searchRecords(rhdataDb, patchbinDb, options);
+    
+    console.log(`Found:`);
+    console.log(`  Game Versions: ${results.gameversions.length}`);
+    console.log(`  Patch Blobs:   ${results.patchblobs.length}`);
+    console.log(`  Attachments:   ${results.attachments.length}`);
+    console.log();
+    
+    if (results.gameversions.length === 0 && results.patchblobs.length === 0 && results.attachments.length === 0) {
+      console.log('✗ No records found');
+      return;
+    }
+    
+    // Process based on query type
+    let outputData = null;
+    let isMetadata = false;
+    
+    switch (options.queryType) {
+      case 'gameversions': {
+        // Output gameversions as JSON
+        isMetadata = true;
+        outputData = JSON.stringify(results.gameversions, null, 2);
+        break;
+      }
+      
+      case 'rawpblob': {
+        // Get raw patchblob data from attachments
+        if (results.attachments.length === 0) {
+          console.error('✗ No attachments found');
+          return;
+        }
+        
+        const attachment = results.attachments[0];
+        
+        if (!attachment.file_data) {
+          console.log('⚠ Attachment file_data is NULL');
+          console.log('Running Mode 2 search for this attachment...');
+          console.log();
+          
+          // Trigger Mode 2 search for this specific attachment
+          await mode2_findAttachmentForMode3(patchbinDb, attachment, options.mode2Options);
+          
+          // Reload attachment to get file_data
+          const reloaded = patchbinDb.prepare(`SELECT * FROM attachments WHERE auuid = ?`).get(attachment.auuid);
+          
+          if (!reloaded || !reloaded.file_data) {
+            console.error('✗ Could not retrieve file data');
+            return;
+          }
+          
+          outputData = reloaded.file_data;
+        } else {
+          outputData = attachment.file_data;
+        }
+        break;
+      }
+      
+      case 'patch': {
+        // Get decoded patchblob (decrypt)
+        if (results.attachments.length === 0) {
+          console.error('✗ No attachments found');
+          return;
+        }
+        
+        const attachment = results.attachments[0];
+        const patchblob = results.patchblobs.find(pb => pb.auuid === attachment.auuid);
+        
+        if (!patchblob) {
+          console.error('✗ No patchblob found for this attachment');
+          return;
+        }
+        
+        if (!attachment.file_data) {
+          console.log('⚠ Attachment file_data is NULL');
+          console.log('Running Mode 2 search for this attachment...');
+          console.log();
+          
+          // Trigger Mode 2 search
+          await mode2_findAttachmentForMode3(patchbinDb, attachment, options.mode2Options);
+          
+          // Reload
+          const reloaded = patchbinDb.prepare(`SELECT * FROM attachments WHERE auuid = ?`).get(attachment.auuid);
+          
+          if (!reloaded || !reloaded.file_data) {
+            console.error('✗ Could not retrieve file data');
+            return;
+          }
+          
+          attachment.file_data = reloaded.file_data;
+        }
+        
+        console.log('Decrypting patchblob...');
+        outputData = decryptPatchblob(attachment.file_data, patchblob);
+        
+        // Verify decoded hash
+        if (patchblob.decoded_hash_sha256) {
+          const actualHash = crypto.createHash('sha256').update(outputData).digest('hex');
+          if (actualHash === patchblob.decoded_hash_sha256) {
+            console.log('✓ Decoded hash verified (SHA256)');
+          } else {
+            console.error('✗ Decoded hash mismatch!');
+            console.error(`  Expected: ${patchblob.decoded_hash_sha256}`);
+            console.error(`  Got:      ${actualHash}`);
+            return;
+          }
+        }
+        break;
+      }
+      
+      default:
+        console.error(`Unsupported query type: ${options.queryType}`);
+        return;
+    }
+    
+    // Output the data
+    if (!outputData) {
+      console.error('✗ No data to output');
+      return;
+    }
+    
+    // Determine output method
+    let outputMethod = options.outputType;
+    if (!outputMethod) {
+      // Auto-detect: metadata goes to stdout, file content goes to file
+      outputMethod = isMetadata ? 'print' : 'file';
+    }
+    
+    if (outputMethod === 'print') {
+      // Print to stdout
+      console.log('Output:');
+      console.log('='.repeat(70));
+      if (Buffer.isBuffer(outputData)) {
+        console.log(`<Binary data: ${outputData.length} bytes>`);
+        console.log('Use -o option to save to file');
+      } else {
+        console.log(outputData);
+      }
+      console.log('='.repeat(70));
+    } else {
+      // Save to file
+      let filename = options.outputFile;
+      
+      if (!filename) {
+        // Generate filename using shake128 hash
+        const tempDir = path.join(__dirname, 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const hashName = calculateShake128Filename(outputData);
+        filename = path.join(tempDir, hashName);
+      }
+      
+      fs.writeFileSync(filename, outputData);
+      console.log(`✓ Saved to: ${filename}`);
+      console.log(`  Size: ${outputData.length} bytes`);
+    }
+    
+  } catch (error) {
+    console.error('Error:', error.message);
+    throw error;
+  } finally {
+    patchbinDb.close();
+    rhdataDb.close();
+  }
+}
+
+/**
+ * Helper: Run Mode 2 search for a specific attachment (for Mode 3)
+ */
+async function mode2_findAttachmentForMode3(db, attachment, extraOptions) {
+  // Run Mode 2 search for just this one attachment
+  const mode2 = require('./fetchpatches_mode2');
+  
+  // Parse search options
+  const searchOptions = mode2.parseMode2Arguments(extraOptions);
+  searchOptions.searchMax = 1;  // Only search for this one attachment
+  
+  console.log('Mode 2 Search Options:');
+  console.log(`  Local Search:  ${searchOptions.searchLocal ? 'Yes' : 'No'}`);
+  console.log(`  ArDrive:       ${searchOptions.searchArDrive ? 'Yes' : 'No'}`);
+  console.log(`  IPFS:          ${searchOptions.searchIPFS ? 'Yes' : 'No'}`);
+  console.log(`  Download URLs: ${searchOptions.searchDownload ? 'Yes' : 'No'}`);
+  console.log(`  API Search:    ${searchOptions.searchAPI ? 'Yes' : 'No'}`);
+  console.log();
+  
+  // Initialize ArDrive if needed
+  let arDrive = null;
+  if (searchOptions.searchArDrive) {
+    arDrive = initArDrive();
+  }
+  
+  // Initialize IPFS gateways if needed
+  let verifiedIPFSGateways = [];
+  if (searchOptions.searchIPFS) {
+    console.log('Initializing IPFS gateways...');
+    verifiedIPFSGateways = await mode2.initializeIPFSGateways(
+      searchOptions.ipfsGateways,
+      db
+    );
+    console.log();
+  }
+  
+  // Search paths for local search
+  const searchPaths = searchOptions.searchLocal ? mode2.DEFAULT_SEARCH_PATHS : [];
+  if (searchOptions.searchLocalPaths.length > 0) {
+    searchPaths.push(...searchOptions.searchLocalPaths);
+  }
+  
+  // Try to find the file
+  let result = null;
+  
+  try {
+    // Try each search option
+    if ((searchOptions.searchLocal || searchOptions.searchLocalPaths.length > 0) && !result) {
+      result = await mode2.searchLocal(attachment, searchPaths, searchOptions);
+    }
+    
+    if (searchOptions.searchArDrive && !result && arDrive) {
+      result = await mode2.searchArDrive(attachment, arDrive, searchOptions);
+    }
+    
+    if (searchOptions.searchIPFS && !result) {
+      result = await mode2.searchIPFS(attachment, searchOptions, verifiedIPFSGateways);
+    }
+    
+    if (searchOptions.searchDownload && !result) {
+      result = await mode2.searchDownloadUrls(attachment, searchOptions);
+    }
+    
+    if (searchOptions.searchAPI && !result) {
+      result = await mode2.searchAPI(attachment, searchOptions, db);
+    }
+    
+    if (result && result.data) {
+      // Validate hash
+      const validation = mode2.validateFileDataHash(result.data, attachment.file_hash_sha256);
+      
+      if (!validation.valid) {
+        console.error('✗ file_data hash validation failed');
+        return false;
+      }
+      
+      console.log('✓ Found and verified file data');
+      console.log(`  Source: ${result.source}`);
+      
+      // Update database
+      db.prepare(`
+        UPDATE attachments
+        SET file_data = ?,
+            updated_time = CURRENT_TIMESTAMP,
+            last_search = CURRENT_TIMESTAMP
+        WHERE auuid = ?
+      `).run(result.data, attachment.auuid);
+      
+      console.log('✓ Updated attachment record');
+      return true;
+    } else {
+      console.log('✗ File not found in any source');
+      
+      // Update last_search
+      db.prepare(`
+        UPDATE attachments SET last_search = CURRENT_TIMESTAMP WHERE auuid = ?
+      `).run(attachment.auuid);
+      
+      return false;
+    }
+  } catch (error) {
+    console.error(`Search error: ${error.message}`);
+    return false;
+  }
 }
 
 /**
@@ -826,7 +1329,7 @@ async function main() {
     console.log('Usage:');
     console.log('  node fetchpatches.js mode1 [options]          # Populate ArDrive metadata');
     console.log('  node fetchpatches.js mode2 [options]          # Find missing attachment data');
-    console.log('  node fetchpatches.js mode3 [args]             # Retrieve specific attachment');
+    console.log('  node fetchpatches.js mode3 <value> [options]  # Retrieve specific attachment/metadata');
     console.log('  node fetchpatches.js addsizes                 # Populate file_size from file_data');
     console.log();
     console.log('General Options (all modes):');
@@ -851,19 +1354,33 @@ async function main() {
     console.log('  --apiclient=ID             API client ID');
     console.log('  --apisecret=SECRET         API client secret');
     console.log();
+    console.log('Mode 3 Options:');
+    console.log('  -b, --by=TYPE        Search by: gameid, file_name, gvuuid, pbuuid (default: file_name)');
+    console.log('  -q, --query=TYPE     Query: rawpblob, patch, gameversions (default: gameversions)');
+    console.log('  -p, --print          Print to stdout');
+    console.log('  -o, --output=FILE    Save to file');
+    console.log('  --multiple           Include all versions (for gameversions query)');
+    console.log('  + Mode 2 options     If file not found, all mode2 options available');
+    console.log();
     console.log('Examples:');
+    console.log('  # Mode 1');
     console.log('  node fetchpatches.js mode1');
     console.log('  node fetchpatches.js mode1 --fetchlimit=50');
+    console.log();
+    console.log('  # Mode 2');
     console.log('  node fetchpatches.js mode2');
     console.log('  node fetchpatches.js mode2 --searchmax=10 --searchipfs');
     console.log('  node fetchpatches.js mode2 --searchlocalpath=../backup --download');
-    console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://ipfs.io/ipfs/%CID%');
-    console.log('  node fetchpatches.js mode2 --searchipfs --ipfsgateway=https://gateway1.com --ipfsgateway=https://gateway2.com');
     console.log('  node fetchpatches.js mode2 --apisearch --apiurl=https://api.example.com/search --apiclient=xxx --apisecret=yyy');
-    console.log('  node fetchpatches.js addsizes');
     console.log();
-    console.log('Testing with alternate databases:');
-    console.log('  node fetchpatches.js mode2 --patchbindb=tests/test_data/test_patchbin.db --apisearch ...');
+    console.log('  # Mode 3');
+    console.log('  node fetchpatches.js mode3 "Super Mario World" -b gameid -q gameversions --multiple');
+    console.log('  node fetchpatches.js mode3 test.bin -b file_name -q rawpblob -o output.bin');
+    console.log('  node fetchpatches.js mode3 <gvuuid> -b gvuuid -q patch --searchipfs');
+    console.log('  node fetchpatches.js mode3 <pbuuid> -b pbuuid -q patch -p');
+    console.log();
+    console.log('  # Other');
+    console.log('  node fetchpatches.js addsizes');
     console.log();
     process.exit(0);
   }
