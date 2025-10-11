@@ -30,7 +30,7 @@ const PUBLIC_FOLDER_ID = '07b13d74-e426-4012-8c6d-cba0927012fb';
 
 // Default parameters for remote fetching
 const DEFAULT_FETCH_LIMIT = 20;
-const DEFAULT_FETCH_DELAY = 2000; // milliseconds
+const DEFAULT_FETCH_DELAY = 1000; // milliseconds
 const MIN_FETCH_DELAY = 500; // minimum 500ms to avoid server overload
 
 /**
@@ -442,6 +442,121 @@ async function mode3_retrieveAttachment(args) {
 }
 
 /**
+ * Mode: Add Sizes - Populate file_size for records with file_data
+ */
+async function modeAddSizes() {
+  console.log('='.repeat(70));
+  console.log('MODE: Add Sizes');
+  console.log('='.repeat(70));
+  console.log();
+  console.log('Populate file_size attribute for attachments with file_data\n');
+  
+  // Check if database exists
+  if (!fs.existsSync(PATCHBIN_DB_PATH)) {
+    console.error(`Error: patchbin.db not found at ${PATCHBIN_DB_PATH}`);
+    process.exit(1);
+  }
+  
+  // Open database
+  const db = new Database(PATCHBIN_DB_PATH);
+  
+  try {
+    // Check if file_size column exists
+    const columns = db.prepare("PRAGMA table_info(attachments)").all();
+    const hasFileSizeColumn = columns.some(col => col.name === 'file_size');
+    
+    if (!hasFileSizeColumn) {
+      console.error('Error: file_size column does not exist in attachments table');
+      console.log('\nYou may need to update the schema. Add the column with:');
+      console.log('  ALTER TABLE attachments ADD COLUMN file_size INTEGER;');
+      process.exit(1);
+    }
+    
+    // Query attachments with file_data but missing file_size
+    console.log('Querying attachments with file_data but missing file_size...');
+    const query = `
+      SELECT auuid, file_name, file_data
+      FROM attachments
+      WHERE file_data IS NOT NULL
+        AND (file_size IS NULL OR file_size = 0)
+    `;
+    
+    const attachments = db.prepare(query).all();
+    console.log(`Found ${attachments.length} attachments needing file_size\n`);
+    
+    if (attachments.length === 0) {
+      console.log('✓ All attachments with file_data already have file_size set!\n');
+      return;
+    }
+    
+    console.log('='.repeat(70));
+    console.log('Processing attachments...\n');
+    
+    let updated = 0;
+    let failed = 0;
+    
+    const updateStmt = db.prepare(`
+      UPDATE attachments
+      SET file_size = ?
+      WHERE auuid = ?
+    `);
+    
+    // Process each attachment
+    for (let i = 0; i < attachments.length; i++) {
+      const attachment = attachments[i];
+      const progress = i + 1;
+      const remaining = attachments.length - progress;
+      
+      try {
+        // Get the size of file_data
+        const fileSize = attachment.file_data ? attachment.file_data.length : 0;
+        
+        console.log(`[${progress}/${attachments.length}] ${attachment.file_name} (${remaining} remaining)`);
+        console.log(`  auuid: ${attachment.auuid}`);
+        console.log(`  file_size: ${fileSize} bytes`);
+        
+        // Update the database
+        updateStmt.run(fileSize, attachment.auuid);
+        
+        console.log(`  ✓ Updated\n`);
+        updated++;
+        
+      } catch (error) {
+        console.error(`  ✗ Error: ${error.message}\n`);
+        failed++;
+      }
+    }
+    
+    // Summary
+    console.log('='.repeat(70));
+    console.log('\nSummary:');
+    console.log(`  Total attachments processed: ${attachments.length}`);
+    console.log(`  Successfully updated:        ${updated}`);
+    console.log(`  Failed:                      ${failed}`);
+    
+    // Verify results
+    const verifyQuery = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM attachments 
+      WHERE file_data IS NOT NULL 
+        AND (file_size IS NULL OR file_size = 0)
+    `).get();
+    
+    console.log(`  Still missing file_size:     ${verifyQuery.count}`);
+    
+    if (verifyQuery.count === 0) {
+      console.log('\n✓ All attachments with file_data now have file_size set!');
+    }
+    
+  } catch (error) {
+    console.error('\nFatal error:', error);
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
+/**
  * Main function
  */
 async function main() {
@@ -453,6 +568,7 @@ async function main() {
     console.log('  node fetchpatches.js mode1 [options]          # Populate ArDrive metadata');
     console.log('  node fetchpatches.js mode2 [options]          # Find missing attachment data');
     console.log('  node fetchpatches.js mode3 [args]             # Retrieve specific attachment');
+    console.log('  node fetchpatches.js addsizes                 # Populate file_size from file_data');
     console.log();
     console.log('Options for modes that query remote servers (mode1, mode2):');
     console.log(`  --fetchlimit=N    Limit number of attachments to process (default: ${DEFAULT_FETCH_LIMIT})`);
@@ -462,6 +578,7 @@ async function main() {
     console.log('  node fetchpatches.js mode1');
     console.log('  node fetchpatches.js mode1 --fetchlimit=50 --fetchdelay=1000');
     console.log('  node fetchpatches.js mode1 --fetchlimit=100');
+    console.log('  node fetchpatches.js addsizes');
     console.log();
     process.exit(0);
   }
@@ -488,9 +605,13 @@ async function main() {
       await mode3_retrieveAttachment(params.extraArgs);
       break;
     
+    case 'addsizes':
+      await modeAddSizes();
+      break;
+    
     default:
       console.error(`Unknown mode: ${params.mode}`);
-      console.error('Valid modes: mode1, mode2, mode3');
+      console.error('Valid modes: mode1, mode2, mode3, addsizes');
       process.exit(1);
   }
 }
@@ -506,6 +627,7 @@ if (require.main === module) {
 module.exports = {
   mode1_populateArDriveMetadata,
   mode2_findAttachmentData,
-  mode3_retrieveAttachment
+  mode3_retrieveAttachment,
+  modeAddSizes
 };
 
