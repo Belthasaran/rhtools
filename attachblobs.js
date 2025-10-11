@@ -189,16 +189,28 @@ function findFileRecursive(dir, fileName, foundFiles = []) {
 }
 
 /**
- * Check if attachment already exists
+ * Check if attachment already exists and return its details
  */
-function attachmentExists(db, fileName, fileHashSha224) {
+function getAttachmentStatus(db, fileName, fileHashSha224) {
   const query = `
-    SELECT COUNT(*) as count 
+    SELECT auuid, file_size
     FROM attachments 
     WHERE file_name = ? AND file_hash_sha224 = ?
   `;
   const result = db.prepare(query).get(fileName, fileHashSha224);
-  return result.count > 0;
+  
+  if (!result) {
+    return { exists: false, needsFileSizeUpdate: false, auuid: null };
+  }
+  
+  // Check if file_size is missing (NULL or undefined)
+  const needsFileSizeUpdate = result.file_size == null;
+  
+  return {
+    exists: true,
+    needsFileSizeUpdate: needsFileSizeUpdate,
+    auuid: result.auuid
+  };
 }
 
 /**
@@ -257,11 +269,32 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
   const fileHashMd5 = md5(fileData);
   const fileHashSha256 = sha256Hash(fileData);
   const fileIPFS = await calculateIPFSCIDs(fileData);
+  const fileSize = fileData.length;
   
   // Check if already exists
-  if (attachmentExists(patchbinDb, patchblob1_name, fileHashSha224)) {
-    console.log(`  ⓘ Already exists in database, skipping`);
+  const attachmentStatus = getAttachmentStatus(patchbinDb, patchblob1_name, fileHashSha224);
+  
+  if (attachmentStatus.exists && !attachmentStatus.needsFileSizeUpdate) {
+    console.log(`  ⓘ Already exists in database with complete data, skipping`);
     return;
+  }
+  
+  if (attachmentStatus.exists && attachmentStatus.needsFileSizeUpdate) {
+    // Update only the file_size field
+    console.log(`  ⓘ Record exists but file_size is missing, updating file_size to ${fileSize} bytes...`);
+    try {
+      const updateQuery = `
+        UPDATE attachments 
+        SET file_size = ?
+        WHERE auuid = ?
+      `;
+      patchbinDb.prepare(updateQuery).run(fileSize, attachmentStatus.auuid);
+      console.log(`  ✓ Updated file_size for existing record (auuid: ${attachmentStatus.auuid})`);
+      return;
+    } catch (error) {
+      console.error(`  ✗ Error updating file_size: ${error.message}`);
+      return;
+    }
   }
   
   // Prepare attachment record
@@ -271,6 +304,7 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
     gvuuid: gvuuid,
     file_crc16: fileCrc16,
     file_crc32: fileCrc32,
+    file_size: fileSize,
     locators: JSON.stringify([]),
     parents: JSON.stringify([]),
     file_ipfs_cidv0: fileIPFS.cidv0,
