@@ -22,3 +22,7 @@ patchbin.db
 *.log
 logs/
 server.log
+
+# Signature logs (may contain sensitive data)
+log_mdsign_new.json
+log_mdsign_historical.json

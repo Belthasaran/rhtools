@@ -20,7 +20,9 @@
     "mdserver:create-client": "node mdserver/create_client.js",
     "mdserver:setup": "node mdserver/setup.js",
     "mdserver:create-signer": "node mdserver/create_signer.js",
-    "mdserver:sign-metadata": "node mdserver/sign_metadata.js"
+    "mdserver:sign-metadata": "node mdserver/sign_metadata.js",
+    "mdserver:migrate-signatures": "node mdserver/migrate_signatures.js",
+    "mdserver:cleanup-signatures": "node mdserver/cleanup_signatures.js"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",

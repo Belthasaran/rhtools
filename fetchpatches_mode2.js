@@ -448,7 +448,7 @@ async function searchIPFS(attachment, options, verifiedGateways) {
       console.log(`    Trying gateway ${i+1}/${verifiedGateways.length}: ${url}`);
       
       const response = await fetch(url, {
-        signal: AbortSignal.timeout(30000) // 30 second timeout
+        signal: AbortSignal.timeout(90000) // 30 second timeout
       });
       
       if (!response.ok) {
