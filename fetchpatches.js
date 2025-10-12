@@ -1178,6 +1178,12 @@ function searchRecords(rhdataDb, patchbinDb, options) {
           // Return all matching versions (matchVersion === 'all' or versions === true)
           results.gameversions = matchingVersions;
         }
+        
+        // Apply nomulti filter - restrict to one gameid
+        if (options.noMulti && results.gameversions.length > 0) {
+          const firstGameid = results.gameversions[0].gameid;
+          results.gameversions = results.gameversions.filter(gv => gv.gameid === firstGameid);
+        }
       }
     }
     
