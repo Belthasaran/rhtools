@@ -5,6 +5,85 @@ This document tracks all database schema changes made to the rhtools project dat
 
 ---
 
+## 2025-10-12: Upload Status Tracking Table (patchbin.db)
+
+### Date
+October 12, 2025
+
+### Description
+Added `upload_status` table to `patchbin.db` to track which blob files have been uploaded to various cloud storage providers (IPFS, Arweave, ArDrive, etc.).
+
+### Rationale
+- **Multi-Provider Support**: Track uploads across multiple storage providers independently
+- **Deduplication**: Avoid re-uploading files that are already available
+- **Metadata Storage**: Store provider-specific identifiers (CIDs, transaction IDs, file IDs)
+- **Audit Trail**: Maintain timestamps of when files were uploaded
+- **Extensibility**: Support additional providers without schema changes
+
+### Tables/Columns Affected
+
+**Database**: `patchbin.db`
+
+**New Table**: `upload_status`
+
+**Columns**:
+1. `file_name` (TEXT PRIMARY KEY)
+   - References blob file name from attachments table
+   - Format: pblob_GAMEID_HASH or rblob_GAMEID_HASH
+   
+2. `uploaded_ipfs` (INTEGER DEFAULT 0)
+   - Boolean flag: 1 = uploaded to IPFS, 0 = not uploaded
+   
+3. `uploaded_arweave` (INTEGER DEFAULT 0)
+   - Boolean flag: 1 = uploaded to Arweave, 0 = not uploaded
+   
+4. `uploaded_ardrive` (INTEGER DEFAULT 0)
+   - Boolean flag: 1 = uploaded to ArDrive, 0 = not uploaded
+   
+5. `ipfs_uploaded_time` (TIMESTAMP NULL)
+   - When file was uploaded to IPFS
+   
+6. `arweave_uploaded_time` (TIMESTAMP NULL)
+   - When file was uploaded to Arweave
+   
+7. `ardrive_uploaded_time` (TIMESTAMP NULL)
+   - When file was uploaded to ArDrive
+   
+8. `ipfs_cid` (TEXT NULL)
+   - IPFS Content Identifier (CIDv1)
+   
+9. `arweave_txid` (TEXT NULL)
+   - Arweave transaction ID
+   
+10. `ardrive_file_id` (TEXT NULL)
+    - ArDrive file ID
+    
+11. `notes` (TEXT NULL)
+    - Additional metadata or custom provider info
+    
+12. `created_time` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    - When record was created
+    
+13. `updated_time` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+    - When record was last updated
+
+### Data Type Changes
+None - new table
+
+### Constraints
+- PRIMARY KEY on `file_name`
+- ON CONFLICT(file_name) DO UPDATE support for upsert operations
+
+### Related Scripts
+- `list-unuploaded-blobs.js` - Lists files not yet uploaded
+- `mark-upload-done.js` - Marks files as uploaded
+
+### Documentation
+- `docs/UPLOAD_TRACKING.md` - Complete upload tracking documentation
+- Table auto-created by scripts on first run
+
+---
+
 ## 2025-10-12: Local Resource Tracking Fields (Migration 004)
 
 ### Date

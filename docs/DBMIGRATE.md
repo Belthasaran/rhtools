@@ -164,6 +164,85 @@ Scripts importing JSON must exclude these fields.
 
 ---
 
+## Upload Status Tracking Table (patchbin.db)
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Create `upload_status` table in `patchbin.db` to track which blob files have been uploaded to various cloud storage providers (IPFS, Arweave, ArDrive, etc.).
+
+### Command
+**Note**: Table is auto-created by `list-unuploaded-blobs.js` and `mark-upload-done.js` scripts on first run.
+
+Manual creation (optional):
+```bash
+sqlite3 electron/patchbin.db << 'EOF'
+CREATE TABLE IF NOT EXISTS upload_status (
+  file_name TEXT PRIMARY KEY,
+  uploaded_ipfs INTEGER DEFAULT 0,
+  uploaded_arweave INTEGER DEFAULT 0,
+  uploaded_ardrive INTEGER DEFAULT 0,
+  ipfs_uploaded_time TIMESTAMP NULL,
+  arweave_uploaded_time TIMESTAMP NULL,
+  ardrive_uploaded_time TIMESTAMP NULL,
+  ipfs_cid TEXT NULL,
+  arweave_txid TEXT NULL,
+  ardrive_file_id TEXT NULL,
+  notes TEXT NULL,
+  created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOF
+```
+
+### What It Does
+- Creates table to track upload status for multiple providers
+- Tracks boolean flags for upload completion (uploaded_ipfs, uploaded_arweave, uploaded_ardrive)
+- Stores provider-specific identifiers (CIDs, transaction IDs, file IDs)
+- Maintains timestamps of when files were uploaded
+- Supports extensibility via notes field for custom providers
+
+### Prerequisites
+- Database electron/patchbin.db must exist
+- No other migrations required
+
+### Expected Outcome
+- `upload_status` table created in patchbin.db
+- Used by list-unuploaded-blobs.js and mark-upload-done.js scripts
+- Initially empty, populated as files are marked uploaded
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- Table is automatically created by upload management scripts
+- No manual intervention typically required
+
+### Related Scripts
+```bash
+# List files not uploaded to IPFS
+node list-unuploaded-blobs.js --provider=ipfs
+
+# Mark files as uploaded
+node mark-upload-done.js --provider=ipfs pblob_123.bin pblob_456.bin
+
+# Create archive of unuploaded files
+node list-unuploaded-blobs.js --provider=arweave --create-archive
+```
+
+### Verification
+```bash
+# Check table was created
+sqlite3 electron/patchbin.db "SELECT name FROM sqlite_master WHERE type='table' AND name='upload_status';"
+
+# Check schema
+sqlite3 electron/patchbin.db "PRAGMA table_info(upload_status);"
+
+# Check records
+sqlite3 electron/patchbin.db "SELECT COUNT(*) FROM upload_status;"
+```
+
+---
+
 ## Phase 1 Migration: updategames.js Support Tables
 
 ### Date Added
