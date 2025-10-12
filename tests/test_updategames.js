@@ -106,6 +106,9 @@ function setupTestDatabase() {
       raw_difficulty VARCHAR(255),
       combinedtype VARCHAR(255),
       legacy_type VARCHAR(255),
+      local_resource_etag VARCHAR(255),
+      local_resource_lastmodified TIMESTAMP,
+      local_resource_filename VARCHAR(500),
       gvimport_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       siglistuuid varchar(255),
       UNIQUE(gameid, version)

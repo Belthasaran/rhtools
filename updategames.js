@@ -25,6 +25,8 @@ const GameDownloader = require('./lib/game-downloader');
 const PatchProcessor = require('./lib/patch-processor');
 const BlobCreator = require('./lib/blob-creator');
 const RecordCreator = require('./lib/record-creator');
+const UpdateProcessor = require('./lib/update-processor');
+const StatsManager = require('./lib/stats-manager');
 
 // Configuration
 const CONFIG = {
@@ -66,6 +68,12 @@ const CONFIG = {
   // Options (can be overridden by command line)
   PROCESS_ALL_PATCHES: false,
   DRY_RUN: false,
+  
+  // Phase 2 options
+  CHECK_UPDATES: true,
+  UPDATE_STATS_ONLY: false,
+  HEAD_REQUEST_SIZE_THRESHOLD: 5 * 1024 * 1024, // 5 MB
+  SIZE_CHANGE_THRESHOLD_PERCENT: 5,
 };
 
 // Command line argument parsing
@@ -90,7 +98,9 @@ function parseArgs(args) {
     'resume': false,
     'dry-run': false,
     'game-ids': null,
-    'limit': null
+    'limit': null,
+    'check-updates': true,
+    'update-stats-only': false
   };
   
   for (let i = 0; i < args.length; i++) {
@@ -109,6 +119,10 @@ function parseArgs(args) {
       parsed['fetch-metadata'] = false;
     } else if (arg === '--no-process-new') {
       parsed['process-new'] = false;
+    } else if (arg === '--no-check-updates') {
+      parsed['check-updates'] = false;
+    } else if (arg === '--update-stats-only') {
+      parsed['update-stats-only'] = true;
     } else if (arg === '--game-ids' || arg === '--game-ids=') {
       if (arg.includes('=')) {
         parsed['game-ids'] = arg.split('=')[1];
@@ -228,9 +242,17 @@ async function main() {
     await createBlobs(dbManager);
     
     // Step 5: Create database records
-    console.log('[Step 5/5] Creating database records...');
+    console.log('[Step 5/6] Creating database records...');
     recordCreator = new RecordCreator(dbManager, CONFIG.PATCHBIN_DB_PATH, CONFIG);
     await createDatabaseRecords(dbManager, recordCreator);
+    
+    // Step 6: Check for updates to existing games (Phase 2)
+    if (argv['check-updates'] && gamesList.length > 0) {
+      console.log('[Step 6/6] Checking for updates to existing games...');
+      await checkExistingGameUpdates(dbManager, gamesList, argv);
+    } else {
+      console.log('[Step 6/6] Skipping update detection\n');
+    }
     
     console.log('\n==================================================');
     console.log('              Update Complete!                    ');
@@ -399,16 +421,20 @@ async function processGames(dbManager, newGames) {
       continue;
     }
     
-    try {
-      // Download ZIP if not already downloaded
-      if (!queueItem.zip_path || !fs.existsSync(queueItem.zip_path)) {
-        dbManager.updateQueueStatus(queueItem.queueuuid, 'downloading');
-        const zipPath = await downloader.downloadGame(queueItem);
-        dbManager.updateQueueZipPath(queueItem.queueuuid, zipPath);
-        queueItem.zip_path = zipPath;
-      } else {
-        console.log(`  Using existing ZIP: ${path.basename(queueItem.zip_path)}`);
-      }
+      try {
+        // Determine version (always 1 for new games)
+        const version = 1;
+        
+        // Download ZIP if not already downloaded
+        if (!queueItem.zip_path || !fs.existsSync(queueItem.zip_path)) {
+          dbManager.updateQueueStatus(queueItem.queueuuid, 'downloading');
+          const downloadResult = await downloader.downloadGame(queueItem, version);
+          const zipPath = typeof downloadResult === 'string' ? downloadResult : downloadResult.zipPath;
+          dbManager.updateQueueZipPath(queueItem.queueuuid, zipPath);
+          queueItem.zip_path = zipPath;
+        } else {
+          console.log(`  Using existing ZIP: ${path.basename(queueItem.zip_path)}`);
+        }
       
       // Process patches
       dbManager.updateQueueStatus(queueItem.queueuuid, 'processing');
@@ -546,6 +572,39 @@ async function createDatabaseRecords(dbManager, recordCreator) {
   console.log(`    Created: ${created}`);
   console.log(`    Skipped: ${skipped}`);
   console.log(`    Errors:  ${errors}\n`);
+}
+
+/**
+ * Check for updates to existing games (Phase 2)
+ */
+async function checkExistingGameUpdates(dbManager, gamesList, argv) {
+  const updateProcessor = new UpdateProcessor(dbManager, CONFIG);
+  
+  // Initialize stats table if it doesn't have data
+  const statsManager = new StatsManager(dbManager);
+  const statsCount = dbManager.db.prepare(`
+    SELECT COUNT(*) as count FROM gameversion_stats
+  `).get().count;
+  
+  if (statsCount === 0) {
+    console.log('  Initializing gameversion_stats table...');
+    statsManager.initializeStatsTable();
+  }
+  
+  // Process existing games
+  const results = await updateProcessor.processExistingGames(gamesList);
+  
+  // Handle games that need downloads
+  if (results.downloadNeeded.length > 0 && !argv['update-stats-only']) {
+    console.log(`\n  ${results.downloadNeeded.length} game(s) need new versions (file changed):`);
+    
+    for (const item of results.downloadNeeded) {
+      console.log(`    - ${item.gameid}: ${item.metadata.name}`);
+    }
+    
+    console.log('\n  ⓘ These games will be processed in a future run or manually.');
+    console.log('    Use --process-new flag or add to queue manually.\n');
+  }
 }
 
 // Execute main
