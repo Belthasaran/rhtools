@@ -70,6 +70,9 @@ const CONFIG = {
   PROCESS_ALL_PATCHES: false,
   DRY_RUN: false,
   
+  // Blob creation method (Python = universal compatibility, JavaScript = faster but different format)
+  USE_PYTHON_BLOB_CREATOR: true,  // Default: true for maximum compatibility
+  
   // Phase 2 options
   CHECK_UPDATES: true,
   UPDATE_STATS_ONLY: false,
@@ -87,6 +90,9 @@ if (argv['all-patches']) {
 if (argv['dry-run']) {
   CONFIG.DRY_RUN = true;
 }
+if (argv['use-js-blobs']) {
+  CONFIG.USE_PYTHON_BLOB_CREATOR = false;
+}
 
 /**
  * Simple argument parser
@@ -101,7 +107,8 @@ function parseArgs(args) {
     'game-ids': null,
     'limit': null,
     'check-updates': true,
-    'update-stats-only': false
+    'update-stats-only': false,
+    'use-js-blobs': false
   };
   
   for (let i = 0; i < args.length; i++) {
@@ -124,6 +131,8 @@ function parseArgs(args) {
       parsed['check-updates'] = false;
     } else if (arg === '--update-stats-only') {
       parsed['update-stats-only'] = true;
+    } else if (arg === '--use-js-blobs') {
+      parsed['use-js-blobs'] = true;
     } else if (arg.startsWith('--game-ids=')) {
       parsed['game-ids'] = arg.split('=')[1];
     } else if (arg === '--game-ids') {
@@ -157,6 +166,8 @@ Options:
   --no-process-new        Skip processing new games
   --game-ids=<ids>        Process specific game IDs (comma-separated)
   --limit=<n>             Limit number of games to process
+  --use-js-blobs          Use JavaScript blob creator (faster, double base64)
+                          Default: use Python blob creator (universal compatibility)
 
 Examples:
   node updategames.js
@@ -164,6 +175,7 @@ Examples:
   node updategames.js --game-ids=12345,12346
   node updategames.js --dry-run --limit=5
   node updategames.js --resume
+  node updategames.js --use-js-blobs  # Use JavaScript instead of Python
 
 For full documentation, see docs/NEW_UPDATE_SCRIPT_SPEC.md
   `);
