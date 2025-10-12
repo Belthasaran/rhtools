@@ -169,19 +169,24 @@
                   </td>
                 </tr>
                 <tr>
-                  <th>My Skill Rating</th>
+                  <th>My Skill Level</th>
                   <td>
-                    <div class="star-rating skill-rating">
-                      <span 
-                        v-for="n in 11" 
-                        :key="'skill-' + (n-1)"
-                        @click="selectedItem.MySkillRating = n - 1"
-                        :class="{ filled: (n - 1) <= (selectedItem.MySkillRating ?? -1) }"
-                        :title="skillRatingHoverText(n - 1)"
-                        class="star star-small"
-                      >★</span>
-                      <button @click="selectedItem.MySkillRating = null" class="btn-clear-rating">✕</button>
-                      <span class="rating-label">{{ skillLabel(selectedItem.MySkillRating) }}</span>
+                    <div class="skill-rating-container">
+                      <div class="star-rating skill-rating">
+                        <span 
+                          v-for="n in 11" 
+                          :key="'skill-' + (n-1)"
+                          @click="selectedItem.MySkillRating = n - 1"
+                          :class="{ filled: (n - 1) <= (selectedItem.MySkillRating ?? -1) }"
+                          :title="skillRatingHoverText(n - 1)"
+                          class="star star-small"
+                        >★</span>
+                        <button @click="selectedItem.MySkillRating = null" class="btn-clear-rating">✕</button>
+                        <span class="rating-label">{{ skillLabel(selectedItem.MySkillRating) }}</span>
+                      </div>
+                      <div class="skill-caption" v-if="selectedItem.MySkillRating !== null && selectedItem.MySkillRating !== undefined">
+                        {{ skillRatingHoverText(selectedItem.MySkillRating) }}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1668,6 +1673,24 @@ button { padding: 6px 10px; }
 .btn-conditions-header:hover {
   background: #dbeafe;
   border-color: #60a5fa;
+}
+
+/* Skill rating caption */
+.skill-rating-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-caption {
+  font-size: 12px;
+  color: #059669;
+  font-style: italic;
+  line-height: 1.4;
+  padding: 6px 8px;
+  background: #f0fdf4;
+  border-left: 3px solid #10b981;
+  border-radius: 3px;
 }
 </style>
 
