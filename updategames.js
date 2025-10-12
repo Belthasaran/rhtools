@@ -124,18 +124,14 @@ function parseArgs(args) {
       parsed['check-updates'] = false;
     } else if (arg === '--update-stats-only') {
       parsed['update-stats-only'] = true;
-    } else if (arg === '--game-ids' || arg === '--game-ids=') {
-      if (arg.includes('=')) {
-        parsed['game-ids'] = arg.split('=')[1];
-      } else {
-        parsed['game-ids'] = args[++i];
-      }
-    } else if (arg === '--limit' || arg === '--limit=') {
-      if (arg.includes('=')) {
-        parsed['limit'] = parseInt(arg.split('=')[1]);
-      } else {
-        parsed['limit'] = parseInt(args[++i]);
-      }
+    } else if (arg.startsWith('--game-ids=')) {
+      parsed['game-ids'] = arg.split('=')[1];
+    } else if (arg === '--game-ids') {
+      parsed['game-ids'] = args[++i];
+    } else if (arg.startsWith('--limit=')) {
+      parsed['limit'] = parseInt(arg.split('=')[1]);
+    } else if (arg === '--limit') {
+      parsed['limit'] = parseInt(args[++i]);
     }
   }
   
@@ -601,14 +597,17 @@ async function checkExistingGameUpdates(dbManager, gamesList, argv) {
   const updateProcessor = new UpdateProcessor(dbManager, CONFIG);
   
   // Initialize stats table if it doesn't have data
+  // (but skip full initialization when filtering by specific game IDs)
   const statsManager = new StatsManager(dbManager);
   const statsCount = dbManager.db.prepare(`
     SELECT COUNT(*) as count FROM gameversion_stats
   `).get().count;
   
-  if (statsCount === 0) {
+  if (statsCount === 0 && !argv['game-ids']) {
     console.log('  Initializing gameversion_stats table...');
     statsManager.initializeStatsTable();
+  } else if (statsCount === 0 && argv['game-ids']) {
+    console.log('  ⓘ Skipping full stats initialization (filtering by specific game IDs)');
   }
   
   // Process existing games
