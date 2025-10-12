@@ -691,6 +691,9 @@ const showHidden = ref(false);
 const hideFinished = ref(false);
 const bulkStatus = ref('');
 
+// Version management (must be declared before watchers use it)
+const selectedVersion = ref<number>(1);
+
 const normalized = (s: string) => s.toLowerCase();
 
 const filteredItems = computed(() => {
@@ -1587,9 +1590,25 @@ async function loadGameVersion(gameid: string, version: number) {
  * Initialize on mount
  */
 onMounted(async () => {
-  console.log('App mounted, loading data...');
-  await loadGames();
-  await loadSettings();
+  console.log('=== APP MOUNTED ===');
+  console.log('Electron API available:', isElectronAvailable());
+  console.log('Starting data load...');
+  
+  try {
+    await loadGames();
+    console.log('Games loaded, count:', items.length);
+  } catch (error) {
+    console.error('Error loading games:', error);
+  }
+  
+  try {
+    await loadSettings();
+    console.log('Settings loaded');
+  } catch (error) {
+    console.error('Error loading settings:', error);
+  }
+  
+  console.log('=== INITIALIZATION COMPLETE ===');
 });
 
 /**
@@ -1626,8 +1645,7 @@ watch(selectedItem, async (newItem, oldItem) => {
   }
 });
 
-// Version management
-const selectedVersion = ref<number>(1);
+// Version management computed properties
 const availableVersions = computed(() => {
   return selectedItem.value?.AvailableVersions || [1];
 });

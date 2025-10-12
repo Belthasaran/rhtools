@@ -18,12 +18,28 @@ function createMainWindow() {
         show: false,
     });
 
+    // Open DevTools automatically in development
+    if (process.env.ELECTRON_START_URL) {
+        mainWindow.webContents.openDevTools();
+    }
+
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
 
     if (process.env.ELECTRON_START_URL) {
+        console.log('Loading URL:', process.env.ELECTRON_START_URL);
         mainWindow.loadURL(process.env.ELECTRON_START_URL);
+        
+        // Log any load errors
+        mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+            console.error('Failed to load:', errorCode, errorDescription);
+        });
+        
+        // Log when loaded
+        mainWindow.webContents.on('did-finish-load', () => {
+            console.log('Page loaded successfully');
+        });
     } else {
         const prodIndex = path.join(__dirname, 'renderer', 'dist', 'index.html');
         mainWindow.loadFile(prodIndex);

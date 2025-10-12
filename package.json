@@ -2,9 +2,11 @@
   "main": "electron/main.js",
   "scripts": {
     "electron:start": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.js",
+    "electron:start-smart": "cd electron && ./smart-start.sh",
     "renderer:dev": "npm --prefix electron/renderer run dev",
     "renderer:build": "npm --prefix electron/renderer run build",
     "app:dev": "run-p renderer:dev electron:start",
+    "app:dev-smart": "cd electron && ./smart-start.sh",
     "app:build": "npm run renderer:build",
     "loaddata": "node loaddata.js",
     "attachblobs": "node attachblobs.js",
