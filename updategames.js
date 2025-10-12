@@ -240,17 +240,28 @@ async function main() {
     
     // Step 4: Create blobs
     console.log('[Step 4/5] Creating encrypted blobs...');
-    await createBlobs(dbManager);
+    await createBlobs(dbManager, argv);
     
     // Step 5: Create database records
     console.log('[Step 5/6] Creating database records...');
     recordCreator = new RecordCreator(dbManager, CONFIG.PATCHBIN_DB_PATH, CONFIG);
-    await createDatabaseRecords(dbManager, recordCreator);
+    await createDatabaseRecords(dbManager, recordCreator, argv);
     
     // Step 6: Check for updates to existing games (Phase 2)
     if (argv['check-updates'] && gamesList.length > 0) {
       console.log('[Step 6/6] Checking for updates to existing games...');
-      await checkExistingGameUpdates(dbManager, gamesList, argv);
+      
+      // Apply game-ids filter if specified
+      let filteredGamesList = gamesList;
+      if (argv['game-ids']) {
+        const requestedIds = argv['game-ids'].split(',').map(s => s.trim());
+        filteredGamesList = gamesList.filter(game => 
+          requestedIds.includes(String(game.id))
+        );
+        console.log(`  Filtered to specific IDs: ${filteredGamesList.length} games\n`);
+      }
+      
+      await checkExistingGameUpdates(dbManager, filteredGamesList, argv);
     } else {
       console.log('[Step 6/6] Skipping update detection\n');
     }
