@@ -365,5 +365,181 @@ sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);" | grep -E "fields_
 
 ---
 
+## 2025-10-12: User Annotations Tables (clientdata.db)
+
+### Date
+October 12, 2025
+
+### Description
+Added three new tables to `clientdata.db` for storing user-specific annotations for games and stages, including ratings, status tracking, notes, and stage metadata.
+
+### Rationale
+- **User Privacy**: Each user maintains their own ratings and notes in their local clientdata.db
+- **Stage-Level Tracking**: Support per-stage ratings and notes for games with documented stages
+- **Progress Tracking**: Track game completion status (Default/In Progress/Finished)
+- **Flexible Organization**: Hidden flag for organizing personal game library
+- **Rating System**: 1-5 difficulty rating scale at both game and stage level
+
+### Tables/Columns Affected
+
+**Database**: `clientdata.db`
+
+#### New Table: `user_game_annotations`
+
+**Purpose**: Store user-specific data for each game
+
+**Columns**:
+1. `gameid` (VARCHAR 255 PRIMARY KEY)
+   - References gameid from rhdata.db gameversions table
+   
+2. `status` (VARCHAR 50 DEFAULT 'Default')
+   - User's progress status: 'Default', 'In Progress', 'Finished'
+   
+3. `user_rating` (INTEGER)
+   - User's personal difficulty rating (1-5 scale)
+   - NULL if not rated
+   - CHECK constraint: (user_rating IS NULL OR (user_rating >= 1 AND user_rating <= 5))
+   
+4. `hidden` (INTEGER DEFAULT 0)
+   - Boolean flag: 0 = visible, 1 = hidden from main list
+   
+5. `user_notes` (TEXT)
+   - User's personal notes about the game
+   
+6. `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+   - When annotation was created
+   
+7. `updated_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+   - When annotation was last modified
+
+**Indexes**:
+- `idx_user_game_status` ON status
+- `idx_user_game_hidden` ON hidden
+- `idx_user_game_rating` ON user_rating
+
+**Triggers**:
+- `trigger_user_game_updated` - Auto-updates updated_at on modification
+
+#### New Table: `game_stages`
+
+**Purpose**: Store stage/exit metadata for games
+
+**Columns**:
+1. `stage_key` (VARCHAR 510 PRIMARY KEY)
+   - Format: "gameid-exitnumber" (e.g., "12345-01")
+   
+2. `gameid` (VARCHAR 255 NOT NULL)
+   - References the game
+   
+3. `exit_number` (VARCHAR 255 NOT NULL)
+   - Stage/exit number (e.g., "0x01", "1", "105")
+   
+4. `description` (TEXT)
+   - Stage description/name
+   
+5. `public_rating` (DECIMAL(3,2))
+   - Community average rating for this stage
+   
+6. `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+7. `updated_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+**Indexes**:
+- `idx_game_stages_gameid` ON gameid
+- `idx_game_stages_exit` ON exit_number
+
+**Constraints**:
+- UNIQUE(gameid, exit_number)
+
+**Triggers**:
+- `trigger_game_stages_updated` - Auto-updates updated_at on modification
+
+#### New Table: `user_stage_annotations`
+
+**Purpose**: Store user-specific annotations for individual stages
+
+**Columns**:
+1. `stage_key` (VARCHAR 510 PRIMARY KEY)
+   - Format: "gameid-exitnumber"
+   
+2. `gameid` (VARCHAR 255 NOT NULL)
+   - References the game
+   
+3. `exit_number` (VARCHAR 255 NOT NULL)
+   - References the specific stage
+   
+4. `user_rating` (INTEGER)
+   - User's personal difficulty rating for this stage (1-5)
+   - NULL if not rated
+   - CHECK constraint: (user_rating IS NULL OR (user_rating >= 1 AND user_rating <= 5))
+   
+5. `user_notes` (TEXT)
+   - User's personal notes about this stage
+   
+6. `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+7. `updated_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+**Indexes**:
+- `idx_user_stage_gameid` ON gameid
+- `idx_user_stage_rating` ON user_rating
+
+**Constraints**:
+- UNIQUE(gameid, exit_number)
+
+**Triggers**:
+- `trigger_user_stage_updated` - Auto-updates updated_at on modification
+
+#### New Views
+
+**v_games_with_annotations**:
+- Convenience view for querying games with user annotations
+- Includes all fields from user_game_annotations
+- Uses COALESCE for default values
+
+**v_stages_with_annotations**:
+- Convenience view joining game_stages with user_stage_annotations
+- Shows both stage metadata and user annotations
+- LEFT JOIN preserves stages without user annotations
+
+### Data Type Changes
+None - all new tables
+
+### Migration File
+`electron/sql/migrations/001_clientdata_user_annotations.sql`
+
+### Related Files Updated
+- `electron/sql/clientdata.sql` - Updated with new schema for fresh installs
+
+### Usage Notes
+
+**Rating Scale**: 1-5 where:
+- 1 = Very Easy
+- 2 = Easy  
+- 3 = Normal
+- 4 = Hard
+- 5 = Very Hard
+- NULL = Not rated
+
+**Status Values**:
+- 'Default' - Not started or no status set
+- 'In Progress' - Currently playing
+- 'Finished' - Completed
+
+**Stage Keys**: Format is "gameid-exitnumber"
+- Examples: "12345-01", "9999-0xFF", "test-105"
+- Ensures unique identification across games
+
+**Important**: 
+- Not all games have documented stages - the stage tables are optional
+- Each user should have their own clientdata.db
+- This database should NOT be synced or shared between users
+- Scripts should support CLIENTDATA_DB_PATH environment variable
+
+### Documentation
+- Migration script: `electron/sql/migrations/001_clientdata_user_annotations.sql`
+- Commands: `docs/DBMIGRATE.md` (updated)
+- This file: `docs/SCHEMACHANGES.md` (this entry)
+
+---
+
 *Last Updated: October 12, 2025*  
-*Next Migration: TBD (Phase 2 implementation)*
+*Next Migration: TBD*

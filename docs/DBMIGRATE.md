@@ -529,5 +529,122 @@ EOF
 
 ---
 
+## Migration 001: User Annotations (clientdata.db)
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Add tables to `clientdata.db` for storing user-specific game annotations (ratings, status, notes) and stage-level annotations.
+
+### Command
+```bash
+sqlite3 electron/clientdata.db < electron/sql/migrations/001_clientdata_user_annotations.sql
+```
+
+### What It Does
+Creates 3 new tables:
+1. `user_game_annotations` - User-specific game data (status, rating, hidden flag, notes)
+2. `game_stages` - Stage/exit metadata for games that have documented stages
+3. `user_stage_annotations` - User-specific stage ratings and notes
+
+Also creates:
+- 2 convenience views for querying annotated data
+- 3 triggers for auto-updating timestamps
+- 7 indexes for query performance
+
+### Prerequisites
+- Database electron/clientdata.db must exist
+- If migrating existing installation, backup recommended
+
+### Expected Outcome
+- Three new tables in clientdata.db
+- Each user can now store:
+  - Game status (Default/In Progress/Finished)
+  - Personal difficulty ratings (1-5 scale)
+  - Hidden flag for hiding games
+  - Personal notes
+  - Stage-specific ratings and notes
+
+### Table Details
+
+**user_game_annotations**:
+- `gameid` - References game from rhdata.db (PRIMARY KEY)
+- `status` - Default/In Progress/Finished
+- `user_rating` - INTEGER 1-5 or NULL
+- `hidden` - 0 or 1 (boolean)
+- `user_notes` - TEXT
+- `created_at`, `updated_at` - TIMESTAMP
+
+**game_stages**:
+- `stage_key` - Format: "gameid-exitnumber" (PRIMARY KEY)
+- `gameid`, `exit_number` - Stage identification
+- `description` - Stage description
+- `public_rating` - Community rating (DECIMAL)
+- `created_at`, `updated_at` - TIMESTAMP
+
+**user_stage_annotations**:
+- `stage_key` - Format: "gameid-exitnumber" (PRIMARY KEY)
+- `gameid`, `exit_number` - References stage
+- `user_rating` - INTEGER 1-5 or NULL
+- `user_notes` - TEXT
+- `created_at`, `updated_at` - TIMESTAMP
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- Each user installation should have their own clientdata.db
+- This database should NOT be shared between users
+
+### Environment Variable
+Scripts can use `CLIENTDATA_DB_PATH` environment variable to override database path:
+```bash
+export CLIENTDATA_DB_PATH=/path/to/my/clientdata.db
+```
+
+### Verification
+```bash
+# Check tables were created
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'user_%' OR name='game_stages';"
+
+# Expected output:
+# user_game_annotations
+# game_stages
+# user_stage_annotations
+
+# Check views were created
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='view';"
+
+# Expected output:
+# v_games_with_annotations
+# v_stages_with_annotations
+```
+
+### Usage Examples
+
+```sql
+-- Set a game as "In Progress" with rating 4
+INSERT OR REPLACE INTO user_game_annotations (gameid, status, user_rating, hidden, user_notes)
+VALUES ('12345', 'In Progress', 4, 0, 'Really enjoying this one!');
+
+-- Hide a game
+UPDATE user_game_annotations SET hidden = 1 WHERE gameid = '12345';
+
+-- Add stage information for a game
+INSERT INTO game_stages (stage_key, gameid, exit_number, description, public_rating)
+VALUES ('12345-01', '12345', '01', 'First Level', 3.5);
+
+-- Rate a specific stage
+INSERT OR REPLACE INTO user_stage_annotations (stage_key, gameid, exit_number, user_rating, user_notes)
+VALUES ('12345-01', '12345', '01', 5, 'Fantastic level design!');
+
+-- Query all user annotations for games
+SELECT * FROM v_games_with_annotations WHERE status = 'In Progress';
+
+-- Query stages with user ratings
+SELECT * FROM v_stages_with_annotations WHERE user_rating >= 4;
+```
+
+---
+
 *Last Updated: October 12, 2025*  
-*Total Migrations: 5 (4 schema + 1 Phase 1 tables)*
+*Total Migrations: 6 (4 rhdata schema + 1 Phase 1 tables + 1 clientdata)*
