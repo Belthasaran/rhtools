@@ -479,11 +479,20 @@ async function processGames(dbManager, newGames) {
 /**
  * Create encrypted blobs for all processed patches
  */
-async function createBlobs(dbManager) {
+async function createBlobs(dbManager, argv) {
   const blobCreator = new BlobCreator(dbManager, CONFIG);
   
   // Get all completed queue items without blobs
-  const queueItems = dbManager.getCompletedQueueItemsWithoutBlobs();
+  let queueItems = dbManager.getCompletedQueueItemsWithoutBlobs();
+  
+  // Apply game-ids filter if specified
+  if (argv['game-ids']) {
+    const requestedIds = argv['game-ids'].split(',').map(s => s.trim());
+    queueItems = queueItems.filter(item => 
+      requestedIds.includes(String(item.gameid))
+    );
+    console.log(`  Filtered to specific IDs: ${queueItems.length} games`);
+  }
   
   if (queueItems.length === 0) {
     console.log(`  No patches need blob creation\n`);
@@ -520,9 +529,18 @@ async function createBlobs(dbManager) {
 /**
  * Create final database records
  */
-async function createDatabaseRecords(dbManager, recordCreator) {
+async function createDatabaseRecords(dbManager, recordCreator, argv) {
   // Get all completed queue items ready for record creation
-  const queueItems = dbManager.getCompletedQueueItemsReadyForRecords();
+  let queueItems = dbManager.getCompletedQueueItemsReadyForRecords();
+  
+  // Apply game-ids filter if specified
+  if (argv['game-ids']) {
+    const requestedIds = argv['game-ids'].split(',').map(s => s.trim());
+    queueItems = queueItems.filter(item => 
+      requestedIds.includes(String(item.gameid))
+    );
+    console.log(`  Filtered to specific IDs: ${queueItems.length} games`);
+  }
   
   if (queueItems.length === 0) {
     console.log(`  No games ready for record creation\n`);
