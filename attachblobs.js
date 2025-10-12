@@ -4,8 +4,16 @@
  * attachblobs.js - Attach blob files to patchbin.db database
  * 
  * Usage:
- *   node attachblobs.js
+ *   node attachblobs.js              # Process all patchblobs
+ *   node attachblobs.js --newonly    # Only process new patchblobs (faster)
+ *   node attachblobs.js --help       # Show help message
  *   npm run attachblobs
+ * 
+ * Options:
+ *   --newonly    Skip processing patchblobs where file_name already exists
+ *                in attachments table. This significantly speeds up incremental
+ *                processing by avoiding file searches and hash calculations for
+ *                files that have already been attached.
  * 
  * Features:
  * - Reads patchblobs records from rhdata.db
@@ -383,10 +391,64 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
 }
 
 /**
+ * Check if any attachment exists with the given file_name
+ */
+function fileNameExistsInAttachments(db, fileName) {
+  const query = `
+    SELECT COUNT(*) as count
+    FROM attachments 
+    WHERE file_name = ?
+  `;
+  const result = db.prepare(query).get(fileName);
+  return result.count > 0;
+}
+
+/**
+ * Parse command line arguments
+ */
+function parseCommandLineArgs() {
+  const args = process.argv.slice(2);
+  const options = {
+    newonly: false
+  };
+  
+  for (const arg of args) {
+    if (arg === '--newonly') {
+      options.newonly = true;
+    } else if (arg === '--help' || arg === '-h') {
+      console.log(`
+Usage: node attachblobs.js [options]
+
+Options:
+  --newonly    Skip processing patchblobs where file_name already exists
+               in attachments table (for faster incremental processing)
+  --help, -h   Show this help message
+
+Examples:
+  node attachblobs.js              # Process all patchblobs
+  node attachblobs.js --newonly    # Only process new patchblobs
+      `);
+      process.exit(0);
+    } else {
+      console.warn(`Warning: Unknown option: ${arg}`);
+    }
+  }
+  
+  return options;
+}
+
+/**
  * Main function
  */
 async function main() {
+  // Parse command line options
+  const options = parseCommandLineArgs();
+  
   console.log('attachblobs.js - Attaching blob files to patchbin.db\n');
+  
+  if (options.newonly) {
+    console.log('Mode: --newonly (skipping existing file_names)\n');
+  }
   
   // Check if databases exist
   if (!fs.existsSync(RHDATA_DB_PATH)) {
@@ -436,10 +498,19 @@ async function main() {
     let processed = 0;
     let inserted = 0;
     let skipped = 0;
+    let skippedNewOnly = 0;
     let errors = 0;
     
     for (const record of patchblobs) {
       try {
+        // If --newonly is set, skip if file_name already exists
+        if (options.newonly && fileNameExistsInAttachments(patchbinDb, record.patchblob1_name)) {
+          console.log(`\nSkipping (--newonly): ${record.patchblob1_name} (already exists)`);
+          skippedNewOnly++;
+          processed++;
+          continue;
+        }
+        
         const beforeCount = patchbinDb.prepare('SELECT COUNT(*) as count FROM attachments').get().count;
         await processPatchBlob(rhdataDb, patchbinDb, record);
         const afterCount = patchbinDb.prepare('SELECT COUNT(*) as count FROM attachments').get().count;
@@ -461,6 +532,9 @@ async function main() {
     console.log(`  Total processed: ${processed}`);
     console.log(`  Inserted:        ${inserted}`);
     console.log(`  Skipped:         ${skipped}`);
+    if (options.newonly) {
+      console.log(`  Skipped (--newonly): ${skippedNewOnly}`);
+    }
     console.log(`  Errors:          ${errors}`);
     
   } finally {
@@ -477,5 +551,17 @@ if (require.main === module) {
   });
 }
 
-module.exports = { processPatchBlob };
+module.exports = { 
+  processPatchBlob,
+  fileNameExistsInAttachments,
+  parseCommandLineArgs,
+  generateUUID,
+  sha224,
+  sha1,
+  sha256Hash,
+  md5,
+  calculateCRC16,
+  calculateCRC32,
+  calculateIPFSCIDs
+};
 
