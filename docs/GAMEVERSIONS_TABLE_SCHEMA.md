@@ -192,6 +192,49 @@ WHERE gameid = '38660' AND version = 2;
 
 **See**: `docs/LOCKED_ATTRIBUTES.md` for complete documentation of this feature.
 
+### Script-Managed Fields (Computed Columns)
+
+These fields are **computed** or **managed** by the update scripts and must **NOT** be updated from external JSON data imports.
+
+| Column | Type | Description | Managed By | Example |
+|--------|------|-------------|------------|---------|
+| **local_resource_etag** | VARCHAR(255) | HTTP ETag header from ZIP download | updategames.js | "33a64df551425..." |
+| **local_resource_lastmodified** | TIMESTAMP | HTTP Last-Modified header from download | updategames.js | "2024-10-20 15:30:45" |
+| **local_resource_filename** | VARCHAR(500) | Local path where ZIP was saved | updategames.js | "zips/39116_2.zip" |
+| **combinedtype** | VARCHAR(255) | Computed from type/difficulty fields | loaddata.js, updategames.js | "Kaizo: Advanced (diff_4)" |
+| **gvimport_time** | TIMESTAMP | Auto-generated on record creation | Database | "2025-01-10 12:34:56" |
+| **version** | INTEGER | Auto-incremented per gameid | Database trigger | 1, 2, 3 |
+| **gvuuid** | VARCHAR(255) | UUID v4 primary key | Database | Auto-generated |
+
+**IMPORTANT**: When importing JSON data, these fields must be excluded or skipped. They are populated by:
+- Database triggers (version, gvuuid, gvimport_time)
+- Script computation (combinedtype)
+- HTTP download process (local_resource_*)
+
+**Purpose of local_resource_* Fields**:
+- **Efficient change detection**: Use HTTP HEAD requests to check if files changed before downloading
+- **Versioned storage**: Preserve old ZIP versions (zips/GAMEID_VERSION.zip format)
+- **Duplicate prevention**: Avoid re-downloading identical files
+- **HTTP metadata tracking**: Store ETag and Last-Modified for comparison
+
+**See**: `docs/LOCAL_RESOURCE_TRACKING.md` for complete documentation of resource tracking.
+
+**Implementation in loaddata.js**:
+```javascript
+const COMPUTED_COLUMNS = [
+  'local_resource_etag',
+  'local_resource_lastmodified',
+  'local_resource_filename',
+  'combinedtype',
+  'gvimport_time',
+  'version',
+  'gvuuid'
+];
+
+// Exclude when building INSERT from JSON
+const GAMEVERSION_FIELDS = ALL_FIELDS.filter(f => !COMPUTED_COLUMNS.includes(f));
+```
+
 ## Schema Evolution
 
 ### Version 1.0 (Original)
@@ -213,12 +256,25 @@ WHERE gameid = '38660' AND version = 2;
 - ✅ Index on `combinedtype` for efficient querying
 - ✅ Supports multi-value raw_fields.type arrays
 
-### Version 1.3 (2025-01-10) - Current
+### Version 1.3 (2025-01-10)
 - ✅ Added locked attributes feature
 - ✅ Added `legacy_type` as first locked attribute
 - ✅ Locked attributes are preserved across version updates
 - ✅ Cannot be overwritten by JSON imports
 - ✅ Curator-managed fields for manual classification
+
+### Version 1.4 (2025-10-12) - Current
+- ✅ Added `local_resource_etag` column - HTTP ETag tracking
+- ✅ Added `local_resource_lastmodified` column - HTTP Last-Modified tracking
+- ✅ Added `local_resource_filename` column - Local ZIP file path
+- ✅ Versioned ZIP storage (zips/GAMEID_VERSION.zip)
+- ✅ HTTP HEAD request optimization for large files
+- ✅ Duplicate ZIP detection and prevention
+- ✅ Computed columns classification system
+
+**Purpose**: Enable efficient change detection and preserve old file versions.
+
+**See**: `docs/LOCAL_RESOURCE_TRACKING.md` for complete documentation.
 
 ## Data Sources and Mapping
 

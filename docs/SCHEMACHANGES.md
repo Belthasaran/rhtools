@@ -1,23 +1,290 @@
-# Database Schema Changes
+# Database Schema Changes Log
 
-This document tracks all database schema changes made to the project. Each entry should include the date, description, affected tables/columns, and rationale.
+## Purpose
+This document tracks all database schema changes made to the rhtools project databases (rhdata.db and patchbin.db) as required by project rules.
 
-## Format
+---
+
+## 2025-10-12: Local Resource Tracking Fields (Migration 004)
+
+### Date
+October 12, 2025
+
+### Description
+Added three new columns to the `gameversions` table to support intelligent change detection and versioned ZIP file storage for Phase 2 of updategames.js implementation.
+
+### Rationale
+- **Efficiency**: Enable HTTP HEAD requests to check if files changed before downloading (saves bandwidth)
+- **Versioning**: Preserve old ZIP file versions when games are updated (zips/GAMEID_VERSION.zip pattern)
+- **Deduplication**: Prevent duplicate downloads and storage of identical files
+- **Tracking**: Maintain HTTP metadata (ETag, Last-Modified) for accurate change detection
+
+### Tables/Columns Affected
+
+**Table**: `gameversions`
+
+**New Columns**:
+1. `local_resource_etag` (VARCHAR 255)
+   - Stores HTTP ETag header from download response
+   - Used for efficient change detection
+   - NULL if server doesn't provide ETag
+
+2. `local_resource_lastmodified` (TIMESTAMP)
+   - Stores HTTP Last-Modified header from download response
+   - Alternative change detection method
+   - NULL if server doesn't provide Last-Modified
+
+3. `local_resource_filename` (VARCHAR 500)
+   - Stores local filesystem path where ZIP was saved
+   - Format: zips/GAMEID.zip (v1) or zips/GAMEID_VERSION.zip (v2+)
+   - Always populated when file is downloaded
+
+**Indexes Created**:
+- `idx_gameversions_local_filename` on `local_resource_filename`
+- `idx_gameversions_local_etag` on `local_resource_etag`
+
+### Data Type Changes
+None - all new columns
+
+### Constraints
+None - all columns nullable
+
+### Migration File
+`electron/sql/migrations/004_add_local_resource_tracking.sql`
+
+### Computed Columns Classification
+These fields are classified as **COMPUTED COLUMNS** and must not be updated from external JSON imports:
+- `local_resource_etag`
+- `local_resource_lastmodified`
+- `local_resource_filename`
+
+Also previously classified as computed:
+- `combinedtype` (computed from other fields)
+- `gvimport_time` (database auto-generated)
+- `version` (database auto-incremented)
+- `gvuuid` (database auto-generated)
+
+**Requirement**: Scripts importing JSON data (loaddata.js, updategames.js) must exclude these fields from JSON imports.
+
+### Documentation
+- `docs/LOCAL_RESOURCE_TRACKING.md` - Complete feature documentation
+- `docs/NEW_UPDATE_SCRIPT_PHASE2_SPEC.md` - Phase 2 specification (updated)
+- `docs/GAMEVERSIONS_TABLE_SCHEMA.md` - Updated with new fields
+
+---
+
+## 2025-01-10: Locked Attributes System (Migration 003)
+
+### Date
+January 10, 2025
+
+### Description
+Added `legacy_type` column and implemented locked attributes system
+
+### Rationale
+Allow curators to set manual classifications that persist across version updates without being overwritten by external data imports.
+
+### Tables/Columns Affected
+
+**Table**: `gameversions`
+
+**New Column**:
+- `legacy_type` (VARCHAR 255)
+  - User-curated type classification
+  - Locked attribute - preserved across versions
+  - NULL by default, set manually by curators
+
+### Migration File
+Manual ALTER TABLE (documented in previous schema changes)
+
+### Documentation
+- `docs/LOCKED_ATTRIBUTES.md`
+- `docs/GV_LOCKED_ATTRIBUTES_IMPLEMENTATION.md`
+
+---
+
+## 2025-01-10: Combined Type Field (Migration 002)
+
+### Date
+January 10, 2025
+
+### Description
+Added `combinedtype` computed column that combines all type and difficulty fields into a single human-readable string.
+
+### Rationale
+- Simplify display of complete type/difficulty information
+- Enable efficient filtering by combined classification
+- Support search across all type indicators in single field
+
+### Tables/Columns Affected
+
+**Table**: `gameversions`
+
+**New Column**:
+- `combinedtype` (VARCHAR 255)
+  - Computed from: fields_type, difficulty, raw_difficulty, raw_fields.type
+  - Format: "[fields_type]: [difficulty] (raw_difficulty) (raw_fields.type)"
+  - Example: "Kaizo: Advanced (diff_4) (kaizo)"
+
+**Index Created**:
+- `idx_gameversions_combinedtype` on `combinedtype`
+
+### Migration File
+`electron/sql/migrations/002_add_combinedtype.sql`
+
+### Backfill
+`electron/sql/migrations/003_backfill_combinedtype.js` - Backfilled 2,913 existing records
+
+### Documentation
+- `docs/GV_COMBINEDTYPE_UPDATE.md`
+- `docs/MIGRATION_003_BACKFILL_COMBINEDTYPE.md`
+
+---
+
+## 2025-01-10: New Schema Fields Support (Migration 001)
+
+### Date
+January 10, 2025
+
+### Description
+Added support for new JSON schema format from SMWC with nested type and difficulty fields.
+
+### Rationale
+- Support new JSON schema from external data sources
+- Extract more granular type/difficulty information
+- Maintain backward compatibility with old format
+
+### Tables/Columns Affected
+
+**Table**: `gameversions`
+
+**New Columns**:
+1. `fields_type` (VARCHAR 255)
+   - Extracted from `fields.type` in new JSON format
+   - More specific type classification
+   - NULL for old format data
+
+2. `raw_difficulty` (VARCHAR 255)
+   - Extracted from `raw_fields.difficulty`
+   - Raw difficulty code (diff_1 through diff_6)
+   - NULL for old format data
+
+**Indexes Created**:
+- `idx_gameversions_fields_type` on `fields_type`
+- `idx_gameversions_raw_difficulty` on `raw_difficulty`
+
+### Data Type Changes
+None - all new columns
+
+### Migration File
+`electron/sql/migrations/001_add_fields_type_raw_difficulty.sql`
+
+### Code Changes
+- Updated `loaddata.js` with field extraction logic
+- Added boolean normalization (true→"1", false→"0")
+
+### Documentation
+- `docs/GV_SCHEMA_UPDATE_SUMMARY.md`
+- `docs/GV_BUGFIX_LOADDATA.md`
+
+---
+
+## Original Schema (Pre-2025)
+
+### Description
+Initial `gameversions` table with core fields for game metadata, authorship, difficulty, and patch references.
+
+### Core Fields
+- gvuuid (primary key)
+- gameid, version (unique constraint)
+- name, author, authors
+- gametype, difficulty
+- description, tags
+- download_url, url
+- patchblob1_name, pat_sha224
+- gvjsondata (full JSON backup)
+- gvimport_time
+
+### Documentation
+- Original `electron/sql/rhdata.sql`
+
+---
+
+## Summary of All Schema Changes
+
+| Date | Migration | Changes | Reason |
+|------|-----------|---------|--------|
+| Pre-2025 | Initial | Original schema | Core functionality |
+| 2025-01-10 | 001 | fields_type, raw_difficulty | New JSON schema support |
+| 2025-01-10 | 002 | combinedtype | Computed type display |
+| 2025-01-10 | 003 | legacy_type | Locked attributes |
+| 2025-10-12 | 004 | local_resource_* (3 fields) | Resource tracking & versioning |
+
+**Total New Columns**: 7  
+**Total New Indexes**: 6  
+**Migrations Created**: 4  
+**Backfill Scripts**: 1
+
+---
+
+## Migration Status
+
+| Migration | File | Status | Records Affected |
+|-----------|------|--------|------------------|
+| 001 | 001_add_fields_type_raw_difficulty.sql | ✅ Complete | All (nullable) |
+| 002 | 002_add_combinedtype.sql | ✅ Complete | All (nullable) |
+| 003 | 003_backfill_combinedtype.js | ✅ Complete | 2,913 backfilled |
+| 004 | 004_add_local_resource_tracking.sql | ✅ Ready | N/A (new feature) |
+
+---
+
+## Applying Migrations
+
+### Complete Migration Sequence
+
+```bash
+# From project root
+cd /home/main/proj/rhtools
+
+# 001: New schema fields
+sqlite3 electron/rhdata.db < electron/sql/migrations/001_add_fields_type_raw_difficulty.sql
+
+# 002: Combined type
+sqlite3 electron/rhdata.db < electron/sql/migrations/002_add_combinedtype.sql
+
+# 003: Backfill combinedtype (optional, for existing data)
+node electron/sql/migrations/003_backfill_combinedtype.js
+
+# 004: Local resource tracking
+sqlite3 electron/rhdata.db < electron/sql/migrations/004_add_local_resource_tracking.sql
 ```
-### [Date] - Brief Title
-**Tables Affected:** table_name(s)
-**Changes:**
-- Description of schema modification
-- Additional changes
 
-**Rationale:** Why this change was made
+### Verification
 
-**Migration Required:** Yes/No (reference DBMIGRATE.md if yes)
+```bash
+# Check schema
+sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);" | grep -E "fields_type|raw_difficulty|combinedtype|legacy_type|local_resource"
+
+# Expected output shows all 7 new columns:
+# 34|fields_type|VARCHAR(255)|0||0
+# 35|legacy_type|VARCHAR(255)|0||0
+# 36|raw_difficulty|VARCHAR(255)|0||0
+# 37|combinedtype|VARCHAR(255)|0||0
+# 38|local_resource_etag|VARCHAR(255)|0||0
+# 39|local_resource_lastmodified|TIMESTAMP|0||0
+# 40|local_resource_filename|VARCHAR(500)|0||0
 ```
 
 ---
 
-## Schema Change History
+## Related Documentation
 
-<!-- New schema changes should be appended below in reverse chronological order (newest first) -->
+- **Schema Reference**: `docs/GAMEVERSIONS_TABLE_SCHEMA.md` - Complete field documentation
+- **Locked Attributes**: `docs/LOCKED_ATTRIBUTES.md` - Locked attributes guide
+- **Resource Tracking**: `docs/LOCAL_RESOURCE_TRACKING.md` - local_resource_* fields guide
+- **Phase 2 Spec**: `docs/NEW_UPDATE_SCRIPT_PHASE2_SPEC.md` - Change detection specification
 
+---
+
+*Last Updated: October 12, 2025*  
+*Next Migration: TBD (Phase 2 implementation)*

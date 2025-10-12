@@ -1,8 +1,8 @@
 # Update Script Phase 2 Specification - Change Detection & Version Management
 
 ## Document Version
-Version: 1.0  
-Date: October 12, 2025  
+Version: 1.1  
+Date: October 12, 2025 (Updated)  
 Purpose: Detect and manage updates to existing game records  
 Prerequisite: Phase 1 implementation must be completed
 
@@ -14,8 +14,9 @@ Prerequisite: Phase 1 implementation must be completed
 
 Phase 2 extends the `updategames.js` script to detect and appropriately handle changes to existing games in the database. While Phase 1 focuses on adding new games, Phase 2 implements intelligent change detection that distinguishes between:
 
-- **Major Changes**: Significant updates requiring a new version record (name change, patch update, author correction, etc.)
+- **Major Changes**: Significant updates requiring a new version record (name change, patch update, author correction, download URL/file changes, etc.)
 - **Minor Changes**: Statistical/metadata updates tracked separately (download counts, ratings, comments)
+- **Resource Changes**: File version updates detected via URL changes, size changes, and HTTP headers (ETag, Last-Modified)
 
 ### 1.2 Goals
 
@@ -35,13 +36,292 @@ Phase 2 extends the `updategames.js` script to detect and appropriately handle c
 
 ---
 
-## 2. Change Classification System
+## 2. Resource Versioning & Change Detection
 
-### 2.1 Major Changes
+### 2.1 Local Resource Tracking (New Schema Fields)
+
+Three new fields added to the `gameversions` table to track downloaded resources:
+
+#### 2.1.1 local_resource_etag (VARCHAR 255)
+- **Purpose**: Store HTTP ETag header from download response
+- **Source**: `ETag` HTTP response header
+- **Usage**: Efficient change detection via HTTP HEAD requests
+- **Example**: `"33a64df551425fcc55e4d42a148795d9f25f89d4"`
+- **Classification**: **COMPUTED COLUMN** - Not updated from JSON imports
+
+#### 2.1.2 local_resource_lastmodified (TIMESTAMP)
+- **Purpose**: Store HTTP Last-Modified header from download response
+- **Source**: `Last-Modified` HTTP response header
+- **Usage**: Alternative change detection mechanism
+- **Example**: `"2024-10-20 15:30:45"`
+- **Classification**: **COMPUTED COLUMN** - Not updated from JSON imports
+
+#### 2.1.3 local_resource_filename (VARCHAR 500)
+- **Purpose**: Local filesystem path where ZIP was saved
+- **Source**: Computed by downloader
+- **Format**: 
+  - Version 1: `zips/<GAMEID>.zip`
+  - Version 2+: `zips/<GAMEID>_<VERSION>.zip`
+- **Example**: `"zips/39116_2.zip"`
+- **Classification**: **COMPUTED COLUMN** - Not updated from JSON imports
+
+### 2.2 Computed Columns List
+
+**IMPORTANT**: These columns are managed by the updategames script and must **NOT** be updated from external JSON data:
+
+- `local_resource_etag`
+- `local_resource_lastmodified`
+- `local_resource_filename`
+- `combinedtype` (computed from other fields)
+- `gvimport_time` (auto-generated timestamp)
+- `version` (auto-incremented)
+
+Scripts importing JSON data (loaddata.js, updategames.js) must skip these fields when processing external data.
+
+### 2.3 Download URL Change Detection
+
+#### 2.3.1 Major Download Changes (Trigger New Version)
+
+Changes to the download URL that indicate a new file version:
+
+**Filename Changes** (MAJOR):
+```
+OLD: dl.smwcentral.net/39116/Binary%20World%201.0.11.zip
+NEW: dl.smwcentral.net/39116/Binary%20World%201.0.12.zip
+                                    ^^^^^^^^  Version changed in filename
+Result: MAJOR CHANGE - Download and process new file
+```
+
+**Path Changes** (MAJOR):
+```
+OLD: dl.smwcentral.net/39116/Original.zip
+NEW: dl.smwcentral.net/39117/Updated.zip
+                      ^^^^^  Path component changed
+Result: MAJOR CHANGE - Download and process new file
+```
+
+**Size Changes** (MAJOR):
+```
+OLD: size: "500000"
+NEW: size: "750000"
+     Size increased significantly
+Result: MAJOR CHANGE - Download and process new file
+```
+
+#### 2.3.2 Minor Download Changes (Ignore)
+
+Changes that do NOT indicate a new file version:
+
+**Hostname Changes** (MINOR - IGNORE):
+```
+OLD: dl.smwcentral.net/39116/Binary%20World%201.0.11.zip
+NEW: dl2.smwcentral.net/39116/Binary%20World%201.0.11.zip
+     ^^^  Server hostname changed
+Result: MINOR - Same file, different CDN endpoint
+```
+
+**Protocol Changes** (MINOR - IGNORE):
+```
+OLD: http://dl.smwcentral.net/39116/file.zip
+NEW: https://dl.smwcentral.net/39116/file.zip
+     ^^ Protocol upgrade
+Result: MINOR - Same file, secure protocol
+```
+
+**Relative vs Absolute** (MINOR - IGNORE):
+```
+OLD: //dl.smwcentral.net/39116/file.zip
+NEW: https://dl.smwcentral.net/39116/file.zip
+Result: MINOR - Same file, different URL format
+```
+
+#### 2.3.3 URL Comparison Algorithm
+
+```javascript
+function isSignificantUrlChange(oldUrl, newUrl, oldSize, newSize) {
+  // 1. Normalize URLs (remove protocol, hostname)
+  const oldPath = extractPathAndFilename(oldUrl);
+  const newPath = extractPathAndFilename(newUrl);
+  
+  // 2. Compare paths and filenames
+  if (oldPath !== newPath) {
+    return true; // MAJOR: Path or filename changed
+  }
+  
+  // 3. Compare sizes
+  const sizeDiff = Math.abs(parseInt(newSize) - parseInt(oldSize));
+  const sizeChangePercent = sizeDiff / parseInt(oldSize) * 100;
+  
+  if (sizeChangePercent > 5) {
+    return true; // MAJOR: Size changed by more than 5%
+  }
+  
+  // 4. No significant change
+  return false; // MINOR: Only hostname/protocol changed
+}
+
+function extractPathAndFilename(url) {
+  // Remove protocol
+  let path = url.replace(/^https?:\/\//, '').replace(/^\/\//, '');
+  
+  // Remove hostname
+  path = path.substring(path.indexOf('/'));
+  
+  return path;
+}
+```
+
+### 2.4 HTTP HEAD Request Optimization
+
+Before downloading a file that appears to have changed, use HTTP HEAD request to check if file actually changed:
+
+#### 2.4.1 HEAD Request Logic
+
+```javascript
+async function shouldDownloadFile(gameversion, newMetadata, downloadUrl) {
+  // 1. Check if URL changed significantly
+  const urlChanged = isSignificantUrlChange(
+    gameversion.download_url,
+    newMetadata.download_url,
+    gameversion.size,
+    newMetadata.size
+  );
+  
+  if (!urlChanged) {
+    return { download: false, reason: 'url_unchanged' };
+  }
+  
+  // 2. If size is large, do HEAD request first
+  const estimatedSize = parseInt(newMetadata.size) || 0;
+  const SIZE_THRESHOLD = 5 * 1024 * 1024; // 5 MB
+  
+  if (estimatedSize > SIZE_THRESHOLD) {
+    const headResponse = await makeHeadRequest(downloadUrl);
+    
+    if (headResponse.success) {
+      // 3. Compare ETag if available
+      if (gameversion.local_resource_etag && headResponse.etag) {
+        if (gameversion.local_resource_etag === headResponse.etag) {
+          return { download: false, reason: 'etag_match' };
+        }
+      }
+      
+      // 4. Compare Last-Modified if available
+      if (gameversion.local_resource_lastmodified && headResponse.lastModified) {
+        const oldTime = new Date(gameversion.local_resource_lastmodified).getTime();
+        const newTime = new Date(headResponse.lastModified).getTime();
+        
+        if (oldTime === newTime) {
+          return { download: false, reason: 'lastmodified_match' };
+        }
+      }
+      
+      // 5. Compare size from HEAD response
+      if (headResponse.contentLength) {
+        const oldSize = parseInt(gameversion.size);
+        const newSize = headResponse.contentLength;
+        
+        if (oldSize === newSize) {
+          return { download: false, reason: 'size_match' };
+        }
+      }
+    }
+  }
+  
+  // 6. Download needed
+  return { download: true, reason: 'change_detected' };
+}
+
+async function makeHeadRequest(url) {
+  try {
+    const response = await fetch(url, { 
+      method: 'HEAD',
+      headers: { 'User-Agent': CONFIG.USER_AGENT }
+    });
+    
+    return {
+      success: response.ok,
+      etag: response.headers.get('ETag'),
+      lastModified: response.headers.get('Last-Modified'),
+      contentLength: parseInt(response.headers.get('Content-Length'))
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+```
+
+### 2.5 Versioned ZIP Storage
+
+#### 2.5.1 Filename Convention
+
+```javascript
+function determineZipFilename(gameid, version) {
+  if (version === 1) {
+    return `zips/${gameid}.zip`;
+  } else {
+    return `zips/${gameid}_${version}.zip`;
+  }
+}
+```
+
+**Examples**:
+- Version 1: `zips/39116.zip`
+- Version 2: `zips/39116_2.zip`
+- Version 3: `zips/39116_3.zip`
+
+#### 2.5.2 Duplicate Prevention
+
+Before saving a ZIP file:
+
+1. **Check if file already exists** at target path
+2. **Calculate hash** of downloaded content
+3. **Compare with existing files** for same gameid
+4. **Reuse existing** if hash matches (avoid duplicate storage)
+
+```javascript
+async function saveZipFile(gameid, version, zipData) {
+  const targetPath = determineZipFilename(gameid, version);
+  
+  // 1. Check if exact file already exists
+  if (fs.existsSync(targetPath)) {
+    const existingHash = calculateFileHash(targetPath);
+    const newHash = calculateBufferHash(zipData);
+    
+    if (existingHash === newHash) {
+      console.log(`  ⓘ File already exists with same content: ${targetPath}`);
+      return targetPath;
+    }
+    
+    // File exists but different - this shouldn't happen with versioning
+    throw new Error(`File exists with different content: ${targetPath}`);
+  }
+  
+  // 2. Check if any other version has same hash (deduplication)
+  const duplicatePath = findDuplicateZipByHash(gameid, zipData);
+  if (duplicatePath) {
+    console.log(`  ⓘ Identical ZIP found: ${duplicatePath}`);
+    // Don't create duplicate, reuse existing patchblobs
+    return duplicatePath;
+  }
+  
+  // 3. Save new file
+  const tempPath = `${targetPath}.new`;
+  fs.writeFileSync(tempPath, zipData);
+  fs.renameSync(tempPath, targetPath);
+  
+  console.log(`  ✓ Saved: ${targetPath}`);
+  return targetPath;
+}
+```
+
+## 2.6 Change Classification System
+
+### 2.6.1 Major Changes
 
 These changes warrant creating a new version record in the `gameversions` table:
 
-#### 2.1.1 Critical Metadata Changes
+#### 2.6.1.1 Critical Metadata Changes
 - **name**: Game title change
 - **author** / **authors**: Author information change
 - **description**: Description text change
@@ -49,28 +329,38 @@ These changes warrant creating a new version record in the `gameversions` table:
 - **length**: Length classification change
 - **gametype** / **type**: Game type change
 
-#### 2.1.2 Patch-Related Changes
-- **download_url**: Download URL change (indicates new patch)
+#### 2.6.1.2 Download/Patch-Related Changes (CRITICAL)
+- **download_url**: Download URL path/filename change (not just hostname)
+- **name_href**: Alternative download URL path/filename change
+- **size**: ZIP file size change (>5% variation)
 - **patchblob1_name**: Primary patch blob change
 - **pat_sha224**: Patch hash change
-- **size**: ZIP file size change (significant variation)
 
-#### 2.1.3 Status Changes
+**URL Change Detection**:
+```
+MAJOR: /39116/Binary%20World%201.0.11.zip → /39116/Binary%20World%201.0.12.zip
+MAJOR: /39116/file.zip → /39117/file.zip (path changed)
+MAJOR: size: "500000" → size: "600000" (>5% change)
+MINOR: dl.smwcentral.net → dl2.smwcentral.net (hostname only)
+MINOR: http:// → https:// (protocol only)
+```
+
+#### 2.6.1.3 Status Changes
 - **removed**: Game removal status change
 - **obsoleted**: Obsolescence status change
 - **obsoleted_by**: Obsoleting game ID change
 - **moderated**: Moderation status change
 
-#### 2.1.4 Structural Changes
+#### 2.6.1.4 Structural Changes
 - **demo**: Demo status change
 - **featured**: Featured status change
 - **tags**: Tag list changes (additions/removals)
 
-### 2.2 Minor Changes
+### 2.6.2 Minor Changes
 
 These changes are tracked in `gameversion_stats` only:
 
-#### 2.2.1 Statistical Data
+#### 2.6.2.1 Statistical Data
 - Download counts
 - View counts
 - Comment counts
@@ -78,19 +368,20 @@ These changes are tracked in `gameversion_stats` only:
 - Rating counts
 - Favorite counts
 
-#### 2.2.2 Volatile Metadata
+#### 2.6.2.2 Volatile Metadata
 - **images**: Image URLs or image metadata
 - **comments**: Comment content (tracked by count only)
 - **hof** (Hall of Fame): HOF status indicators
 - **rom**: ROM file paths (internal tracking)
 - **romblob_name**: ROM blob name (internal)
 - **romblob_salt**: ROM blob salt (internal)
+- **local_resource_*** fields: Computed columns (managed by script)
 
-#### 2.2.3 Unknown Fields
+#### 2.6.2.3 Unknown Fields
 - Any new fields introduced by SMWC that aren't in our classification lists
 - Tracked to prevent loss but don't trigger versions
 
-### 2.3 Ignored Changes
+### 2.6.3 Ignored Changes
 
 These changes are not tracked at all (computed/derived values):
 

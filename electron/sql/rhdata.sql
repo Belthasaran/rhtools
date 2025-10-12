@@ -35,6 +35,9 @@ CREATE TABLE gameversions (
   legacy_type varchar(255),
   raw_difficulty varchar(255),
   combinedtype varchar(255),
+  local_resource_etag varchar(255),
+  local_resource_lastmodified TIMESTAMP,
+  local_resource_filename varchar(500),
   gvimport_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   siglistuuid varchar(255),
   UNIQUE(gameid, version)

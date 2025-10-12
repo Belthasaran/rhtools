@@ -1,28 +1,454 @@
-# Database Migration and Maintenance Commands
+# Database Migration Commands
 
-This document contains all database migration scripts and maintenance commands that administrators should run. Commands are listed in chronological order (oldest first) to maintain the correct migration sequence.
+## Purpose
+This document lists all database migration scripts and maintenance commands that administrators should run, as required by project rules.
 
-## Format
+---
+
+## Migration 001: New Schema Fields Support
+
+### Date Added
+January 10, 2025
+
+### Purpose
+Add support for new JSON schema format from SMWC with nested type and difficulty fields.
+
+### Command
+```bash
+sqlite3 electron/rhdata.db < electron/sql/migrations/001_add_fields_type_raw_difficulty.sql
 ```
-### Migration [Number/ID] - [Date] - Brief Title
-**Purpose:** Description of what this migration accomplishes
 
-**Prerequisites:**
-- Any requirements before running
+### What It Does
+- Adds `fields_type` column (VARCHAR 255)
+- Adds `raw_difficulty` column (VARCHAR 255)
+- Creates indexes for query performance
 
-**Command:**
-```sql
--- SQL command or script here
+### Prerequisites
+- Database electron/rhdata.db must exist
+- Backup recommended before running
+
+### Expected Outcome
+- Two new columns appear in gameversions table
+- Two new indexes created
+- No data loss
+- Existing queries continue to work
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- No existing data is modified
+
+---
+
+## Migration 002: Combined Type Field
+
+### Date Added
+January 10, 2025
+
+### Purpose
+Add computed `combinedtype` column that combines all type and difficulty fields into single human-readable string.
+
+### Command
+```bash
+sqlite3 electron/rhdata.db < electron/sql/migrations/002_add_combinedtype.sql
 ```
 
-**Expected Outcome:** What should happen after running
+### What It Does
+- Adds `combinedtype` column (VARCHAR 255)
+- Creates index for efficient querying
 
-**Notes/Warnings:** Any important information
+### Prerequisites
+- Migration 001 must be run first
+- Database must be accessible
+
+### Expected Outcome
+- combinedtype column appears in gameversions table
+- Index created
+- Column will be NULL for existing records until backfilled
+
+### Warnings
+- Safe to run multiple times
+- Existing records have NULL combinedtype until backfill runs
+
+---
+
+## Migration 003: Backfill Combined Type (Optional)
+
+### Date Added
+January 10, 2025
+
+### Purpose
+Populate `combinedtype` column for all existing gameversions records by parsing stored JSON data.
+
+### Command
+```bash
+node electron/sql/migrations/003_backfill_combinedtype.js
+```
+
+### What It Does
+- Reads all gameversions records
+- Parses gvjsondata for each record
+- Computes combinedtype from stored data
+- Updates records with computed values
+- Reports progress and completion
+
+### Prerequisites
+- Migration 002 must be run first
+- Node.js installed
+- better-sqlite3 package installed
+
+### Expected Outcome
+- All existing records have combinedtype populated
+- ~3 seconds for 2,913 records
+- 100% coverage achieved
+- No data loss
+
+### Warnings
+- Uses transaction (safe)
+- Can take several minutes for large databases (>10,000 records)
+- Safe to re-run (idempotent)
+
+### Output Example
+```
+Backfilling combinedtype for 2,913 records...
+Processing records... 
+✓ Successfully updated 2,913 records
+Coverage: 100%
 ```
 
 ---
 
-## Migration History
+## Migration 004: Local Resource Tracking
 
-<!-- New migrations and maintenance commands should be appended below in chronological order -->
+### Date Added
+October 12, 2025
 
+### Purpose
+Add columns to track downloaded ZIP files with HTTP headers (ETag, Last-Modified) and local filenames for efficient change detection and versioned storage.
+
+### Command
+```bash
+sqlite3 electron/rhdata.db < electron/sql/migrations/004_add_local_resource_tracking.sql
+```
+
+### What It Does
+- Adds `local_resource_etag` column (VARCHAR 255)
+- Adds `local_resource_lastmodified` column (TIMESTAMP)
+- Adds `local_resource_filename` column (VARCHAR 500)
+- Creates indexes for efficient querying
+
+### Prerequisites
+- Migrations 001-003 recommended (not strictly required)
+- Database must be accessible
+
+### Expected Outcome
+- Three new columns in gameversions table
+- Two new indexes created
+- Columns NULL for existing records (will be populated by updategames.js on next run)
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- These are COMPUTED COLUMNS - do not import from JSON
+- Managed exclusively by updategames.js script
+
+### Important Notes
+**COMPUTED COLUMNS**: These fields are managed by the updategames.js script and must NOT be updated from external JSON data:
+- `local_resource_etag` - Set from HTTP headers during download
+- `local_resource_lastmodified` - Set from HTTP headers during download
+- `local_resource_filename` - Computed by downloader based on version
+- `combinedtype` - Computed from other type/difficulty fields
+- `gvimport_time` - Auto-generated by database
+- `version` - Auto-incremented by database trigger
+- `gvuuid` - Auto-generated by database
+
+Scripts importing JSON must exclude these fields.
+
+---
+
+## Phase 1 Migration: updategames.js Support Tables
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Create supporting tables for updategames.js script functionality (update tracking, queue management, patch processing, metadata caching).
+
+### Command
+```bash
+sqlite3 electron/rhdata.db < electron/sql/rhdata_phase1_migration.sql
+```
+
+### What It Does
+Creates 5 new tables:
+1. `update_status` - Track update operations
+2. `game_fetch_queue` - Queue for games to process
+3. `patch_files_working` - Working table for patch processing
+4. `smwc_metadata_cache` - Cache SMWC API responses
+5. `patchblobs_extended` - Extended patchblob metadata
+
+### Prerequisites
+- Base rhdata.sql schema must be applied first
+- Database must exist
+
+### Expected Outcome
+- 5 new tables created
+- Multiple indexes created
+- updategames.js script becomes functional
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- No impact on existing tables
+- Required for updategames.js to function
+
+---
+
+## Complete Migration Sequence
+
+### For New Database
+
+```bash
+# 1. Create base schema
+sqlite3 electron/rhdata.db < electron/sql/rhdata.sql
+sqlite3 electron/patchbin.db < electron/sql/patchbin.sql
+
+# 2. Apply all migrations in order
+sqlite3 electron/rhdata.db < electron/sql/migrations/001_add_fields_type_raw_difficulty.sql
+sqlite3 electron/rhdata.db < electron/sql/migrations/002_add_combinedtype.sql
+sqlite3 electron/rhdata.db < electron/sql/migrations/004_add_local_resource_tracking.sql
+sqlite3 electron/rhdata.db < electron/sql/rhdata_phase1_migration.sql
+
+# 3. (Optional) Backfill combinedtype if importing existing data
+node electron/sql/migrations/003_backfill_combinedtype.js
+```
+
+### For Existing Database
+
+```bash
+# Check which migrations are needed
+sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);" | grep -E "fields_type|combinedtype|local_resource"
+
+# Apply missing migrations in order
+# (Run commands above for migrations that show no results)
+
+# Apply Phase 1 migration if using updategames.js
+sqlite3 electron/rhdata.db "SELECT name FROM sqlite_master WHERE type='table' AND name='update_status';"
+# If no result, run:
+sqlite3 electron/rhdata.db < electron/sql/rhdata_phase1_migration.sql
+```
+
+---
+
+## Verification Commands
+
+### Check Schema Version
+
+```bash
+# List all columns in gameversions table
+sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);"
+
+# Check for specific new columns
+sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);" | grep -E "fields_type|raw_difficulty|combinedtype|legacy_type|local_resource"
+```
+
+### Check Migration Status
+
+```bash
+# Check if Phase 1 tables exist
+sqlite3 electron/rhdata.db "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('update_status', 'game_fetch_queue');"
+
+# Check column counts
+sqlite3 electron/rhdata.db "SELECT COUNT(*) FROM pragma_table_info('gameversions');"
+# Should be 40+ columns (was 33 originally)
+
+# Check indexes
+sqlite3 electron/rhdata.db "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='gameversions';"
+```
+
+### Verify Data Integrity
+
+```bash
+# Check no data was lost
+sqlite3 electron/rhdata.db "SELECT COUNT(*) FROM gameversions;"
+# Should match pre-migration count
+
+# Check new columns exist and have proper types
+sqlite3 electron/rhdata.db "
+  SELECT 
+    COUNT(*) as total,
+    COUNT(combinedtype) as with_combinedtype,
+    COUNT(fields_type) as with_fields_type,
+    COUNT(local_resource_filename) as with_local_filename
+  FROM gameversions;
+"
+```
+
+---
+
+## Rollback Procedures
+
+### For Migration 001-004
+
+**No automated rollback** - These migrations add columns only.
+
+Manual rollback (if necessary):
+```sql
+-- Remove columns (SQLite requires table recreation)
+-- CAUTION: Backup first!
+
+BEGIN TRANSACTION;
+
+-- Create temp table without new columns
+CREATE TABLE gameversions_backup AS 
+SELECT 
+  gvuuid, section, gameid, version, removed, obsoleted,
+  gametype, name, time, added, moderated, author, authors,
+  submitter, demo, featured, length, difficulty, url,
+  download_url, name_href, author_href, obsoleted_by,
+  patchblob1_name, pat_sha224, size, description,
+  gvjsondata, gvchange_attributes, gvchanges, tags, tags_href,
+  gvimport_time, siglistuuid
+FROM gameversions;
+
+-- Drop original
+DROP TABLE gameversions;
+
+-- Rename backup
+ALTER TABLE gameversions_backup RENAME TO gameversions;
+
+-- Recreate trigger and indexes
+-- (see original rhdata.sql)
+
+COMMIT;
+```
+
+**Recommendation**: Keep backups instead of rolling back.
+
+### For Phase 1 Migration
+
+```bash
+# Drop Phase 1 tables
+sqlite3 electron/rhdata.db << 'EOF'
+DROP TABLE IF EXISTS update_status;
+DROP TABLE IF EXISTS patch_files_working;
+DROP TABLE IF EXISTS game_fetch_queue;
+DROP TABLE IF EXISTS smwc_metadata_cache;
+DROP TABLE IF EXISTS patchblobs_extended;
+EOF
+```
+
+---
+
+## Backup Procedures
+
+### Before Any Migration
+
+```bash
+# Timestamp backup
+cp electron/rhdata.db electron/rhdata.db.backup-$(date +%Y%m%d-%H%M%S)
+
+# Verify backup
+ls -lh electron/rhdata.db.backup-*
+```
+
+### Restore from Backup
+
+```bash
+# List backups
+ls -lh electron/rhdata.db.backup-*
+
+# Restore specific backup
+cp electron/rhdata.db.backup-20251012-103000 electron/rhdata.db
+```
+
+---
+
+## Maintenance Commands
+
+### Clear Expired Cache (updategames.js)
+
+```sql
+-- Remove expired metadata cache entries
+DELETE FROM smwc_metadata_cache 
+WHERE cache_expires < datetime('now');
+
+-- Vacuum to reclaim space
+VACUUM;
+```
+
+### Clean Old Update Status Records
+
+```sql
+-- Keep only recent update status (last 30 days)
+DELETE FROM update_status 
+WHERE started_at < datetime('now', '-30 days');
+```
+
+### Archive Completed Queue Items
+
+```sql
+-- Optional: Clean up old completed queue items
+DELETE FROM game_fetch_queue 
+WHERE status = 'completed' 
+  AND completed_at < datetime('now', '-90 days');
+
+-- Also clean related patch files working records
+DELETE FROM patch_files_working 
+WHERE queueuuid NOT IN (SELECT queueuuid FROM game_fetch_queue);
+```
+
+---
+
+## Database Statistics
+
+### Check Database Size
+
+```bash
+ls -lh electron/rhdata.db
+sqlite3 electron/rhdata.db "SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size();"
+```
+
+### Table Statistics
+
+```bash
+sqlite3 electron/rhdata.db << 'EOF'
+SELECT 
+  'gameversions' as table_name, 
+  COUNT(*) as records 
+FROM gameversions
+
+UNION ALL
+
+SELECT 'patchblobs', COUNT(*) FROM patchblobs
+
+UNION ALL
+
+SELECT 'update_status', COUNT(*) FROM update_status
+
+UNION ALL
+
+SELECT 'game_fetch_queue', COUNT(*) FROM game_fetch_queue;
+EOF
+```
+
+---
+
+## Support
+
+### If Migration Fails
+
+1. **Check error message** carefully
+2. **Verify prerequisites** (previous migrations, backups)
+3. **Check database accessibility** (not open in other programs)
+4. **Restore from backup** if necessary
+5. **Review migration SQL** for syntax errors
+
+### If Data Seems Wrong After Migration
+
+1. **Check record counts** - Should match pre-migration
+2. **Verify NULL handling** - New columns should be NULL for old records
+3. **Run verification queries** (see above)
+4. **Check documentation** for expected behavior
+
+---
+
+*Last Updated: October 12, 2025*  
+*Total Migrations: 5 (4 schema + 1 Phase 1 tables)*
