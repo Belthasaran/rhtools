@@ -45,7 +45,9 @@
     "verify:blobs": "node verify-all-blobs.js --verify-blobs=files",
     "verify:blobs-db": "node verify-all-blobs.js --verify-blobs=db",
     "verify:blobs-full": "node verify-all-blobs.js --verify-blobs=files --full-check",
-    "verify:blobs-db-full": "node verify-all-blobs.js --verify-blobs=db --full-check"
+    "verify:blobs-db-full": "node verify-all-blobs.js --verify-blobs=db --full-check",
+    "verify:blobs-result": "node verify-all-blobs.js --verify-blobs=files --full-check --verify-result",
+    "verify:blobs-db-result": "node verify-all-blobs.js --verify-blobs=db --full-check --verify-result"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
