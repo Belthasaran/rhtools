@@ -15,6 +15,7 @@ Options:
     --gameid=<id>          Verify specific game ID only
     --file-name=<name>     Verify specific blob file only
     --full-check           Test patches with flips (slow, comprehensive)
+    --verify-result        Verify flips result hash against result_sha224 (requires --full-check)
     --log-file=<path>      Log results to file (default: verification_results_py.log)
     --failed-file=<path>   Save failed items list (default: failed_blobs_py.json)
 

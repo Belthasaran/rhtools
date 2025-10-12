@@ -14,6 +14,7 @@
  *   --gameid=<id>            Verify specific game ID only
  *   --file-name=<name>       Verify specific blob file only
  *   --full-check             Test patches with flips (slow, comprehensive)
+ *   --verify-result          Verify flips result hash against result_sha224 (requires --full-check)
  *   --log-file=<path>        Log results to file (default: verification_results.log)
  *   --failed-file=<path>     Save failed items list (default: failed_blobs.json)
  * 
@@ -40,6 +41,7 @@ const CONFIG = {
   FAILED_FILE: 'failed_blobs.json',
   VERIFY_SOURCE: 'files',  // 'files' or 'db'
   FULL_CHECK: false,
+  VERIFY_RESULT: false,  // Verify flips result hash
   GAMEID: null,
   FILE_NAME: null,
   FLIPS_PATH: null,
@@ -66,6 +68,8 @@ function parseArgs(args) {
       parsed.fileName = args[++i];
     } else if (arg === '--full-check') {
       parsed.fullCheck = true;
+    } else if (arg === '--verify-result') {
+      parsed.verifyResult = true;
     } else if (arg.startsWith('--log-file=')) {
       parsed.logFile = arg.split('=')[1];
     } else if (arg === '--log-file') {
@@ -100,7 +104,7 @@ class VerificationLogger {
   }
 }
 
-async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullCheck = false, verifySource = 'files') {
+async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullCheck = false, verifyResult = false, verifySource = 'files') {
   const gameid = patchblob.gameid || 'N/A';
   const blobName = patchblob.patchblob1_name;
   
@@ -114,6 +118,7 @@ async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullChec
     decode_success: false,
     patch_hash_valid: false,
     flips_test_success: false,
+    result_hash_valid: false,
     errors: []
   };
   
@@ -196,13 +201,30 @@ async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullChec
         const flipsCmd = `"${CONFIG.FLIPS_PATH}" --apply "${tempPatch}" "${CONFIG.BASE_ROM_PATH}" "${tempRom}"`;
         execSync(flipsCmd, { stdio: 'pipe' });
         
+        result.flips_test_success = true;
+        
+        // Check 6: Verify result hash (optional)
+        if (verifyResult && patchblob.result_sha224 && fs.existsSync(tempRom)) {
+          const resultData = fs.readFileSync(tempRom);
+          const resultHash = crypto.createHash('sha224').update(resultData).digest('hex');
+          
+          if (resultHash === patchblob.result_sha224) {
+            result.result_hash_valid = true;
+          } else {
+            result.errors.push(`Result hash mismatch: expected ${patchblob.result_sha224}, got ${resultHash}`);
+            result.flips_test_success = false; // Override - result doesn't match despite success
+          }
+        } else if (verifyResult && !patchblob.result_sha224) {
+          // No expected hash to verify against - skip
+          result.result_hash_valid = null;
+        }
+        
         // Clean up
         fs.unlinkSync(tempPatch);
         if (fs.existsSync(tempRom)) {
           fs.unlinkSync(tempRom);
         }
         
-        result.flips_test_success = true;
       } catch (error) {
         result.errors.push(`Flips test failed: ${error.message}`);
       }
@@ -222,8 +244,15 @@ async function main() {
   CONFIG.GAMEID = argv.gameid || null;
   CONFIG.FILE_NAME = argv.fileName || null;
   CONFIG.FULL_CHECK = argv.fullCheck || false;
+  CONFIG.VERIFY_RESULT = argv.verifyResult || false;
   CONFIG.LOG_FILE = argv.logFile || CONFIG.LOG_FILE;
   CONFIG.FAILED_FILE = argv.failedFile || CONFIG.FAILED_FILE;
+  
+  // Verify-result requires full-check
+  if (CONFIG.VERIFY_RESULT && !CONFIG.FULL_CHECK) {
+    console.error('Error: --verify-result requires --full-check');
+    process.exit(2);
+  }
   
   // Validate verify source
   if (CONFIG.VERIFY_SOURCE !== 'files' && CONFIG.VERIFY_SOURCE !== 'db') {
@@ -237,7 +266,12 @@ async function main() {
   console.log(`Verification source: ${CONFIG.VERIFY_SOURCE === 'db' ? 'patchbin.db file_data' : 'blob files'}\n`);
   
   if (CONFIG.FULL_CHECK) {
-    console.log('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)\n');
+    console.log('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)');
+    if (CONFIG.VERIFY_RESULT) {
+      console.log('⚠️  VERIFY RESULT MODE - Will verify result_sha224 hash\n');
+    } else {
+      console.log('');
+    }
     
     try {
       CONFIG.FLIPS_PATH = getFlipsPath({ projectRoot: __dirname });
@@ -306,10 +340,18 @@ async function main() {
       
       logger.log(`\n${progress} Game ${pb.gameid || 'N/A'}: ${pb.patchblob1_name}`);
       
-      const result = await verifyBlob(pb, recordCreator, patchbinDb, logger, CONFIG.FULL_CHECK, CONFIG.VERIFY_SOURCE);
+      const result = await verifyBlob(pb, recordCreator, patchbinDb, logger, CONFIG.FULL_CHECK, CONFIG.VERIFY_RESULT, CONFIG.VERIFY_SOURCE);
       
       if (result.errors.length === 0 && result.patch_hash_valid) {
-        logger.log(`  ✅ VALID${CONFIG.FULL_CHECK && result.flips_test_success ? ' (flips test passed)' : ''}`);
+        let statusMsg = '  ✅ VALID';
+        if (CONFIG.FULL_CHECK && result.flips_test_success) {
+          statusMsg += ' (flips test passed';
+          if (CONFIG.VERIFY_RESULT && result.result_hash_valid) {
+            statusMsg += ', result hash verified';
+          }
+          statusMsg += ')';
+        }
+        logger.log(statusMsg);
         verified++;
       } else {
         logger.log(`  ❌ FAILED:`);
