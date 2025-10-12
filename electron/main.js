@@ -1,5 +1,10 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { DatabaseManager } = require('./database-manager');
+const { registerDatabaseHandlers } = require('./ipc-handlers');
+
+// Initialize database manager
+let dbManager = null;
 
 function createMainWindow() {
     const mainWindow = new BrowserWindow({
@@ -23,9 +28,24 @@ function createMainWindow() {
         const prodIndex = path.join(__dirname, 'renderer', 'dist', 'index.html');
         mainWindow.loadFile(prodIndex);
     }
+    
+    return mainWindow;
 }
 
 app.whenReady().then(() => {
+    // Initialize database manager
+    try {
+        dbManager = new DatabaseManager();
+        console.log('Database manager initialized');
+        
+        // Register IPC handlers
+        registerDatabaseHandlers(dbManager);
+        console.log('IPC handlers registered');
+    } catch (error) {
+        console.error('Failed to initialize database:', error);
+        // Continue anyway - will show error in UI
+    }
+
     createMainWindow();
 
     app.on('activate', () => {
@@ -36,9 +56,19 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+    // Close database connections
+    if (dbManager) {
+        dbManager.closeAll();
+    }
+    
     if (process.platform !== 'darwin') {
         app.quit();
     }
 });
 
-
+app.on('before-quit', () => {
+    // Ensure databases are closed
+    if (dbManager) {
+        dbManager.closeAll();
+    }
+});
