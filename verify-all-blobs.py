@@ -54,6 +54,7 @@ CONFIG = {
     'GAMEID': None,
     'FILE_NAME': None,
     'FULL_CHECK': False,
+    'VERIFY_RESULT': False,
     'FLIPS_PATH': None,
     'BASE_ROM_PATH': None
 }
@@ -73,7 +74,7 @@ class VerificationLogger:
         if self.log_stream:
             self.log_stream.close()
 
-def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_source='files'):
+def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_result=False, verify_source='files'):
     """Verify a single patchblob"""
     gameid = patchblob.get('gameid', 'N/A')
     blob_name = patchblob['patchblob1_name']
@@ -88,6 +89,7 @@ def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_sourc
         'decode_success': False,
         'patch_hash_valid': False,
         'flips_test_success': False,
+        'result_hash_valid': False,
         'errors': []
     }
     
@@ -172,13 +174,30 @@ def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_sourc
                 flips_cmd = [CONFIG['FLIPS_PATH'], '--apply', temp_patch, CONFIG['BASE_ROM_PATH'], temp_rom]
                 subprocess.run(flips_cmd, check=True, capture_output=True)
                 
+                result['flips_test_success'] = True
+                
+                # Check result hash if requested
+                if verify_result and patchblob.get('result_sha224') and os.path.exists(temp_rom):
+                    with open(temp_rom, 'rb') as f:
+                        result_data = f.read()
+                    
+                    result_hash = hashlib.sha224(result_data).hexdigest()
+                    
+                    if result_hash == patchblob['result_sha224']:
+                        result['result_hash_valid'] = True
+                    else:
+                        result['errors'].append(f"Result hash mismatch: expected {patchblob['result_sha224']}, got {result_hash}")
+                        result['flips_test_success'] = False  # Override - result doesn't match
+                elif verify_result and not patchblob.get('result_sha224'):
+                    # No expected hash to verify against
+                    result['result_hash_valid'] = None
+                
                 # Clean up
                 if os.path.exists(temp_patch):
                     os.remove(temp_patch)
                 if os.path.exists(temp_rom):
                     os.remove(temp_rom)
                 
-                result['flips_test_success'] = True
             except subprocess.CalledProcessError as e:
                 result['errors'].append(f"Flips test failed: exit code {e.returncode}")
             except Exception as e:
@@ -279,6 +298,7 @@ def main():
     parser.add_argument('--gameid', help='Verify specific game ID only')
     parser.add_argument('--file-name', help='Verify specific blob file only')
     parser.add_argument('--full-check', action='store_true', help='Test with flips (slow)')
+    parser.add_argument('--verify-result', action='store_true', help='Verify result hash (requires --full-check)')
     parser.add_argument('--log-file', default='verification_results_py.log', help='Log file path')
     parser.add_argument('--failed-file', default='failed_blobs_py.json', help='Failed items file')
     
@@ -289,8 +309,14 @@ def main():
     CONFIG['GAMEID'] = args.gameid
     CONFIG['FILE_NAME'] = args.file_name
     CONFIG['FULL_CHECK'] = args.full_check
+    CONFIG['VERIFY_RESULT'] = args.verify_result
     CONFIG['LOG_FILE'] = args.log_file
     CONFIG['FAILED_FILE'] = args.failed_file
+    
+    # Verify-result requires full-check
+    if CONFIG['VERIFY_RESULT'] and not CONFIG['FULL_CHECK']:
+        print('Error: --verify-result requires --full-check')
+        sys.exit(2)
     
     print('=' * 70)
     print('BLOB VERIFICATION UTILITY (Python)')
@@ -299,7 +325,11 @@ def main():
     print(f"Verification source: {'patchbin.db file_data' if CONFIG['VERIFY_SOURCE'] == 'db' else 'blob files'}\n")
     
     if CONFIG['FULL_CHECK']:
-        print('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)\n')
+        print('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)')
+        if CONFIG['VERIFY_RESULT']:
+            print('⚠️  VERIFY RESULT MODE - Will verify result_sha224 hash\n')
+        else:
+            print()
         
         # Find flips and base ROM
         try:
@@ -353,11 +383,16 @@ def main():
             progress = f"[{i + 1}/{len(patchblobs)}]"
             logger.log(f"\n{progress} Game {pb.get('gameid', 'N/A')}: {pb['patchblob1_name']}")
             
-            result = verify_blob(pb, patchbin_conn, logger, CONFIG['FULL_CHECK'], CONFIG['VERIFY_SOURCE'])
+            result = verify_blob(pb, patchbin_conn, logger, CONFIG['FULL_CHECK'], CONFIG['VERIFY_RESULT'], CONFIG['VERIFY_SOURCE'])
             
             if not result['errors'] and result['patch_hash_valid']:
-                flips_msg = ' (flips test passed)' if CONFIG['FULL_CHECK'] and result['flips_test_success'] else ''
-                logger.log(f"  ✅ VALID{flips_msg}")
+                status_msg = '  ✅ VALID'
+                if CONFIG['FULL_CHECK'] and result['flips_test_success']:
+                    status_msg += ' (flips test passed'
+                    if CONFIG['VERIFY_RESULT'] and result['result_hash_valid']:
+                        status_msg += ', result hash verified'
+                    status_msg += ')'
+                logger.log(status_msg)
                 verified += 1
             else:
                 logger.log(f"  ❌ FAILED:")
