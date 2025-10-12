@@ -27,6 +27,7 @@ const BlobCreator = require('./lib/blob-creator');
 const RecordCreator = require('./lib/record-creator');
 const UpdateProcessor = require('./lib/update-processor');
 const StatsManager = require('./lib/stats-manager');
+const { getFlipsPath } = require('./lib/flips-finder');
 
 // Configuration
 const CONFIG = {
@@ -59,8 +60,8 @@ const CONFIG = {
   // User Agent
   USER_AGENT: 'rhtools-updategames/1.0',
   
-  // Flips utility
-  FLIPS_PATH: process.platform === 'win32' ? 'flips.exe' : './flips',
+  // Flips utility (will be set during initialization)
+  FLIPS_PATH: null,
   
   // Encryption settings
   PBKDF2_ITERATIONS: 390000,
@@ -295,16 +296,12 @@ async function verifyPrerequisites() {
     console.log(`    ✓ Base ROM verified`);
   }
   
-  // Check flips utility
+  // Check flips utility using the finder
   try {
-    const flipsCheck = process.platform === 'win32' ? 'where flips' : 'which flips';
-    execSync(flipsCheck, { stdio: 'pipe' });
+    CONFIG.FLIPS_PATH = getFlipsPath({ projectRoot: __dirname });
     console.log(`    ✓ Flips utility found`);
   } catch (error) {
-    // Try local flips
-    if (!fs.existsSync(CONFIG.FLIPS_PATH)) {
-      throw new Error(`Flips utility not found. Please install flips or place it in the project root.\nSee: https://github.com/Alcaro/Flips`);
-    }
+    throw error;
   }
   
   // Check/create directories
