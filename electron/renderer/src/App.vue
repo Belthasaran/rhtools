@@ -47,6 +47,18 @@
 
     <section class="content">
       <div class="table-wrapper">
+        <!-- Loading indicator -->
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="loading-spinner"></div>
+          <div>Loading games from database...</div>
+        </div>
+        
+        <!-- Error message -->
+        <div v-if="loadError" class="error-message">
+          <strong>Error:</strong> {{ loadError }}
+          <button @click="loadGames">Retry</button>
+        </div>
+        
         <table class="data-table">
           <thead>
             <tr>
@@ -632,7 +644,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, onMounted, watch } from 'vue';
+
+// Debounce utility
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout | null = null;
+  return ((...args: any[]) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
 
 type ItemStatus = 'Default' | 'In Progress' | 'Finished';
 
@@ -657,66 +678,12 @@ type Item = {
   CurrentVersion?: number;
 };
 
-const items = reactive<Item[]>([
-  { 
-    Id: '11374', 
-    Name: 'Super Dram World', 
-    Type: 'Kaizo: Intermediate', 
-    Author: 'Panga', 
-    Length: '18 exits', 
-    PublicDifficulty: 'Advanced',
-    Status: 'Default', 
-    MyDifficultyRating: 4, 
-    MyReviewRating: 5,
-    MySkillRating: 5,  // Master level when rated
-    Publicrating: 4.3, 
-    Hidden: false, 
-    ExcludeFromRandom: false,
-    Mynotes: '',
-    AvailableVersions: [1, 2, 3],
-    CurrentVersion: 3,
-    JsonData: { gameid: '11374', name: 'Super Dram World', version: 3, author: 'Panga', difficulty: 'Advanced' }
-  },
-  { 
-    Id: '17289', 
-    Name: 'Storks, Apes, and Crocodiles', 
-    Type: 'Standard', 
-    LegacyType: 'Standard: Hard',
-    Author: 'Morsel', 
-    Length: 'unknown', 
-    PublicDifficulty: 'Moderate',
-    Status: 'In Progress', 
-    MyDifficultyRating: 5, 
-    MyReviewRating: 4,
-    MySkillRating: 3,  // Advanced when rated
-    Publicrating: 4.6, 
-    Hidden: false, 
-    ExcludeFromRandom: false,
-    Mynotes: 'Practice level 0x0F',
-    AvailableVersions: [1, 2],
-    CurrentVersion: 2,
-    JsonData: { gameid: '17289', name: 'Storks, Apes, and Crocodiles', version: 2, author: 'Morsel' }
-  },
-  { 
-    Id: '20091', 
-    Name: 'Example Hack', 
-    Type: 'Traditional', 
-    Author: 'Someone', 
-    Length: '5 exits', 
-    PublicDifficulty: 'Easy',
-    Status: 'Finished', 
-    MyDifficultyRating: 2, 
-    MyReviewRating: 2,
-    MySkillRating: 1,  // Casual when rated
-    Publicrating: 3.8, 
-    Hidden: false, 
-    ExcludeFromRandom: true,
-    Mynotes: '',
-    AvailableVersions: [1],
-    CurrentVersion: 1,
-    JsonData: { gameid: '20091', name: 'Example Hack', version: 1, author: 'Someone' }
-  },
-]);
+// Loading and error states
+const isLoading = ref(false);
+const loadError = ref<string | null>(null);
+
+// Main data (will be loaded from database)
+const items = reactive<Item[]>([]);
 
 const selectedIds = ref<Set<string>>(new Set());
 const searchQuery = ref('');
@@ -913,9 +880,38 @@ function closeSettings() {
   settingsModalOpen.value = false;
 }
 
-function saveSettings() {
+async function saveSettings() {
   console.log('Saving settings:', settings);
-  // TODO: Persist settings via IPC
+  
+  try {
+    // Convert settings to object with string values
+    const settingsToSave = {
+      vanillaRomValid: String(settings.vanillaRomValid),
+      flipsValid: String(settings.flipsValid),
+      asarValid: String(settings.asarValid),
+      uberAsmValid: String(settings.uberAsmValid),
+      launchMethod: settings.launchMethod,
+      launchProgram: settings.launchProgram,
+      launchProgramArgs: settings.launchProgramArgs,
+      usb2snesAddress: settings.usb2snesAddress,
+      usb2snesEnabled: settings.usb2snesEnabled,
+      usb2snesLaunchPref: settings.usb2snesLaunchPref,
+      usb2snesUploadPref: settings.usb2snesUploadPref,
+      usb2snesUploadDir: settings.usb2snesUploadDir,
+    };
+    
+    const result = await (window as any).electronAPI.saveSettings(settingsToSave);
+    if (result.success) {
+      console.log('Settings saved successfully');
+    } else {
+      console.error('Failed to save settings:', result.error);
+      alert(`Error saving settings: ${result.error}`);
+    }
+  } catch (error: any) {
+    console.error('Error saving settings:', error);
+    alert(`Error saving settings: ${error.message}`);
+  }
+  
   closeSettings();
 }
 
@@ -1348,6 +1344,170 @@ function editGlobalConditions() {
   }
 }
 
+// ===========================================================================
+// DATABASE INTEGRATION
+// ===========================================================================
+
+/**
+ * Load all games from database
+ */
+async function loadGames() {
+  isLoading.value = true;
+  loadError.value = null;
+  
+  try {
+    const games = await (window as any).electronAPI.getGames();
+    
+    // Get available versions for each game
+    for (const game of games) {
+      try {
+        const versions = await (window as any).electronAPI.getVersions(game.Id);
+        game.AvailableVersions = versions;
+      } catch (error) {
+        console.error(`Error getting versions for ${game.Id}:`, error);
+        game.AvailableVersions = [game.CurrentVersion];
+      }
+    }
+    
+    items.splice(0, items.length, ...games);
+    console.log(`Loaded ${games.length} games from database`);
+  } catch (error: any) {
+    console.error('Failed to load games:', error);
+    loadError.value = error.message || 'Failed to load games';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+/**
+ * Load stages for currently selected game
+ */
+async function loadStages(gameid: string) {
+  try {
+    const stages = await (window as any).electronAPI.getStages(gameid);
+    stagesByItemId[gameid] = stages;
+    return stages;
+  } catch (error) {
+    console.error(`Error loading stages for ${gameid}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Load settings from database
+ */
+async function loadSettings() {
+  try {
+    const savedSettings = await (window as any).electronAPI.getSettings();
+    
+    // Apply saved settings to reactive state
+    if (savedSettings.vanillaRomValid) settings.vanillaRomValid = savedSettings.vanillaRomValid === 'true';
+    if (savedSettings.flipsValid) settings.flipsValid = savedSettings.flipsValid === 'true';
+    if (savedSettings.asarValid) settings.asarValid = savedSettings.asarValid === 'true';
+    if (savedSettings.uberAsmValid) settings.uberAsmValid = savedSettings.uberAsmValid === 'true';
+    if (savedSettings.launchMethod) settings.launchMethod = savedSettings.launchMethod as any;
+    if (savedSettings.launchProgram) settings.launchProgram = savedSettings.launchProgram;
+    if (savedSettings.launchProgramArgs) settings.launchProgramArgs = savedSettings.launchProgramArgs;
+    if (savedSettings.usb2snesAddress) settings.usb2snesAddress = savedSettings.usb2snesAddress;
+    if (savedSettings.usb2snesEnabled) settings.usb2snesEnabled = savedSettings.usb2snesEnabled as any;
+    if (savedSettings.usb2snesLaunchPref) settings.usb2snesLaunchPref = savedSettings.usb2snesLaunchPref as any;
+    if (savedSettings.usb2snesUploadPref) settings.usb2snesUploadPref = savedSettings.usb2snesUploadPref as any;
+    if (savedSettings.usb2snesUploadDir) settings.usb2snesUploadDir = savedSettings.usb2snesUploadDir;
+    
+    console.log('Settings loaded from database');
+  } catch (error) {
+    console.error('Error loading settings:', error);
+  }
+}
+
+/**
+ * Save annotation to database (debounced)
+ */
+const debouncedSaveAnnotation = debounce(async (item: Item) => {
+  try {
+    const annotation = {
+      gameid: item.Id,
+      status: item.Status,
+      myDifficultyRating: item.MyDifficultyRating,
+      myReviewRating: item.MyReviewRating,
+      mySkillRating: item.MySkillRating,
+      hidden: item.Hidden,
+      excludeFromRandom: item.ExcludeFromRandom,
+      mynotes: item.Mynotes
+    };
+    
+    const result = await (window as any).electronAPI.saveAnnotation(annotation);
+    if (!result.success) {
+      console.error('Failed to save annotation:', result.error);
+    }
+  } catch (error) {
+    console.error('Error saving annotation:', error);
+  }
+}, 500);
+
+/**
+ * Load specific game version
+ */
+async function loadGameVersion(gameid: string, version: number) {
+  try {
+    const game = await (window as any).electronAPI.getGame(gameid, version);
+    if (game) {
+      // Update the item in the list
+      const index = items.findIndex(it => it.Id === gameid);
+      if (index >= 0) {
+        // Preserve AvailableVersions
+        game.AvailableVersions = items[index].AvailableVersions;
+        Object.assign(items[index], game);
+      }
+    }
+  } catch (error) {
+    console.error(`Error loading game ${gameid} version ${version}:`, error);
+  }
+}
+
+/**
+ * Initialize on mount
+ */
+onMounted(async () => {
+  console.log('App mounted, loading data...');
+  await loadGames();
+  await loadSettings();
+});
+
+/**
+ * Watch for item changes and auto-save
+ */
+watch(items, () => {
+  // Auto-save when items change
+  for (const item of items) {
+    debouncedSaveAnnotation(item);
+  }
+}, { deep: true });
+
+/**
+ * Watch for version changes
+ */
+watch(selectedVersion, async (newVersion) => {
+  if (selectedItem.value && newVersion) {
+    await loadGameVersion(selectedItem.value.Id, newVersion);
+  }
+});
+
+/**
+ * Watch for selected item changes to load stages
+ */
+watch(selectedItem, async (newItem, oldItem) => {
+  if (newItem && newItem.Id !== oldItem?.Id) {
+    // Load stages for this game if not already loaded
+    if (!stagesByItemId[newItem.Id]) {
+      await loadStages(newItem.Id);
+    }
+    
+    // Set selected version to current version
+    selectedVersion.value = newItem.CurrentVersion || 1;
+  }
+});
+
 // Version management
 const selectedVersion = ref<number>(1);
 const availableVersions = computed(() => {
@@ -1691,6 +1851,63 @@ button { padding: 6px 10px; }
   background: #f0fdf4;
   border-left: 3px solid #10b981;
   border-radius: 3px;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+  font-size: 16px;
+  color: #374151;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  padding: 12px 16px;
+  margin: 16px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #991b1b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.error-message button {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.error-message button:hover {
+  background: #b91c1c;
 }
 </style>
 
