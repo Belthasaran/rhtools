@@ -41,7 +41,9 @@
     "test:updategames": "node tests/test_updategames.js",
     "utils:identify-keys": "node identify-incompatible-keys.js",
     "utils:reprocess-attachments": "node reprocess-attachments.js",
-    "utils:backfill-rhmd": "node backfill_rhmd.js"
+    "utils:backfill-rhmd": "node backfill_rhmd.js",
+    "verify:blobs": "node verify-all-blobs.js",
+    "verify:blobs-full": "node verify-all-blobs.js --full-check"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
