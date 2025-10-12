@@ -55,6 +55,8 @@ node verify-all-blobs.js [options]
 | `--gameid=<id>` | Verify specific game ID only | all |
 | `--file-name=<name>` | Verify specific blob file only | all |
 | `--full-check` | Test patches with flips (slow) | false |
+| `--verify-result` | Verify result_sha224 hash (requires --full-check) | false |
+| `--newer-than=<value>` | Only verify blobs newer than timestamp or blob name | all |
 | `--log-file=<path>` | Log results to file | verification_results.log |
 | `--failed-file=<path>` | Save failed items list | failed_blobs.json |
 
@@ -70,6 +72,11 @@ node verify-all-blobs.js [options]
 - ✓ All basic checks
 - ✓ Patch applies successfully with flips
 - ✓ Flips exits with success code
+
+#### Result Hash Verification (--verify-result, requires --full-check)
+- ✓ All full check validations
+- ✓ **Result ROM hash matches result_sha224**
+- ✓ Protects against flips bugs that return success with incorrect output
 
 ### Examples
 
@@ -91,6 +98,21 @@ node verify-all-blobs.js --verify-blobs=files --full-check --log-file=full_verif
 
 # Full check specific game (from database)
 node verify-all-blobs.js --verify-blobs=db --gameid=40663 --full-check
+
+# Full check with result hash verification (most thorough)
+node verify-all-blobs.js --verify-blobs=files --full-check --verify-result
+
+# Verify result hash for specific game
+node verify-all-blobs.js --gameid=40663 --full-check --verify-result
+
+# Incremental verification - only recent blobs
+node verify-all-blobs.js --newer-than="2025-10-12"
+
+# Verify blobs newer than a specific blob
+node verify-all-blobs.js --newer-than=pblob_40663_60a76bf9c7
+
+# Daily verification - blobs from today
+node verify-all-blobs.js --newer-than="$(date +%Y-%m-%d)"
 ```
 
 ### Output Format
@@ -168,6 +190,8 @@ python3 verify-all-blobs.py [options]
 | `--gameid=<id>` | Verify specific game ID only | all |
 | `--file-name=<name>` | Verify specific blob file only | all |
 | `--full-check` | Test patches with flips (slow) | false |
+| `--verify-result` | Verify result_sha224 hash (requires --full-check) | false |
+| `--newer-than=<value>` | Only verify blobs newer than timestamp or blob name | all |
 | `--log-file=<path>` | Log results to file | verification_results_py.log |
 | `--failed-file=<path>` | Save failed items list | failed_blobs_py.json |
 
@@ -189,8 +213,17 @@ python3 verify-all-blobs.py --dbtype=sqlite --verify-blobs=db --gameid=40663
 # Full check with flips
 python3 verify-all-blobs.py --dbtype=sqlite --full-check --log-file=py_verify.log
 
+# Full check with result hash verification
+python3 verify-all-blobs.py --dbtype=sqlite --full-check --verify-result
+
 # Verify specific blob from RHMD file
 python3 verify-all-blobs.py --dbtype=rhmd --file-name=pblob_4982_d61803aa91
+
+# Incremental verification - only recent blobs
+python3 verify-all-blobs.py --dbtype=sqlite --newer-than="2025-10-12"
+
+# Verify blobs newer than a specific blob
+python3 verify-all-blobs.py --dbtype=sqlite --newer-than=pblob_40663_60a76bf9c7
 ```
 
 ---
@@ -239,7 +272,8 @@ In addition to basic verification, full check mode:
 1. **Saves decoded patch** to temporary file
 2. **Runs flips** to apply patch to SMW ROM
 3. **Verifies flips** exits successfully
-4. **Cleans up** temporary files
+4. **With --verify-result**: Verifies result ROM hash matches result_sha224
+5. **Cleans up** temporary files
 
 ### Requirements
 
@@ -249,21 +283,39 @@ In addition to basic verification, full check mode:
 ### Example Output
 
 ```
+# Basic check
+[1/10] Game 40663: pblob_40663_60a76bf9c7
+  ✅ VALID
+
+# Full check
 [1/10] Game 40663: pblob_40663_60a76bf9c7
   ✅ VALID (flips test passed)
+
+# Full check with result verification
+[1/10] Game 40663: pblob_40663_60a76bf9c7
+  ✅ VALID (flips test passed, result hash verified)
 ```
 
 ### When to Use
 
+**Basic --full-check:**
 - Before production deployment
 - After database migration
 - When suspicious patch issues occur
 - Monthly/quarterly integrity audits
 
+**With --verify-result (most thorough):**
+- Critical production verification
+- When flips behavior is suspect
+- Final validation before archiving
+- Compliance/audit requirements
+- Detecting silent corruption where flips succeeds but produces wrong output
+
 ### Performance Impact
 
 **Without full check**: ~50-100 blobs/second  
-**With full check**: ~2-5 blobs/second
+**With full check**: ~2-5 blobs/second  
+**With full check + verify-result**: ~2-5 blobs/second (minimal overhead for hash check)
 
 **Recommendation**: Use `--gameid` or `--file-name` with full check for testing, run full database verification overnight.
 
@@ -271,9 +323,18 @@ In addition to basic verification, full check mode:
 
 ## Common Use Cases
 
-### Daily Health Check
+### Daily Health Check (Incremental)
 ```bash
-# Quick verify (from files)
+# Verify only blobs added/updated today
+node verify-all-blobs.js --newer-than="$(date +%Y-%m-%d)"
+
+# Expected: Only recent blobs verified ✅
+# Performance: 60x+ faster than full verification
+```
+
+### Weekly Full Verification
+```bash
+# Full verify (from files)
 npm run verify:blobs
 
 # Expected: All blobs valid ✅
@@ -477,6 +538,25 @@ flips --apply temp/test.patch smw.sfc temp/result.sfc
 # If flips fails, patch may be invalid - redownload game
 ```
 
+### "Result hash mismatch"
+
+```bash
+# This means flips succeeded but produced wrong output
+# Possible causes:
+# 1. Corrupt base ROM (smw.sfc)
+# 2. Flips bug
+# 3. Corrupt patch data
+# 4. Wrong result_sha224 in database
+
+# Verify base ROM
+sha224sum smw.sfc
+# Expected: fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08
+
+# Try with fresh base ROM
+# If still fails, patch data or database record is corrupt - reprocess game
+node updategames.js --game-ids=XXXXX --all-patches
+```
+
 ---
 
 ## Exit Codes
@@ -500,8 +580,10 @@ Dataset: 3,120 blobs
 | db (basic) | ~60 seconds | ~50 blobs/sec |
 | files (full-check) | ~45 minutes | ~1.2 blobs/sec |
 | db (full-check) | ~50 minutes | ~1.0 blobs/sec |
+| files (full + verify-result) | ~45 minutes | ~1.2 blobs/sec |
+| db (full + verify-result) | ~50 minutes | ~1.0 blobs/sec |
 
-**Recommendation**: Use basic verification for routine checks, full-check for audits.
+**Recommendation**: Use basic verification for routine checks, full-check for audits, verify-result for critical validation.
 
 ---
 
@@ -536,5 +618,7 @@ fi
 - `docs/UPDATEGAMES_DECODER_001.md` - Blob format documentation
 - `docs/PYTHON_COMPATIBILITY_GUIDE.md` - Python integration
 - `docs/BLOB_COMPATIBILITY_SOLUTION.md` - Complete solution guide
+- `docs/VERIFY_RESULT_FEATURE.md` - Result verification feature
+- `docs/NEWER_THAN_FEATURE.md` - Incremental verification feature
 - `tests/README_BLOB_TESTS.md` - Test suite documentation
 

@@ -15,6 +15,8 @@
  *   --file-name=<name>       Verify specific blob file only
  *   --full-check             Test patches with flips (slow, comprehensive)
  *   --verify-result          Verify flips result hash against result_sha224 (requires --full-check)
+ *   --newer-than=<value>     Only verify blobs newer than timestamp or blob file_name
+ *                            (value can be ISO date/timestamp or a patchblob file_name)
  *   --log-file=<path>        Log results to file (default: verification_results.log)
  *   --failed-file=<path>     Save failed items list (default: failed_blobs.json)
  * 
@@ -44,6 +46,7 @@ const CONFIG = {
   VERIFY_RESULT: false,  // Verify flips result hash
   GAMEID: null,
   FILE_NAME: null,
+  NEWER_THAN: null,  // Timestamp or blob file_name
   FLIPS_PATH: null,
   BASE_ROM_PATH: null
 };
@@ -70,6 +73,10 @@ function parseArgs(args) {
       parsed.fullCheck = true;
     } else if (arg === '--verify-result') {
       parsed.verifyResult = true;
+    } else if (arg.startsWith('--newer-than=')) {
+      parsed.newerThan = arg.split('=')[1];
+    } else if (arg === '--newer-than') {
+      parsed.newerThan = args[++i];
     } else if (arg.startsWith('--log-file=')) {
       parsed.logFile = arg.split('=')[1];
     } else if (arg === '--log-file') {
@@ -237,6 +244,60 @@ async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullChec
   return result;
 }
 
+async function resolveNewerThanTimestamp(newerThanValue, dbManager, patchbinDb) {
+  // Check if it's a blob file_name or a timestamp
+  // First, try to look it up as a blob file_name
+  
+  // Check if it looks like a patchblob filename
+  if (newerThanValue.startsWith('pblob_') || newerThanValue.startsWith('rblob_')) {
+    // Query patchblobs table for pbimport_time
+    const patchblob = dbManager.db.prepare(
+      'SELECT pbimport_time FROM patchblobs WHERE patchblob1_name = ?'
+    ).get(newerThanValue);
+    
+    const timestamps = [];
+    
+    if (patchblob && patchblob.pbimport_time) {
+      timestamps.push(patchblob.pbimport_time);
+    }
+    
+    // Query attachments table for updated_time and import_time (from patchbin.db)
+    if (patchbinDb) {
+      const attachment = patchbinDb.prepare(
+        'SELECT updated_time, import_time FROM attachments WHERE file_name = ?'
+      ).get(newerThanValue);
+      
+      if (attachment) {
+        if (attachment.updated_time) timestamps.push(attachment.updated_time);
+        if (attachment.import_time) timestamps.push(attachment.import_time);
+      }
+    }
+    
+    if (timestamps.length === 0) {
+      throw new Error(`Blob ${newerThanValue} not found or has no valid timestamps`);
+    }
+    
+    // Return the latest timestamp
+    const latest = timestamps.reduce((max, ts) => ts > max ? ts : max);
+    console.log(`Using timestamp from blob ${newerThanValue}: ${latest}`);
+    return latest;
+  }
+  
+  // Not a blob name - treat as timestamp
+  // Try to parse as ISO date or timestamp
+  try {
+    const date = new Date(newerThanValue);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date');
+    }
+    const timestamp = date.toISOString();
+    console.log(`Using specified timestamp: ${timestamp}`);
+    return timestamp;
+  } catch (error) {
+    throw new Error(`Invalid --newer-than value: ${newerThanValue}. Must be a valid blob file_name or ISO date/timestamp.`);
+  }
+}
+
 async function main() {
   const argv = parseArgs(process.argv.slice(2));
   
@@ -245,6 +306,7 @@ async function main() {
   CONFIG.FILE_NAME = argv.fileName || null;
   CONFIG.FULL_CHECK = argv.fullCheck || false;
   CONFIG.VERIFY_RESULT = argv.verifyResult || false;
+  CONFIG.NEWER_THAN = argv.newerThan || null;
   CONFIG.LOG_FILE = argv.logFile || CONFIG.LOG_FILE;
   CONFIG.FAILED_FILE = argv.failedFile || CONFIG.FAILED_FILE;
   
@@ -295,13 +357,20 @@ async function main() {
     const dbManager = new DatabaseManager(CONFIG.DB_PATH);
     const recordCreator = new RecordCreator(dbManager, CONFIG.PATCHBIN_DB_PATH, CONFIG);
     
-    // Open patchbin database if verifying from db
+    // Open patchbin database if verifying from db or if newer-than is specified
     const Database = require('better-sqlite3');
-    const patchbinDb = CONFIG.VERIFY_SOURCE === 'db' 
+    const patchbinDb = (CONFIG.VERIFY_SOURCE === 'db' || CONFIG.NEWER_THAN)
       ? new Database(CONFIG.PATCHBIN_DB_PATH, { readonly: true })
       : null;
     
     // Build query
+    // Resolve newer-than timestamp if specified
+    let newerThanTimestamp = null;
+    if (CONFIG.NEWER_THAN) {
+      newerThanTimestamp = await resolveNewerThanTimestamp(CONFIG.NEWER_THAN, dbManager, patchbinDb);
+      logger.log(`Filtering to blobs newer than: ${newerThanTimestamp}\n`);
+    }
+    
     let query = `
       SELECT pb.*, gv.gameid
       FROM patchblobs pb
@@ -321,6 +390,36 @@ async function main() {
       query += ` AND pb.patchblob1_name = ?`;
       params.push(CONFIG.FILE_NAME);
       logger.log(`Filtering to file: ${CONFIG.FILE_NAME}`);
+    }
+    
+    if (newerThanTimestamp) {
+      // Attach patchbin.db to query attachments table
+      dbManager.db.prepare(`ATTACH DATABASE '${CONFIG.PATCHBIN_DB_PATH}' AS patchbin`).run();
+      
+      query = `
+        SELECT pb.*, gv.gameid
+        FROM patchblobs pb
+        LEFT JOIN gameversions gv ON gv.gvuuid = pb.gvuuid
+        LEFT JOIN patchbin.attachments a ON a.file_name = pb.patchblob1_name
+        WHERE pb.patchblob1_key IS NOT NULL
+      `;
+      
+      // Re-apply filters
+      params.length = 0;
+      
+      if (CONFIG.GAMEID) {
+        query += ` AND gv.gameid = ?`;
+        params.push(CONFIG.GAMEID);
+      }
+      
+      if (CONFIG.FILE_NAME) {
+        query += ` AND pb.patchblob1_name = ?`;
+        params.push(CONFIG.FILE_NAME);
+      }
+      
+      // Filter by any of the three timestamps
+      query += ` AND (pb.pbimport_time >= ? OR a.updated_time >= ? OR a.import_time >= ?)`;
+      params.push(newerThanTimestamp, newerThanTimestamp, newerThanTimestamp);
     }
     
     query += ` ORDER BY gv.gameid`;

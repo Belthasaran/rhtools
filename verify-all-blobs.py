@@ -16,6 +16,8 @@ Options:
     --file-name=<name>     Verify specific blob file only
     --full-check           Test patches with flips (slow, comprehensive)
     --verify-result        Verify flips result hash against result_sha224 (requires --full-check)
+    --newer-than=<value>   Only verify blobs newer than timestamp or blob file_name
+                           (value can be ISO date/timestamp or a patchblob file_name)
     --log-file=<path>      Log results to file (default: verification_results_py.log)
     --failed-file=<path>   Save failed items list (default: failed_blobs_py.json)
 
@@ -55,6 +57,7 @@ CONFIG = {
     'FILE_NAME': None,
     'FULL_CHECK': False,
     'VERIFY_RESULT': False,
+    'NEWER_THAN': None,
     'FLIPS_PATH': None,
     'BASE_ROM_PATH': None
 }
@@ -208,18 +211,39 @@ def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_resul
     
     return result
 
-def get_patchblobs_from_sqlite(gameid=None, file_name=None):
+def get_patchblobs_from_sqlite(gameid=None, file_name=None, newer_than=None):
     """Get patchblobs from SQLite database"""
     conn = sqlite3.connect(CONFIG['DB_PATH'])
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    query = """
-        SELECT pb.*, gv.gameid
-        FROM patchblobs pb
-        LEFT JOIN gameversions gv ON gv.gvuuid = pb.gvuuid
-        WHERE pb.patchblob1_key IS NOT NULL
-    """
+    # Resolve newer-than timestamp if specified
+    newer_than_timestamp = None
+    if newer_than:
+        # Need patchbin.db connection for resolving newer_than
+        patchbin_conn_temp = sqlite3.connect(CONFIG['PATCHBIN_DB_PATH'])
+        newer_than_timestamp = resolve_newer_than_timestamp(newer_than, conn, patchbin_conn_temp)
+        patchbin_conn_temp.close()
+        print(f"Filtering to blobs newer than: {newer_than_timestamp}\n")
+    
+    # Attach patchbin.db if using newer_than filter
+    if newer_than_timestamp:
+        cursor.execute(f"ATTACH DATABASE '{CONFIG['PATCHBIN_DB_PATH']}' AS patchbin")
+        
+        query = """
+            SELECT pb.*, gv.gameid
+            FROM patchblobs pb
+            LEFT JOIN gameversions gv ON gv.gvuuid = pb.gvuuid
+            LEFT JOIN patchbin.attachments a ON a.file_name = pb.patchblob1_name
+            WHERE pb.patchblob1_key IS NOT NULL
+        """
+    else:
+        query = """
+            SELECT pb.*, gv.gameid
+            FROM patchblobs pb
+            LEFT JOIN gameversions gv ON gv.gvuuid = pb.gvuuid
+            WHERE pb.patchblob1_key IS NOT NULL
+        """
     
     params = []
     
@@ -231,6 +255,10 @@ def get_patchblobs_from_sqlite(gameid=None, file_name=None):
         query += " AND pb.patchblob1_name = ?"
         params.append(file_name)
     
+    if newer_than_timestamp:
+        query += " AND (pb.pbimport_time >= ? OR a.updated_time >= ? OR a.import_time >= ?)"
+        params.extend([newer_than_timestamp, newer_than_timestamp, newer_than_timestamp])
+    
     query += " ORDER BY gv.gameid"
     
     cursor.execute(query, params)
@@ -241,8 +269,23 @@ def get_patchblobs_from_sqlite(gameid=None, file_name=None):
     conn.close()
     return patchblobs
 
-def get_patchblobs_from_rhmd(gameid=None, file_name=None):
+def get_patchblobs_from_rhmd(gameid=None, file_name=None, newer_than=None):
     """Get patchblobs from RHMD file"""
+    # Note: newer_than filtering for RHMD requires loading metadata for timestamp lookup
+    newer_than_timestamp = None
+    if newer_than:
+        # For RHMD, we need to resolve the timestamp differently
+        # If it's a blob name, we need to find it in the RHMD data
+        if newer_than.startswith('pblob_') or newer_than.startswith('rblob_'):
+            # We'll need to filter after loading all data
+            print(f"Will filter to blobs newer than: {newer_than} (requires loading all data)")
+        else:
+            # Parse as timestamp
+            from datetime import datetime
+            dt = datetime.fromisoformat(newer_than.replace('Z', '+00:00'))
+            newer_than_timestamp = dt.isoformat()
+            print(f"Filtering to blobs newer than: {newer_than_timestamp}\n")
+    
     try:
         import loadsmwrh
         
@@ -271,6 +314,30 @@ def get_patchblobs_from_rhmd(gameid=None, file_name=None):
             if file_name and blob_name != file_name:
                 continue
             
+            # Get timestamps for filtering
+            updated_time = hack.get('updated_time') or (hack.get('xdata', {}).get('updated_time') if isinstance(hack.get('xdata'), dict) else None)
+            import_time = hack.get('import_time') or (hack.get('xdata', {}).get('import_time') if isinstance(hack.get('xdata'), dict) else None)
+            pbimport_time = hack.get('pbimport_time') or (hack.get('xdata', {}).get('pbimport_time') if isinstance(hack.get('xdata'), dict) else None)
+            
+            # Filter by newer_than if specified
+            if newer_than_timestamp:
+                timestamps = [t for t in [updated_time, import_time, pbimport_time] if t]
+                if timestamps:
+                    latest = max(timestamps)
+                    if latest < newer_than_timestamp:
+                        continue
+                else:
+                    # No timestamps - skip if newer_than filter is active
+                    continue
+            elif newer_than and newer_than.startswith('pblob_'):
+                # Blob name reference - need to find that blob's timestamp first
+                if blob_name == newer_than:
+                    # This is the reference blob itself
+                    timestamps = [t for t in [updated_time, import_time, pbimport_time] if t]
+                    if timestamps:
+                        newer_than_timestamp = max(timestamps)
+                    continue  # Don't include the reference blob itself
+            
             patchblob = {
                 'gameid': hack.get('id'),
                 'pbuuid': None,
@@ -278,6 +345,9 @@ def get_patchblobs_from_rhmd(gameid=None, file_name=None):
                 'patchblob1_key': blob_key,
                 'patchblob1_sha224': blob_sha224,
                 'pat_sha224': hack.get('pat_sha224'),
+                'updated_time': updated_time,
+                'import_time': import_time,
+                'pbimport_time': pbimport_time,
                 'source': 'rhmd'
             }
             
@@ -289,6 +359,58 @@ def get_patchblobs_from_rhmd(gameid=None, file_name=None):
         print(f"Error loading RHMD file: {e}")
         return []
 
+def resolve_newer_than_timestamp(newer_than_value, conn, patchbin_conn=None):
+    """
+    Resolve newer-than value to a timestamp.
+    Can be a blob file_name or a timestamp.
+    """
+    # Check if it looks like a patchblob filename
+    if newer_than_value.startswith('pblob_') or newer_than_value.startswith('rblob_'):
+        # Query patchblobs table for pbimport_time
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT pbimport_time FROM patchblobs WHERE patchblob1_name = ?',
+            (newer_than_value,)
+        )
+        row = cursor.fetchone()
+        
+        timestamps = []
+        
+        if row and row[0]:
+            timestamps.append(row[0])
+        
+        # Query attachments table for updated_time and import_time (from patchbin.db)
+        if patchbin_conn:
+            cursor = patchbin_conn.cursor()
+            cursor.execute(
+                'SELECT updated_time, import_time FROM attachments WHERE file_name = ?',
+                (newer_than_value,)
+            )
+            row = cursor.fetchone()
+            
+            if row:
+                if row[0]: timestamps.append(row[0])
+                if row[1]: timestamps.append(row[1])
+        
+        if not timestamps:
+            raise ValueError(f"Blob {newer_than_value} not found or has no valid timestamps")
+        
+        # Return the latest timestamp
+        latest = max(timestamps)
+        print(f"Using timestamp from blob {newer_than_value}: {latest}")
+        return latest
+    
+    # Not a blob name - treat as timestamp
+    # Try to parse as ISO date or timestamp
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(newer_than_value.replace('Z', '+00:00'))
+        timestamp = dt.isoformat()
+        print(f"Using specified timestamp: {timestamp}")
+        return timestamp
+    except Exception as e:
+        raise ValueError(f"Invalid --newer-than value: {newer_than_value}. Must be a valid blob file_name or ISO date/timestamp.")
+
 def main():
     # Parse arguments
     import argparse
@@ -299,6 +421,7 @@ def main():
     parser.add_argument('--file-name', help='Verify specific blob file only')
     parser.add_argument('--full-check', action='store_true', help='Test with flips (slow)')
     parser.add_argument('--verify-result', action='store_true', help='Verify result hash (requires --full-check)')
+    parser.add_argument('--newer-than', help='Only verify blobs newer than timestamp or blob file_name')
     parser.add_argument('--log-file', default='verification_results_py.log', help='Log file path')
     parser.add_argument('--failed-file', default='failed_blobs_py.json', help='Failed items file')
     
@@ -310,6 +433,7 @@ def main():
     CONFIG['FILE_NAME'] = args.file_name
     CONFIG['FULL_CHECK'] = args.full_check
     CONFIG['VERIFY_RESULT'] = args.verify_result
+    CONFIG['NEWER_THAN'] = args.newer_than
     CONFIG['LOG_FILE'] = args.log_file
     CONFIG['FAILED_FILE'] = args.failed_file
     
@@ -368,9 +492,9 @@ def main():
     try:
         # Get patchblobs from appropriate source
         if CONFIG['DBTYPE'] == 'sqlite':
-            patchblobs = get_patchblobs_from_sqlite(CONFIG['GAMEID'], CONFIG['FILE_NAME'])
+            patchblobs = get_patchblobs_from_sqlite(CONFIG['GAMEID'], CONFIG['FILE_NAME'], CONFIG['NEWER_THAN'])
         else:  # rhmd
-            patchblobs = get_patchblobs_from_rhmd(CONFIG['GAMEID'], CONFIG['FILE_NAME'])
+            patchblobs = get_patchblobs_from_rhmd(CONFIG['GAMEID'], CONFIG['FILE_NAME'], CONFIG['NEWER_THAN'])
         
         logger.log(f"\nFound {len(patchblobs)} patchblobs to verify\n")
         logger.log('=' * 70)
