@@ -646,5 +646,229 @@ SELECT * FROM v_stages_with_annotations WHERE user_rating >= 4;
 
 ---
 
+## Migration 002: Enhanced Ratings and Run System (clientdata.db)
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Add dual rating system (difficulty + review), version-specific annotations, random exclusion controls, and complete run system for planning/executing challenge runs.
+
+### Command
+```bash
+sqlite3 electron/clientdata.db < electron/sql/migrations/002_clientdata_enhanced_ratings_and_runs.sql
+```
+
+### What It Does
+Creates/enhances 9 components:
+
+**Enhanced Tables**:
+1. `user_game_annotations` - Adds user_difficulty_rating, user_review_rating, exclude_from_random
+2. `user_stage_annotations` - Adds user_difficulty_rating, user_review_rating
+
+**New Tables**:
+3. `user_game_version_annotations` - Version-specific ratings/status/notes
+4. `runs` - Run metadata and status tracking
+5. `run_plan_entries` - Planned challenges in a run
+6. `run_results` - Actual execution results
+7. `run_archive` - Archived run metadata
+
+**New Views**:
+8. `v_active_run` - Current active run summary
+9. `v_run_progress` - Current run progress details
+
+Also updates existing views to include new rating fields.
+
+### Key Features
+
+**Dual Ratings**:
+- `user_difficulty_rating` (1-5): How hard is it?
+- `user_review_rating` (1-5): How much do you recommend it?
+
+**Version-Specific Annotations**:
+- Rate different versions of same game differently
+- Override game-wide ratings for specific versions
+- Example: v1 might be harder (difficulty=5) than v2 (difficulty=3)
+
+**Random Exclusion**:
+- User-level: `exclude_from_random` flag
+- Curator-level: See Migration 005
+
+**Run System**:
+- Plan runs with specific games or random challenges
+- Execute runs with timing and result tracking
+- Support for 4 entry types: game, stage, random_game, random_stage
+- Track success/skip/fail for each challenge
+- Archive completed runs for history
+
+### Prerequisites
+- Migration 001 (user annotations) must be run first
+- Database must be accessible
+
+### Expected Outcome
+- 4 new tables in clientdata.db
+- 3 enhanced tables with new columns
+- 2 new views for run tracking
+- Dual rating system functional
+- Version-specific annotations supported
+- Run system ready for use
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS and ALTER TABLE)
+- Keeps `user_rating` column for backwards compatibility
+- Applications should migrate to user_difficulty_rating
+- Run system is complex - see docs/ENHANCED_RATINGS_AND_RUN_SYSTEM.md
+
+### Verification
+```bash
+# Check new tables
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%run%';"
+
+# Expected output:
+# runs
+# run_plan_entries
+# run_results
+# run_archive
+
+# Check new columns
+sqlite3 electron/clientdata.db "PRAGMA table_info(user_game_annotations);" | grep -E "difficulty|review|exclude"
+
+# Check new views
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='view' AND name LIKE '%run%';"
+
+# Expected output:
+# v_active_run
+# v_run_progress
+```
+
+### Usage Examples
+
+```sql
+-- Set both ratings for a game
+INSERT OR REPLACE INTO user_game_annotations 
+  (gameid, user_difficulty_rating, user_review_rating, status)
+VALUES ('12345', 4, 5, 'In Progress');
+-- Difficulty 4 (Hard), Review 5 (Highly Recommended)
+
+-- Set version-specific rating
+INSERT OR REPLACE INTO user_game_version_annotations 
+  (annotation_key, gameid, version, user_difficulty_rating, user_review_rating)
+VALUES ('12345-2', '12345', 2, 3, 5);
+-- Version 2 is easier (3) but still great (5)
+
+-- Exclude from random
+UPDATE user_game_annotations SET exclude_from_random = 1 WHERE gameid = '12345';
+
+-- Create a run
+INSERT INTO runs (run_uuid, run_name, status)
+VALUES (lower(hex(randomblob(16))), 'Morning Run', 'preparing');
+
+-- Add specific game to run
+INSERT INTO run_plan_entries 
+  (run_uuid, sequence_number, entry_type, gameid, count)
+VALUES ('abc123', 1, 'game', '12345', 1);
+
+-- Add random kaizo challenges
+INSERT INTO run_plan_entries 
+  (run_uuid, sequence_number, entry_type, count, filter_type, filter_seed)
+VALUES ('abc123', 2, 'random_game', 5, 'Kaizo', 'seed789');
+```
+
+---
+
+## Migration 005: Local Run Exclusion (rhdata.db)
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Add curator-controlled flag to exclude games from random selection in gameversions table.
+
+### Command
+```bash
+sqlite3 electron/rhdata.db < electron/sql/migrations/005_add_local_runexcluded.sql
+```
+
+### What It Does
+- Adds `local_runexcluded` column (INTEGER DEFAULT 0) to gameversions table
+- Creates index on local_runexcluded for efficient filtering
+- Marks field as COMPUTED COLUMN (do not import from JSON)
+
+### Rationale
+Curators need ability to exclude certain games from random selection independent of user preferences:
+- Broken or buggy games
+- Inappropriate content
+- Test/demo games
+- Duplicate entries
+- Games with missing files
+
+### Prerequisites
+- Database must be accessible
+- Backup recommended
+
+### Expected Outcome
+- gameversions table has new local_runexcluded column
+- Index created for efficient queries
+- All existing games default to 0 (not excluded)
+
+### Warnings
+- Safe to run multiple times (uses IF NOT EXISTS)
+- This is a **COMPUTED COLUMN** - scripts must NOT import from JSON
+- This field complements user-level exclude_from_random in clientdata.db
+
+### COMPUTED COLUMNS
+Fields that must NOT be imported from JSON:
+- local_runexcluded (NEW)
+- combinedtype
+- gvimport_time
+- version
+- gvuuid
+- local_resource_etag
+- local_resource_lastmodified
+- local_resource_filename
+
+### Verification
+```bash
+# Check column exists
+sqlite3 electron/rhdata.db "PRAGMA table_info(gameversions);" | grep runexcluded
+
+# Expected output:
+# 41|local_runexcluded|INTEGER|0|0|0
+
+# Check index exists
+sqlite3 electron/rhdata.db "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_gameversions_runexcluded';"
+
+# Count excluded games
+sqlite3 electron/rhdata.db "SELECT COUNT(*) FROM gameversions WHERE local_runexcluded = 1;"
+```
+
+### Usage Examples
+
+```sql
+-- Exclude a game from random selection
+UPDATE gameversions SET local_runexcluded = 1 WHERE gameid = '12345';
+
+-- Un-exclude a game
+UPDATE gameversions SET local_runexcluded = 0 WHERE gameid = '12345';
+
+-- Get eligible games for random selection (combining both exclusion flags)
+ATTACH DATABASE 'electron/clientdata.db' AS clientdata;
+
+SELECT gv.gameid, gv.name, gv.difficulty
+FROM gameversions gv
+LEFT JOIN clientdata.user_game_annotations uga ON gv.gameid = uga.gameid
+WHERE gv.removed = 0
+  AND gv.obsoleted = 0
+  AND gv.local_runexcluded = 0  -- Curator says OK
+  AND (uga.exclude_from_random IS NULL OR uga.exclude_from_random = 0)  -- User says OK
+  AND gv.version = (SELECT MAX(version) FROM gameversions WHERE gameid = gv.gameid)
+ORDER BY RANDOM()
+LIMIT 10;
+
+DETACH DATABASE clientdata;
+```
+
+---
+
 *Last Updated: October 12, 2025*  
-*Total Migrations: 6 (4 rhdata schema + 1 Phase 1 tables + 1 clientdata)*
+*Total Migrations: 8 (4 rhdata schema + 1 Phase 1 tables + 1 rhdata runexcluded + 2 clientdata)*

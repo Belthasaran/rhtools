@@ -541,5 +541,217 @@ None - all new tables
 
 ---
 
+## 2025-10-12: Enhanced Ratings and Run System (clientdata.db - Migration 002)
+
+### Date
+October 12, 2025
+
+### Description
+Major enhancement adding dual rating system (difficulty + review), version-specific annotations, random exclusion controls, and complete run system for planning and executing challenge runs.
+
+### Rationale
+- **Dual Ratings**: Users need to rate both difficulty AND quality/recommendation separately
+- **Version-Specific**: Different game versions may warrant different ratings
+- **Random Exclusion**: Users and curators need control over random game selection
+- **Run System**: Support planned challenge runs with timing and tracking
+
+### Tables/Columns Affected
+
+**Database**: `clientdata.db`
+
+#### Enhanced Table: user_game_annotations
+
+**New Columns**:
+1. `user_difficulty_rating` (INTEGER 1-5 or NULL)
+   - Replaces/augments user_rating
+   - How hard the user finds the game
+   
+2. `user_review_rating` (INTEGER 1-5 or NULL)
+   - NEW: How much user recommends the game
+   - 1=Not Recommended, 5=Highly Recommended
+   
+3. `exclude_from_random` (INTEGER DEFAULT 0)
+   - User flag to exclude from random selection
+   - 0=eligible, 1=excluded
+
+**Note**: `user_rating` kept for backwards compatibility
+
+#### New Table: user_game_version_annotations
+
+**Purpose**: Store version-specific ratings that override game-wide ratings
+
+**Columns**:
+1. `annotation_key` (VARCHAR 510 PRIMARY KEY) - "gameid-version"
+2. `gameid` (VARCHAR 255)
+3. `version` (INTEGER)
+4. `user_difficulty_rating` (INTEGER 1-5 or NULL)
+5. `user_review_rating` (INTEGER 1-5 or NULL)
+6. `status` (VARCHAR 50) - Override game-wide status
+7. `user_notes` (TEXT)
+8. `created_at`, `updated_at` (TIMESTAMP)
+
+**Indexes**:
+- `idx_user_gv_gameid` ON gameid
+- `idx_user_gv_version` ON version
+- `idx_user_gv_status` ON status
+
+**Constraints**:
+- UNIQUE(gameid, version)
+
+**Triggers**:
+- `trigger_user_game_version_updated` - Auto-updates updated_at
+
+#### Enhanced Table: user_stage_annotations
+
+**New Columns**:
+1. `user_difficulty_rating` (INTEGER 1-5 or NULL)
+2. `user_review_rating` (INTEGER 1-5 or NULL)
+
+#### New Table: runs
+
+**Purpose**: Store planned and executed challenge runs
+
+**Columns**:
+1. `run_uuid` (VARCHAR 255 PRIMARY KEY)
+2. `run_name` (VARCHAR 255)
+3. `run_description` (TEXT)
+4. `status` (VARCHAR 50) - 'preparing', 'active', 'completed', 'cancelled'
+5. `created_at`, `started_at`, `completed_at`, `updated_at` (TIMESTAMP)
+6. `total_challenges`, `completed_challenges`, `skipped_challenges` (INTEGER)
+7. `config_json` (TEXT)
+
+**Indexes**:
+- `idx_runs_status` ON status
+- `idx_runs_created` ON created_at
+
+#### New Table: run_plan_entries
+
+**Purpose**: Store planned challenges in a run
+
+**Columns**:
+1. `entry_uuid` (VARCHAR 255 PRIMARY KEY)
+2. `run_uuid` (VARCHAR 255) - References runs
+3. `sequence_number` (INTEGER)
+4. `entry_type` (VARCHAR 50) - 'game', 'stage', 'random_game', 'random_stage'
+5. `gameid`, `exit_number` (VARCHAR 255) - For specific challenges
+6. `count` (INTEGER) - Repeat count
+7. `filter_difficulty`, `filter_type`, `filter_pattern`, `filter_seed` (VARCHAR 255) - For random
+8. `entry_notes` (TEXT)
+9. `created_at` (TIMESTAMP)
+
+**Indexes**:
+- `idx_run_plan_run` ON run_uuid
+- `idx_run_plan_sequence` ON (run_uuid, sequence_number)
+- `idx_run_plan_type` ON entry_type
+
+**Constraints**:
+- UNIQUE(run_uuid, sequence_number)
+
+#### New Table: run_results
+
+**Purpose**: Store actual execution results (expanded from plan)
+
+**Columns**:
+1. `result_uuid` (VARCHAR 255 PRIMARY KEY)
+2. `run_uuid` (VARCHAR 255) - References runs
+3. `plan_entry_uuid` (VARCHAR 255) - References run_plan_entries
+4. `sequence_number` (INTEGER)
+5. `gameid`, `game_name`, `exit_number`, `stage_description` (VARCHAR 255)
+6. `was_random`, `revealed_early` (BOOLEAN)
+7. `status` (VARCHAR 50) - 'pending', 'success', 'ok', 'skipped', 'failed'
+8. `started_at`, `completed_at` (TIMESTAMP)
+9. `duration_seconds` (INTEGER)
+10. `result_notes` (TEXT)
+
+**Indexes**:
+- `idx_run_results_run` ON run_uuid
+- `idx_run_results_sequence` ON (run_uuid, sequence_number)
+- `idx_run_results_status` ON status
+- `idx_run_results_game` ON gameid
+
+**Constraints**:
+- UNIQUE(run_uuid, sequence_number)
+
+#### New Table: run_archive
+
+**Purpose**: Archive metadata for completed runs
+
+**Columns**:
+1. `archive_uuid` (VARCHAR 255 PRIMARY KEY)
+2. `run_uuid` (VARCHAR 255) - References runs
+3. `archived_at` (TIMESTAMP)
+4. `archive_notes` (TEXT)
+5. `total_time_seconds` (INTEGER)
+6. `success_rate` (DECIMAL 5,2)
+
+**Indexes**:
+- `idx_run_archive_date` ON archived_at
+
+**Constraints**:
+- UNIQUE(run_uuid)
+
+#### Updated Views
+
+**v_games_with_annotations** - Now includes:
+- user_difficulty_rating
+- user_review_rating
+- exclude_from_random
+
+**v_stages_with_annotations** - Now includes:
+- user_difficulty_rating
+- user_review_rating
+
+**New Views**:
+- `v_active_run` - Current active run summary
+- `v_run_progress` - Current run progress details
+
+### Migration File
+`electron/sql/migrations/002_clientdata_enhanced_ratings_and_runs.sql`
+
+---
+
+## 2025-10-12: Local Run Exclusion (rhdata.db - Migration 005)
+
+### Date
+October 12, 2025
+
+### Description
+Added curator-controlled flag to exclude games from random selection in rhdata.db gameversions table.
+
+### Rationale
+Curators need ability to exclude games from random selection (broken games, inappropriate content, duplicates, etc.) independent of user preferences.
+
+### Tables/Columns Affected
+
+**Database**: `rhdata.db`
+
+**Table**: `gameversions`
+
+**New Column**:
+1. `local_runexcluded` (INTEGER DEFAULT 0)
+   - Curator-controlled exclusion from random selection
+   - 0=eligible, 1=excluded
+   - This is a **COMPUTED COLUMN** - do not import from JSON
+
+**Indexes**:
+- `idx_gameversions_runexcluded` ON local_runexcluded
+
+### Migration File
+`electron/sql/migrations/005_add_local_runexcluded.sql`
+
+### Important
+This field is classified as a **COMPUTED COLUMN** along with:
+- combinedtype
+- gvimport_time
+- version
+- gvuuid
+- local_resource_etag
+- local_resource_lastmodified
+- local_resource_filename
+
+Scripts importing JSON data must exclude these fields.
+
+---
+
 *Last Updated: October 12, 2025*  
 *Next Migration: TBD*
