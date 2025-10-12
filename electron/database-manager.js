@@ -27,15 +27,20 @@ class DatabaseManager {
     // Default paths
     let basePath;
     
-    if (isDev) {
-      // Development: Use electron/ directory
+    try {
+      if (isDev || !app || !app.getPath) {
+        // Development or testing: Use electron/ directory
+        basePath = path.join(__dirname);
+      } else {
+        // Production: Use app user data directory
+        // Windows: C:\Users\<User>\AppData\Roaming\rhtools\
+        // Linux: ~/.config/rhtools/
+        // macOS: ~/Library/Application Support/rhtools/
+        basePath = app.getPath('userData');
+      }
+    } catch (error) {
+      // Fallback for testing
       basePath = path.join(__dirname);
-    } else {
-      // Production: Use app user data directory
-      // Windows: C:\Users\<User>\AppData\Roaming\rhtools\
-      // Linux: ~/.config/rhtools/
-      // macOS: ~/Library/Application Support/rhtools/
-      basePath = app.getPath('userData');
     }
     
     return {
