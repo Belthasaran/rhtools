@@ -285,18 +285,30 @@
   <div v-if="runModalOpen" class="modal-backdrop" @click.self="closeRunModal">
     <div class="modal">
       <header class="modal-header">
-        <h3>Prepare Run</h3>
+        <h3>{{ isRunActive ? 'Active Run' : 'Prepare Run' }}{{ currentRunName ? ': ' + currentRunName : '' }}</h3>
         <div class="modal-header-actions">
-          <button @click="editGlobalConditions" class="btn-conditions-header" :title="`Global Conditions: ${globalRunConditions.length > 0 ? globalRunConditions.join(', ') : 'None'}`">
-            {{ globalRunConditions.length > 0 ? `✓ Global Conditions (${globalRunConditions.length})` : 'Set Global Conditions' }}
-          </button>
-          <button @click="stageRun('save')" :disabled="runEntries.length === 0">Stage and Save</button>
-          <button @click="stageRun('upload')" :disabled="runEntries.length === 0">Stage and Upload</button>
+          <!-- Preparing state -->
+          <template v-if="!isRunActive">
+            <button @click="editGlobalConditions" class="btn-conditions-header" :title="`Global Conditions: ${globalRunConditions.length > 0 ? globalRunConditions.join(', ') : 'None'}`">
+              {{ globalRunConditions.length > 0 ? `✓ Global Conditions (${globalRunConditions.length})` : 'Set Global Conditions' }}
+            </button>
+            <button @click="stageRun('save')" :disabled="runEntries.length === 0">Stage and Save</button>
+            <button @click="startRun" :disabled="!isRunSaved" class="btn-start-run">▶ Start Run</button>
+          </template>
+          <!-- Active state -->
+          <template v-if="isRunActive">
+            <span class="run-timer">⏱ {{ formatTime(runElapsedSeconds) }}</span>
+            <span class="run-progress">Challenge {{ currentChallengeIndex + 1 }} / {{ runEntries.length }}</span>
+            <button @click="nextChallenge" :disabled="!currentChallenge" class="btn-next">✓ Done</button>
+            <button @click="skipChallenge" :disabled="!currentChallenge" class="btn-skip">⏭ Skip</button>
+            <button @click="cancelRun" class="btn-cancel-run">✕ Cancel Run</button>
+          </template>
           <button class="close" @click="closeRunModal">✕</button>
         </div>
       </header>
 
-      <section class="modal-toolbar">
+      <!-- Toolbar only shown when preparing -->
+      <section v-if="!isRunActive" class="modal-toolbar">
         <div class="left">
           <button @click="checkAllRun">Check All</button>
           <button @click="uncheckAllRun">Uncheck All</button>
@@ -363,24 +375,27 @@
               <tr 
                 v-for="(entry, idx) in runEntries" 
                 :key="entry.key"
-                draggable="true"
+                :draggable="!isRunActive"
                 @dragstart="handleDragStart(idx, $event)"
                 @dragover.prevent="handleDragOver(idx, $event)"
                 @drop="handleDrop(idx, $event)"
                 @dragend="handleDragEnd"
-                :class="{ 'dragging': draggedIndex === idx }"
+                :class="{ 
+                  'dragging': draggedIndex === idx,
+                  'current-challenge': isRunActive && idx === currentChallengeIndex
+                }"
               >
                 <td class="col-check">
-                  <input type="checkbox" :checked="checkedRun.has(entry.key)" @change="toggleRunEntrySelection(entry.key, $event)" />
+                  <input type="checkbox" :checked="checkedRun.has(entry.key)" @change="toggleRunEntrySelection(entry.key, $event)" :disabled="isRunActive" />
                 </td>
                 <td class="col-seq">{{ idx + 1 }}</td>
                 <td class="col-actions">
-                  <button class="btn-mini" @click="moveRowUp(idx)" :disabled="idx === 0" title="Move up">↑</button>
-                  <button class="btn-mini" @click="moveRowDown(idx)" :disabled="idx === runEntries.length - 1" title="Move down">↓</button>
+                  <button class="btn-mini" @click="moveRowUp(idx)" :disabled="isRunActive || idx === 0" title="Move up">↑</button>
+                  <button class="btn-mini" @click="moveRowDown(idx)" :disabled="isRunActive || idx === runEntries.length - 1" title="Move down">↓</button>
                 </td>
                 <td>{{ entry.id }}</td>
                 <td>
-                  <select v-model="entry.entryType" :disabled="entry.isLocked">
+                  <select v-model="entry.entryType" :disabled="isRunActive || entry.isLocked">
                     <option value="game" v-if="entry.isLocked && entry.entryType === 'game'">Game</option>
                     <option value="stage" v-if="entry.isLocked && entry.entryType === 'stage'">Stage</option>
                     <option value="random_game" v-if="!entry.isLocked || entry.entryType === 'random_game'">Random Game</option>
@@ -390,9 +405,9 @@
                 <td>{{ entry.name }}</td>
                 <td>{{ entry.stageNumber ?? '' }}</td>
                 <td>{{ entry.stageName ?? '' }}</td>
-                <td class="col-count"><input type="number" min="1" v-model.number="entry.count" /></td>
+                <td class="col-count"><input type="number" min="1" v-model.number="entry.count" :disabled="isRunActive" /></td>
                 <td v-if="isRandomEntry(entry)">
-                  <select v-model="entry.filterDifficulty">
+                  <select v-model="entry.filterDifficulty" :disabled="isRunActive">
                     <option value="">—</option>
                     <option value="beginner">Beginner</option>
                     <option value="intermediate">Intermediate</option>
@@ -401,7 +416,7 @@
                 </td>
                 <td v-else>—</td>
                 <td v-if="isRandomEntry(entry)">
-                  <select v-model="entry.filterType">
+                  <select v-model="entry.filterType" :disabled="isRunActive">
                     <option value="">—</option>
                     <option value="standard">Standard</option>
                     <option value="kaizo">Kaizo</option>
@@ -409,12 +424,12 @@
                   </select>
                 </td>
                 <td v-else>—</td>
-                <td class="col-pattern" v-if="isRandomEntry(entry)"><input v-model="entry.filterPattern" /></td>
+                <td class="col-pattern" v-if="isRandomEntry(entry)"><input v-model="entry.filterPattern" :disabled="isRunActive" /></td>
                 <td class="col-pattern" v-else>—</td>
-                <td class="col-seed" v-if="isRandomEntry(entry)"><input v-model="entry.seed" /></td>
+                <td class="col-seed" v-if="isRandomEntry(entry)"><input v-model="entry.seed" :disabled="isRunActive" /></td>
                 <td class="col-seed" v-else>—</td>
                 <td class="col-conditions">
-                  <button @click="editConditions(entry)" class="btn-mini btn-conditions" :title="`Conditions: ${entry.conditions.length > 0 ? entry.conditions.join(', ') : 'None'}`">
+                  <button @click="editConditions(entry)" class="btn-mini btn-conditions" :disabled="isRunActive" :title="`Conditions: ${entry.conditions.length > 0 ? entry.conditions.join(', ') : 'None'}`">
                     {{ entry.conditions.length > 0 ? `✓ (${entry.conditions.length})` : 'Set' }}
                   </button>
                 </td>
@@ -637,6 +652,31 @@
 
       <footer class="modal-footer">
         <button @click="saveSettings" class="btn-primary">Save Changes and Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Run Name Input Modal -->
+  <div v-if="runNameModalOpen" class="modal-backdrop" @click.self="cancelRunName">
+    <div class="modal run-name-modal">
+      <header class="modal-header">
+        <h3>Enter Run Name</h3>
+        <button class="close" @click="cancelRunName">✕</button>
+      </header>
+      <section class="modal-body run-name-body">
+        <label for="run-name-input">Run Name:</label>
+        <input 
+          id="run-name-input"
+          type="text" 
+          v-model="runNameInput" 
+          placeholder="My Challenge Run"
+          @keyup.enter="confirmRunName"
+          autofocus
+        />
+      </section>
+      <footer class="modal-footer">
+        <button @click="confirmRunName" class="btn-primary">Save Run</button>
+        <button @click="cancelRunName">Cancel</button>
       </footer>
     </div>
   </div>
@@ -1122,8 +1162,27 @@ const runEntries = reactive<RunEntry[]>([]);
 const checkedRun = ref<Set<string>>(new Set());
 const globalRunConditions = ref<ChallengeCondition[]>([]);  // Global conditions for entire run
 
+// Run execution state
+const currentRunUuid = ref<string | null>(null);
+const currentRunStatus = ref<'preparing' | 'active' | 'completed' | 'cancelled'>('preparing');
+const currentRunName = ref<string>('');
+const currentChallengeIndex = ref<number>(0);
+const runStartTime = ref<number | null>(null);
+const runElapsedSeconds = ref<number>(0);
+const runTimerInterval = ref<number | null>(null);
+
+// Run name input modal
+const runNameModalOpen = ref(false);
+const runNameInput = ref<string>('My Challenge Run');
+
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
+const isRunSaved = computed(() => currentRunUuid.value !== null && currentRunStatus.value === 'preparing');
+const isRunActive = computed(() => currentRunStatus.value === 'active');
+const currentChallenge = computed(() => {
+  if (!isRunActive.value || currentChallengeIndex.value >= runEntries.length) return null;
+  return runEntries[currentChallengeIndex.value];
+});
 
 function openRunModal() {
   if (!randomFilter.seed) randomFilter.seed = Math.random().toString(36).slice(2, 10);
@@ -1278,7 +1337,246 @@ function addRandomGameToRun() {
 
 function stageRun(mode: 'save' | 'upload') {
   console.log('Stage run', mode, runEntries);
-  // Placeholder: integrate with backend/IPC later
+  
+  // If no name yet, open name input modal
+  if (!currentRunName.value) {
+    runNameInput.value = 'My Challenge Run';
+    runNameModalOpen.value = true;
+  } else {
+    // Already have name, just save
+    saveRunToDatabase();
+  }
+}
+
+async function saveRunToDatabase() {
+  if (!isElectronAvailable()) {
+    alert('Run saving requires Electron environment');
+    return;
+  }
+  
+  try {
+    const runName = currentRunName.value;
+    if (!runName) {
+      alert('Run name is required');
+      return;
+    }
+    
+    // Convert reactive objects to plain objects for IPC
+    const plainGlobalConditions = JSON.parse(JSON.stringify(globalRunConditions.value));
+    const plainRunEntries = JSON.parse(JSON.stringify(runEntries));
+    
+    // Create run in database
+    const result = await (window as any).electronAPI.createRun(
+      runName,
+      '',  // runDescription
+      plainGlobalConditions
+    );
+    
+    if (!result.success) {
+      alert('Failed to create run: ' + result.error);
+      return;
+    }
+    
+    // Save run plan
+    const planResult = await (window as any).electronAPI.saveRunPlan(
+      result.runUuid,
+      plainRunEntries
+    );
+    
+    if (planResult.success) {
+      currentRunUuid.value = result.runUuid;
+      currentRunStatus.value = 'preparing';
+      console.log('Run saved with UUID:', result.runUuid);
+      alert(`Run "${runName}" saved successfully!`);
+    } else {
+      alert('Failed to save run plan: ' + planResult.error);
+    }
+  } catch (error) {
+    console.error('Error saving run:', error);
+    alert('Error saving run');
+  }
+}
+
+function confirmRunName() {
+  if (!runNameInput.value || runNameInput.value.trim() === '') {
+    alert('Please enter a run name');
+    return;
+  }
+  currentRunName.value = runNameInput.value;
+  runNameModalOpen.value = false;
+  saveRunToDatabase();
+}
+
+function cancelRunName() {
+  runNameModalOpen.value = false;
+}
+
+async function startRun() {
+  if (!currentRunUuid.value) {
+    alert('No run saved. Please save the run first.');
+    return;
+  }
+  
+  if (!isElectronAvailable()) {
+    alert('Run execution requires Electron environment');
+    return;
+  }
+  
+  const confirmed = confirm(
+    `Start run "${currentRunName.value}"?\n\n` +
+    `${runEntries.length} challenges\n` +
+    `Global conditions: ${globalRunConditions.value.length > 0 ? globalRunConditions.value.join(', ') : 'None'}\n\n` +
+    `Once started, the run cannot be edited.`
+  );
+  
+  if (!confirmed) return;
+  
+  try {
+    const result = await (window as any).electronAPI.startRun({
+      runUuid: currentRunUuid.value
+    });
+    
+    if (result.success) {
+      currentRunStatus.value = 'active';
+      currentChallengeIndex.value = 0;
+      runStartTime.value = Date.now();
+      runElapsedSeconds.value = 0;
+      
+      // Start timer
+      runTimerInterval.value = window.setInterval(() => {
+        if (runStartTime.value) {
+          runElapsedSeconds.value = Math.floor((Date.now() - runStartTime.value) / 1000);
+        }
+      }, 1000);
+      
+      console.log('Run started');
+    } else {
+      alert('Failed to start run: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Error starting run:', error);
+    alert('Error starting run');
+  }
+}
+
+async function cancelRun() {
+  const confirmed = confirm(
+    `Cancel run "${currentRunName.value}"?\n\n` +
+    `This will mark the run as cancelled. You can view it later but cannot continue it.`
+  );
+  
+  if (!confirmed) return;
+  
+  try {
+    if (isElectronAvailable()) {
+      await (window as any).electronAPI.cancelRun({
+        runUuid: currentRunUuid.value
+      });
+    }
+    
+    // Stop timer
+    if (runTimerInterval.value) {
+      clearInterval(runTimerInterval.value);
+      runTimerInterval.value = null;
+    }
+    
+    currentRunStatus.value = 'cancelled';
+    console.log('Run cancelled');
+    alert('Run cancelled');
+    closeRunModal();
+  } catch (error) {
+    console.error('Error cancelling run:', error);
+    alert('Error cancelling run');
+  }
+}
+
+async function nextChallenge() {
+  if (!currentChallenge.value) return;
+  
+  try {
+    if (isElectronAvailable()) {
+      await (window as any).electronAPI.recordChallengeResult({
+        runUuid: currentRunUuid.value,
+        challengeIndex: currentChallengeIndex.value,
+        status: 'success'
+      });
+    }
+    
+    console.log(`Challenge ${currentChallengeIndex.value + 1} completed`);
+    
+    // Move to next challenge
+    if (currentChallengeIndex.value < runEntries.length - 1) {
+      currentChallengeIndex.value++;
+    } else {
+      // Run completed
+      completeRun();
+    }
+  } catch (error) {
+    console.error('Error recording challenge result:', error);
+    alert('Error recording result');
+  }
+}
+
+async function skipChallenge() {
+  if (!currentChallenge.value) return;
+  
+  const confirmed = confirm(`Skip challenge ${currentChallengeIndex.value + 1}?`);
+  if (!confirmed) return;
+  
+  try {
+    if (isElectronAvailable()) {
+      await (window as any).electronAPI.recordChallengeResult({
+        runUuid: currentRunUuid.value,
+        challengeIndex: currentChallengeIndex.value,
+        status: 'skipped'
+      });
+    }
+    
+    console.log(`Challenge ${currentChallengeIndex.value + 1} skipped`);
+    
+    // Move to next challenge
+    if (currentChallengeIndex.value < runEntries.length - 1) {
+      currentChallengeIndex.value++;
+    } else {
+      // Run completed
+      completeRun();
+    }
+  } catch (error) {
+    console.error('Error recording skip:', error);
+    alert('Error recording skip');
+  }
+}
+
+function completeRun() {
+  // Stop timer
+  if (runTimerInterval.value) {
+    clearInterval(runTimerInterval.value);
+    runTimerInterval.value = null;
+  }
+  
+  currentRunStatus.value = 'completed';
+  
+  alert(
+    `Run "${currentRunName.value}" completed!\n\n` +
+    `Total time: ${formatTime(runElapsedSeconds.value)}\n` +
+    `Challenges: ${runEntries.length}`
+  );
+  
+  closeRunModal();
+}
+
+function formatTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  
+  if (h > 0) {
+    return `${h}h ${m}m ${s}s`;
+  } else if (m > 0) {
+    return `${m}m ${s}s`;
+  } else {
+    return `${s}s`;
+  }
 }
 
 // Helper: Check if entry is random type
@@ -1814,6 +2112,21 @@ button { padding: 6px 10px; }
 .data-table tbody tr[draggable="true"] { cursor: move; }
 .data-table tbody tr.dragging { opacity: 0.5; background: #e0e7ff; }
 
+/* Run execution */
+.btn-start-run { background: #10b981; color: white; font-weight: bold; }
+.btn-start-run:hover:not(:disabled) { background: #059669; }
+.btn-start-run:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+.btn-cancel-run { background: #ef4444; color: white; }
+.btn-cancel-run:hover { background: #dc2626; }
+.btn-next { background: #10b981; color: white; }
+.btn-next:hover:not(:disabled) { background: #059669; }
+.btn-skip { background: #f59e0b; color: white; }
+.btn-skip:hover:not(:disabled) { background: #d97706; }
+.run-timer { font-weight: bold; color: #059669; font-size: 16px; padding: 0 8px; }
+.run-progress { color: #6b7280; padding: 0 8px; }
+.data-table tbody tr.current-challenge { background: #dbeafe !important; border-left: 4px solid #3b82f6; font-weight: 600; }
+.data-table tbody tr.current-challenge td { background: #dbeafe; }
+
 /* Settings Modal */
 .settings-modal { width: 800px; max-width: 95vw; }
 .settings-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
@@ -1831,9 +2144,16 @@ button { padding: 6px 10px; }
 .setting-caption a:hover { text-decoration: underline; }
 .drop-zone { flex: 1; border: 2px dashed #d1d5db; border-radius: 4px; padding: 12px; text-align: center; color: #6b7280; background: #f9fafb; cursor: pointer; transition: all 0.2s; }
 .drop-zone:hover { border-color: #3b82f6; background: #eff6ff; color: #3b82f6; }
-.modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb; }
+.modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px; background: #f9fafb; }
 .btn-primary { padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
 .btn-primary:hover { background: #2563eb; }
+
+/* Run Name Modal */
+.run-name-modal { width: 500px; max-width: 95vw; }
+.run-name-body { padding: 20px; }
+.run-name-body label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
+.run-name-body input[type="text"] { width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
+.run-name-body input[type="text"]:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
 
 /* New UI Components */
 

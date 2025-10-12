@@ -124,4 +124,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{success: boolean}>}
    */
   saveRunPlan: (runUuid, entries) => ipcRenderer.invoke('db:runs:save-plan', { runUuid, entries }),
+  
+  /**
+   * Start a run (change status to active, expand plan to results)
+   * @param {Object} params - {runUuid: string}
+   * @returns {Promise<{success: boolean}>}
+   */
+  startRun: (params) => ipcRenderer.invoke('db:runs:start', params),
+  
+  /**
+   * Record challenge result
+   * @param {Object} params - {runUuid: string, challengeIndex: number, status: string}
+   * @returns {Promise<{success: boolean}>}
+   */
+  recordChallengeResult: (params) => ipcRenderer.invoke('db:runs:record-result', params),
+  
+  /**
+   * Cancel a run
+   * @param {Object} params - {runUuid: string}
+   * @returns {Promise<{success: boolean}>}
+   */
+  cancelRun: (params) => ipcRenderer.invoke('db:runs:cancel', params),
 });

@@ -534,6 +534,164 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  /**
+   * Start a run (change status to active, expand plan to results)
+   * Channel: db:runs:start
+   */
+  ipcMain.handle('db:runs:start', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      const transaction = db.transaction((runId) => {
+        // Update run status
+        db.prepare(`
+          UPDATE runs 
+          SET status = 'active', 
+              started_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE run_uuid = ?
+        `).run(runId);
+        
+        // Get plan entries
+        const planEntries = db.prepare(`
+          SELECT * FROM run_plan_entries 
+          WHERE run_uuid = ? 
+          ORDER BY sequence_number
+        `).all(runId);
+        
+        // Expand plan entries to run_results
+        const insertStmt = db.prepare(`
+          INSERT INTO run_results
+            (result_uuid, run_uuid, plan_entry_uuid, sequence_number, 
+             gameid, game_name, exit_number, stage_description,
+             was_random, status, conditions)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        `);
+        
+        planEntries.forEach((planEntry) => {
+          const count = planEntry.count || 1;
+          const isRandom = planEntry.entry_type === 'random_game' || planEntry.entry_type === 'random_stage';
+          
+          // Create multiple results if count > 1
+          for (let i = 0; i < count; i++) {
+            const resultUuid = crypto.randomUUID();
+            
+            // For random entries, mask name until attempted
+            let gameName = '???';
+            let gameid = null;
+            
+            // For specific entries, use the gameid
+            if (!isRandom) {
+              gameid = planEntry.gameid;
+              // We'll fetch name from gameversions in a real implementation
+              gameName = planEntry.gameid; // Placeholder
+            }
+            
+            insertStmt.run(
+              resultUuid,
+              runId,
+              planEntry.entry_uuid,
+              planEntry.sequence_number,
+              gameid,
+              gameName,
+              planEntry.exit_number,
+              planEntry.entry_type === 'stage' ? 'Stage' : null,
+              isRandom ? 1 : 0,
+              planEntry.conditions
+            );
+          }
+        });
+        
+        // Update total challenges count
+        const total = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE run_uuid = ?`).get(runId);
+        db.prepare(`UPDATE runs SET total_challenges = ? WHERE run_uuid = ?`).run(total.count, runId);
+      });
+      
+      transaction(runUuid);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error starting run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Record challenge result
+   * Channel: db:runs:record-result
+   */
+  ipcMain.handle('db:runs:record-result', async (event, { runUuid, challengeIndex, status }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      // Get the result at this index
+      const result = db.prepare(`
+        SELECT result_uuid FROM run_results 
+        WHERE run_uuid = ? 
+        ORDER BY sequence_number 
+        LIMIT 1 OFFSET ?
+      `).get(runUuid, challengeIndex);
+      
+      if (!result) {
+        throw new Error('Challenge not found');
+      }
+      
+      // Update result
+      db.prepare(`
+        UPDATE run_results
+        SET status = ?,
+            completed_at = CURRENT_TIMESTAMP,
+            duration_seconds = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER)
+        WHERE result_uuid = ?
+      `).run(status, result.result_uuid);
+      
+      // Update run counts
+      if (status === 'success' || status === 'ok') {
+        db.prepare(`
+          UPDATE runs 
+          SET completed_challenges = completed_challenges + 1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE run_uuid = ?
+        `).run(runUuid);
+      } else if (status === 'skipped') {
+        db.prepare(`
+          UPDATE runs 
+          SET skipped_challenges = skipped_challenges + 1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE run_uuid = ?
+        `).run(runUuid);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error recording challenge result:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Cancel a run
+   * Channel: db:runs:cancel
+   */
+  ipcMain.handle('db:runs:cancel', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      db.prepare(`
+        UPDATE runs 
+        SET status = 'cancelled',
+            completed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE run_uuid = ?
+      `).run(runUuid);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   console.log('IPC handlers registered successfully');
 }
 
