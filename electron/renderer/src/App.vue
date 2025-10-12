@@ -89,7 +89,7 @@
               <td class="notes">{{ row.Mynotes ?? '' }}</td>
             </tr>
             <tr v-if="filteredItems.length === 0">
-              <td class="empty" colspan="12">No items match your filters.</td>
+              <td class="empty" colspan="11">No items match your filters.</td>
             </tr>
           </tbody>
         </table>
@@ -135,16 +135,16 @@
                   </td>
                 </tr>
                 
-                <!-- Dual Ratings with Star Picker -->
+                <!-- Dual Ratings with Star Picker (0-5 scale) -->
                 <tr>
                   <th>My Difficulty</th>
                   <td>
                     <div class="star-rating">
                       <span 
-                        v-for="n in 5" 
-                        :key="'diff-' + n"
-                        @click="selectedItem.MyDifficultyRating = n"
-                        :class="{ filled: n <= (selectedItem.MyDifficultyRating || 0) }"
+                        v-for="n in 6" 
+                        :key="'diff-' + (n-1)"
+                        @click="selectedItem.MyDifficultyRating = n - 1"
+                        :class="{ filled: (n - 1) <= (selectedItem.MyDifficultyRating ?? -1) }"
                         class="star"
                       >★</span>
                       <button @click="selectedItem.MyDifficultyRating = null" class="btn-clear-rating">✕</button>
@@ -157,14 +157,31 @@
                   <td>
                     <div class="star-rating">
                       <span 
-                        v-for="n in 5" 
-                        :key="'rev-' + n"
-                        @click="selectedItem.MyReviewRating = n"
-                        :class="{ filled: n <= (selectedItem.MyReviewRating || 0) }"
+                        v-for="n in 6" 
+                        :key="'rev-' + (n-1)"
+                        @click="selectedItem.MyReviewRating = n - 1"
+                        :class="{ filled: (n - 1) <= (selectedItem.MyReviewRating ?? -1) }"
                         class="star"
                       >★</span>
                       <button @click="selectedItem.MyReviewRating = null" class="btn-clear-rating">✕</button>
                       <span class="rating-label">{{ reviewLabel(selectedItem.MyReviewRating) }}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <th>My Skill Rating</th>
+                  <td>
+                    <div class="star-rating skill-rating">
+                      <span 
+                        v-for="n in 11" 
+                        :key="'skill-' + (n-1)"
+                        @click="selectedItem.MySkillRating = n - 1"
+                        :class="{ filled: (n - 1) <= (selectedItem.MySkillRating ?? -1) }"
+                        :title="skillRatingHoverText(n - 1)"
+                        class="star star-small"
+                      >★</span>
+                      <button @click="selectedItem.MySkillRating = null" class="btn-clear-rating">✕</button>
+                      <span class="rating-label">{{ skillLabel(selectedItem.MySkillRating) }}</span>
                     </div>
                   </td>
                 </tr>
@@ -253,6 +270,9 @@
       <header class="modal-header">
         <h3>Prepare Run</h3>
         <div class="modal-header-actions">
+          <button @click="editGlobalConditions" class="btn-conditions-header" :title="`Global Conditions: ${globalRunConditions.length > 0 ? globalRunConditions.join(', ') : 'None'}`">
+            {{ globalRunConditions.length > 0 ? `✓ Global Conditions (${globalRunConditions.length})` : 'Set Global Conditions' }}
+          </button>
           <button @click="stageRun('save')" :disabled="runEntries.length === 0">Stage and Save</button>
           <button @click="stageRun('upload')" :disabled="runEntries.length === 0">Stage and Upload</button>
           <button class="close" @click="closeRunModal">✕</button>
@@ -317,11 +337,12 @@
                 <th class="col-count">Count</th>
                 <th>Filter difficulty</th>
                 <th>Filter type</th>
-                <th class="col-pattern">Filter pattern</th>
-                <th class="col-seed">Seed</th>
-              </tr>
-            </thead>
-            <tbody>
+              <th class="col-pattern">Filter pattern</th>
+              <th class="col-seed">Seed</th>
+              <th class="col-conditions">Conditions</th>
+            </tr>
+          </thead>
+          <tbody>
               <tr 
                 v-for="(entry, idx) in runEntries" 
                 :key="entry.key"
@@ -342,18 +363,18 @@
                 </td>
                 <td>{{ entry.id }}</td>
                 <td>
-                  <select v-model="entry.entryType">
-                    <option value="game">Game</option>
-                    <option value="stage">Stage</option>
-                    <option value="random_game">Random Game</option>
-                    <option value="random_stage">Random Stage</option>
+                  <select v-model="entry.entryType" :disabled="entry.isLocked">
+                    <option value="game" v-if="entry.isLocked && entry.entryType === 'game'">Game</option>
+                    <option value="stage" v-if="entry.isLocked && entry.entryType === 'stage'">Stage</option>
+                    <option value="random_game" v-if="!entry.isLocked || entry.entryType === 'random_game'">Random Game</option>
+                    <option value="random_stage" v-if="!entry.isLocked || entry.entryType === 'random_stage'">Random Stage</option>
                   </select>
                 </td>
                 <td>{{ entry.name }}</td>
                 <td>{{ entry.stageNumber ?? '' }}</td>
                 <td>{{ entry.stageName ?? '' }}</td>
                 <td class="col-count"><input type="number" min="1" v-model.number="entry.count" /></td>
-                <td>
+                <td v-if="isRandomEntry(entry)">
                   <select v-model="entry.filterDifficulty">
                     <option value="">—</option>
                     <option value="beginner">Beginner</option>
@@ -361,7 +382,8 @@
                     <option value="expert">Expert</option>
                   </select>
                 </td>
-                <td>
+                <td v-else>—</td>
+                <td v-if="isRandomEntry(entry)">
                   <select v-model="entry.filterType">
                     <option value="">—</option>
                     <option value="standard">Standard</option>
@@ -369,11 +391,19 @@
                     <option value="traditional">Traditional</option>
                   </select>
                 </td>
-                <td class="col-pattern"><input v-model="entry.filterPattern" /></td>
-                <td class="col-seed"><input v-model="entry.seed" /></td>
+                <td v-else>—</td>
+                <td class="col-pattern" v-if="isRandomEntry(entry)"><input v-model="entry.filterPattern" /></td>
+                <td class="col-pattern" v-else>—</td>
+                <td class="col-seed" v-if="isRandomEntry(entry)"><input v-model="entry.seed" /></td>
+                <td class="col-seed" v-else>—</td>
+                <td class="col-conditions">
+                  <button @click="editConditions(entry)" class="btn-mini btn-conditions" :title="`Conditions: ${entry.conditions.length > 0 ? entry.conditions.join(', ') : 'None'}`">
+                    {{ entry.conditions.length > 0 ? `✓ (${entry.conditions.length})` : 'Set' }}
+                  </button>
+                </td>
               </tr>
               <tr v-if="runEntries.length === 0">
-                <td class="empty" colspan="13">Run is empty. Add entries or use Add Random Game.</td>
+                <td class="empty" colspan="14">Run is empty. Add entries or use Add Random Game.</td>
               </tr>
             </tbody>
           </table>
@@ -610,8 +640,9 @@ type Item = {
   Length: string;
   PublicDifficulty?: string;
   Status: ItemStatus;
-  MyDifficultyRating?: number | null;
-  MyReviewRating?: number | null;
+  MyDifficultyRating?: number | null;  // 0-5
+  MyReviewRating?: number | null;      // 0-5
+  MySkillRating?: number | null;       // 0-10
   Publicrating?: number;
   Hidden: boolean;
   ExcludeFromRandom?: boolean;
@@ -632,13 +663,14 @@ const items = reactive<Item[]>([
     Status: 'Default', 
     MyDifficultyRating: 4, 
     MyReviewRating: 5,
+    MySkillRating: 5,  // Master level when rated
     Publicrating: 4.3, 
     Hidden: false, 
     ExcludeFromRandom: false,
     Mynotes: '',
     AvailableVersions: [1, 2, 3],
     CurrentVersion: 3,
-    JsonData: { gameid: '11374', name: 'Super Dram World', version: 3 }
+    JsonData: { gameid: '11374', name: 'Super Dram World', version: 3, author: 'Panga', difficulty: 'Advanced' }
   },
   { 
     Id: '17289', 
@@ -651,13 +683,14 @@ const items = reactive<Item[]>([
     Status: 'In Progress', 
     MyDifficultyRating: 5, 
     MyReviewRating: 4,
+    MySkillRating: 3,  // Advanced when rated
     Publicrating: 4.6, 
     Hidden: false, 
     ExcludeFromRandom: false,
     Mynotes: 'Practice level 0x0F',
     AvailableVersions: [1, 2],
     CurrentVersion: 2,
-    JsonData: { gameid: '17289', name: 'Storks, Apes, and Crocodiles', version: 2 }
+    JsonData: { gameid: '17289', name: 'Storks, Apes, and Crocodiles', version: 2, author: 'Morsel' }
   },
   { 
     Id: '20091', 
@@ -667,15 +700,16 @@ const items = reactive<Item[]>([
     Length: '5 exits', 
     PublicDifficulty: 'Easy',
     Status: 'Finished', 
-    MyDifficultyRating: 3, 
+    MyDifficultyRating: 2, 
     MyReviewRating: 2,
+    MySkillRating: 1,  // Casual when rated
     Publicrating: 3.8, 
     Hidden: false, 
     ExcludeFromRandom: true,
     Mynotes: '',
     AvailableVersions: [1],
     CurrentVersion: 1,
-    JsonData: { gameid: '20091', name: 'Example Hack', version: 1 }
+    JsonData: { gameid: '20091', name: 'Example Hack', version: 1, author: 'Someone' }
   },
 ]);
 
@@ -755,19 +789,22 @@ function addSelectedToRun() {
     // Skip if already in run
     if (isInRun(game.Id)) continue;
     
-    const key = `game-${game.Id}-${Date.now()}`;
+    const key = `game-${game.Id}-${Date.now()}-${addedCount}`;
     runEntries.push({
       key,
       id: game.Id,
-      entryType: 'game',
+      entryType: 'game',  // Locked as 'game' type
       name: game.Name,
       stageNumber: '',
       stageName: '',
       count: 1,
+      // No filter fields for specific games
       filterDifficulty: '',
       filterType: '',
       filterPattern: '',
-      seed: Math.random().toString(36).slice(2, 10),
+      seed: '',
+      isLocked: true,  // Mark as locked (can't change type)
+      conditions: [],  // Challenge conditions
     });
     addedCount++;
   }
@@ -993,7 +1030,35 @@ function toggleStageSelection(key: string, e: Event) {
 
 function addStagesToRun() {
   const ids = Array.from(selectedStageIds.value.values());
-  console.log('Add stages to run:', ids);
+  if (ids.length === 0) return;
+  
+  let addedCount = 0;
+  for (const stageKey of ids) {
+    const stage = currentStages.value.find(s => s.key === stageKey);
+    if (!stage) continue;
+    
+    const key = `stage-${stage.key}-${Date.now()}-${addedCount}`;
+    runEntries.push({
+      key,
+      id: stage.parentId,
+      entryType: 'stage',  // Locked as 'stage' type
+      name: selectedItem.value?.Name || '',
+      stageNumber: stage.exitNumber,
+      stageName: stage.description,
+      count: 1,
+      // No filter fields for specific stages
+      filterDifficulty: '',
+      filterType: '',
+      filterPattern: '',
+      seed: '',
+      isLocked: true,  // Mark as locked (can't change type)
+      conditions: [],  // Challenge conditions
+    });
+    addedCount++;
+  }
+  
+  selectedStageIds.value.clear();
+  console.log(`Added ${addedCount} stages to run`);
 }
 
 function editStageNotes() {
@@ -1024,6 +1089,8 @@ function setStageRating(type: 'difficulty' | 'review') {
 }
 
 // Prepare Run modal state and logic
+type ChallengeCondition = 'Hitless' | 'Deathless' | 'No Coins' | 'No Powerups' | 'No Midway';
+
 type RunEntry = {
   key: string;
   id: string;
@@ -1036,11 +1103,14 @@ type RunEntry = {
   filterType?: '' | 'standard' | 'kaizo' | 'traditional';
   filterPattern?: string;
   seed?: string;
+  isLocked?: boolean;  // If true, entry type cannot be changed
+  conditions: ChallengeCondition[];  // Challenge conditions for this entry
 };
 
 const runModalOpen = ref(false);
 const runEntries = reactive<RunEntry[]>([]);
 const checkedRun = ref<Set<string>>(new Set());
+const globalRunConditions = ref<ChallengeCondition[]>([]);  // Global conditions for entire run
 
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
@@ -1182,19 +1252,95 @@ function addRandomGameToRun() {
   runEntries.push({
     key,
     id: '(random)',
-    entryType: 'game',
+    entryType: 'random_game',  // Default to random_game
     name: 'Random Game',
+    stageNumber: '',
+    stageName: '',
     count: (randomFilter.count as number) || 1,
     filterDifficulty: randomFilter.difficulty === 'any' ? '' : (randomFilter.difficulty as any),
     filterType: randomFilter.type === 'any' ? '' : (randomFilter.type as any),
     filterPattern: randomFilter.pattern || '',
     seed,
+    isLocked: false,  // Can change between random_game and random_stage
+    conditions: [],  // Challenge conditions
   });
 }
 
 function stageRun(mode: 'save' | 'upload') {
   console.log('Stage run', mode, runEntries);
   // Placeholder: integrate with backend/IPC later
+}
+
+// Helper: Check if entry is random type
+function isRandomEntry(entry: RunEntry): boolean {
+  return entry.entryType === 'random_game' || entry.entryType === 'random_stage';
+}
+
+// Challenge conditions management
+const allConditions: ChallengeCondition[] = [
+  'Hitless',
+  'Deathless', 
+  'No Coins',
+  'No Powerups',
+  'No Midway'
+];
+
+function editConditions(entry: RunEntry) {
+  const current = entry.conditions || [];
+  const message = 'Select challenge conditions for this entry:\n\n' +
+    allConditions.map((c, i) => `${i + 1}. ${c} ${current.includes(c) ? '✓' : ''}`).join('\n') +
+    '\n\nEnter numbers to toggle (e.g., "1,3,5" or "all" or "none"):';
+  
+  const input = window.prompt(message, current.length === 0 ? '' : 'current');
+  if (input === null) return;
+  
+  const inputLower = input.toLowerCase().trim();
+  
+  if (inputLower === 'none' || inputLower === '') {
+    entry.conditions = [];
+    return;
+  }
+  
+  if (inputLower === 'all') {
+    entry.conditions = [...allConditions];
+    return;
+  }
+  
+  // Parse numbers
+  const numbers = inputLower.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n >= 1 && n <= allConditions.length);
+  if (numbers.length > 0) {
+    const newConditions = numbers.map(n => allConditions[n - 1]);
+    entry.conditions = [...new Set(newConditions)];  // Remove duplicates
+  }
+}
+
+function editGlobalConditions() {
+  const current = globalRunConditions.value || [];
+  const message = 'Select global challenge conditions for entire run:\n\n' +
+    allConditions.map((c, i) => `${i + 1}. ${c} ${current.includes(c) ? '✓' : ''}`).join('\n') +
+    '\n\nEnter numbers to toggle (e.g., "1,3,5" or "all" or "none"):';
+  
+  const input = window.prompt(message, current.length === 0 ? '' : 'current');
+  if (input === null) return;
+  
+  const inputLower = input.toLowerCase().trim();
+  
+  if (inputLower === 'none' || inputLower === '') {
+    globalRunConditions.value = [];
+    return;
+  }
+  
+  if (inputLower === 'all') {
+    globalRunConditions.value = [...allConditions];
+    return;
+  }
+  
+  // Parse numbers
+  const numbers = inputLower.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n >= 1 && n <= allConditions.length);
+  if (numbers.length > 0) {
+    const newConditions = numbers.map(n => allConditions[n - 1]);
+    globalRunConditions.value = [...new Set(newConditions)];  // Remove duplicates
+  }
 }
 
 // Version management
@@ -1220,15 +1366,50 @@ function formatRatings(difficulty?: number | null, review?: number | null): stri
 }
 
 function difficultyLabel(rating?: number | null): string {
-  if (!rating) return '';
-  const labels = ['', 'Very Easy', 'Easy', 'Normal', 'Hard', 'Very Hard'];
+  if (rating === null || rating === undefined) return '';
+  const labels = ['Super Easy', 'Very Easy', 'Easy', 'Normal', 'Hard', 'Very Hard'];
   return labels[rating] || '';
 }
 
 function reviewLabel(rating?: number | null): string {
-  if (!rating) return '';
-  const labels = ['', 'Not Recommended', 'Below Average', 'Average', 'Good', 'Excellent'];
+  if (rating === null || rating === undefined) return '';
+  const labels = ['Terrible', 'Not Recommended', 'Below Average', 'Average', 'Good', 'Excellent'];
   return labels[rating] || '';
+}
+
+function skillLabel(rating?: number | null): string {
+  if (rating === null || rating === undefined) return '';
+  const labels = [
+    'Observer',      // 0
+    'Casual',        // 1
+    'Apprentice',    // 2
+    'Advanced',      // 3
+    'Expert',        // 4
+    'Master',        // 5
+    'Legend',        // 6
+    'Champion',      // 7
+    'Deity',         // 8
+    'Speedrunner',   // 9
+    'Pro Speedrunner' // 10
+  ];
+  return labels[rating] || '';
+}
+
+function skillRatingHoverText(rating: number): string {
+  const texts = [
+    'I saw someone play Mario',  // 0
+    'Casual',                     // 1
+    'Apprentice',                 // 2
+    'Advanced',                   // 3
+    'Expert',                     // 4
+    'Master',                     // 5
+    'I am one of the greats: Glitchcat7, jaku, shovda, juzcook, Panga, Stew_, Calco, MrMightymouse, Noblet, MitchFlowerPower, GPB, Aurateur, Pmiller, Barb, ThaBeast, DaWildGrim, etc', // 6
+    'I beat Hackers Dragon or JUMP, Responsible World 1.0, Casio, and Fruit Dealer RTA', // 7
+    'I would consider a second run of those',  // 8
+    'I might speed run a few hacks like these', // 9
+    'I did speedrun a few hacks of these'       // 10
+  ];
+  return texts[rating] || '';
 }
 
 // JSON Details Modal
@@ -1447,6 +1628,46 @@ button { padding: 6px 10px; }
   color: #e5e7eb;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* Skill Rating (smaller stars for 0-10 scale) */
+.star-small {
+  font-size: 18px;
+}
+
+/* Conditions column */
+.col-conditions {
+  width: 80px;
+  text-align: center;
+}
+
+.btn-conditions {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-conditions:hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+
+.btn-conditions-header {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-conditions-header:hover {
+  background: #dbeafe;
+  border-color: #60a5fa;
 }
 </style>
 
