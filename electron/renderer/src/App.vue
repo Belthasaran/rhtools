@@ -60,8 +60,8 @@
               <th>Author</th>
               <th>Length</th>
               <th>Status</th>
-              <th>My rating</th>
-              <th>Public rating</th>
+              <th>My Ratings</th>
+              <th>Public</th>
               <th>Hidden</th>
               <th>My notes</th>
             </tr>
@@ -83,7 +83,7 @@
               <td>{{ row.Author }}</td>
               <td>{{ row.Length }}</td>
               <td>{{ row.Status }}</td>
-              <td>{{ row.Myrating ?? '' }}</td>
+              <td>{{ formatRatings(row.MyDifficultyRating, row.MyReviewRating) }}</td>
               <td>{{ row.Publicrating ?? '' }}</td>
               <td>{{ row.Hidden ? 'Yes' : 'No' }}</td>
               <td class="notes">{{ row.Mynotes ?? '' }}</td>
@@ -101,11 +101,29 @@
           <div class="panel-body details">
             <table class="kv-table">
               <tbody>
-                <tr><th>Id</th><td>{{ selectedItem.Id }}</td></tr>
-                <tr><th>Name</th><td><input v-model="selectedItem.Name" /></td></tr>
-                <tr><th>Type</th><td><input v-model="selectedItem.Type" /></td></tr>
-                <tr><th>Author</th><td><input v-model="selectedItem.Author" /></td></tr>
-                <tr><th>Length</th><td><input v-model="selectedItem.Length" /></td></tr>
+                <!-- Version Selector -->
+                <tr>
+                  <th>Version</th>
+                  <td>
+                    <select v-model="selectedVersion">
+                      <option v-for="v in availableVersions" :key="v" :value="v">
+                        Version {{ v }}{{ v === latestVersion ? ' (Latest)' : '' }}
+                      </option>
+                    </select>
+                  </td>
+                </tr>
+                
+                <!-- Official Fields (READ-ONLY) -->
+                <tr><th>Id</th><td class="readonly-field">{{ selectedItem.Id }}</td></tr>
+                <tr><th>Name</th><td class="readonly-field">{{ selectedItem.Name }}</td></tr>
+                <tr><th>Type</th><td class="readonly-field">{{ selectedItem.Type }}</td></tr>
+                <tr v-if="selectedItem.LegacyType"><th>Legacy Type</th><td class="readonly-field">{{ selectedItem.LegacyType }}</td></tr>
+                <tr><th>Author</th><td class="readonly-field">{{ selectedItem.Author }}</td></tr>
+                <tr><th>Length</th><td class="readonly-field">{{ selectedItem.Length }}</td></tr>
+                <tr><th>Public Difficulty</th><td class="readonly-field">{{ selectedItem.PublicDifficulty || '—' }}</td></tr>
+                <tr><th>Public Rating</th><td class="readonly-field">{{ selectedItem.Publicrating || '—' }}</td></tr>
+                
+                <!-- User-Editable Fields -->
                 <tr>
                   <th>Status</th>
                   <td>
@@ -116,15 +134,64 @@
                     </select>
                   </td>
                 </tr>
-                <tr><th>My rating</th><td><input type="number" min="0" max="5" step="0.5" v-model.number="selectedItem.Myrating" /></td></tr>
-                <tr><th>Public rating</th><td><input type="number" min="0" max="5" step="0.1" v-model.number="selectedItem.Publicrating" /></td></tr>
+                
+                <!-- Dual Ratings with Star Picker -->
+                <tr>
+                  <th>My Difficulty</th>
+                  <td>
+                    <div class="star-rating">
+                      <span 
+                        v-for="n in 5" 
+                        :key="'diff-' + n"
+                        @click="selectedItem.MyDifficultyRating = n"
+                        :class="{ filled: n <= (selectedItem.MyDifficultyRating || 0) }"
+                        class="star"
+                      >★</span>
+                      <button @click="selectedItem.MyDifficultyRating = null" class="btn-clear-rating">✕</button>
+                      <span class="rating-label">{{ difficultyLabel(selectedItem.MyDifficultyRating) }}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <th>My Review</th>
+                  <td>
+                    <div class="star-rating">
+                      <span 
+                        v-for="n in 5" 
+                        :key="'rev-' + n"
+                        @click="selectedItem.MyReviewRating = n"
+                        :class="{ filled: n <= (selectedItem.MyReviewRating || 0) }"
+                        class="star"
+                      >★</span>
+                      <button @click="selectedItem.MyReviewRating = null" class="btn-clear-rating">✕</button>
+                      <span class="rating-label">{{ reviewLabel(selectedItem.MyReviewRating) }}</span>
+                    </div>
+                  </td>
+                </tr>
+                
                 <tr>
                   <th>Hidden</th>
                   <td><input type="checkbox" v-model="selectedItem.Hidden" /></td>
                 </tr>
                 <tr>
+                  <th>Exclude from Random</th>
+                  <td><input type="checkbox" v-model="selectedItem.ExcludeFromRandom" /></td>
+                </tr>
+                <tr>
                   <th>My notes</th>
                   <td><textarea v-model="selectedItem.Mynotes" rows="4"></textarea></td>
+                </tr>
+                
+                <!-- Action Buttons -->
+                <tr>
+                  <td colspan="2" style="padding-top: 12px;">
+                    <div class="detail-actions">
+                      <button @click="setVersionSpecificRating" :disabled="isVersionSpecific">
+                        {{ isVersionSpecific ? '✓ Version-Specific' : 'Set Version-Specific Rating' }}
+                      </button>
+                      <button @click="viewJsonDetails">View Details (JSON)</button>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -136,7 +203,8 @@
           <div class="panel-actions">
             <button @click="addStagesToRun" :disabled="selectedStageIds.size === 0">Add chosen stages to run</button>
             <button @click="editStageNotes" :disabled="selectedStageIds.size === 0">Edit notes</button>
-            <button @click="setStageRating" :disabled="selectedStageIds.size === 0">My rating</button>
+            <button @click="setStageRating('difficulty')" :disabled="selectedStageIds.size === 0">Set Difficulty</button>
+            <button @click="setStageRating('review')" :disabled="selectedStageIds.size === 0">Set Review</button>
           </div>
           <div class="panel-body stages">
             <table class="data-table">
@@ -148,9 +216,9 @@
                   <th>Parent ID</th>
                   <th>Exit #</th>
                   <th>Description</th>
-                  <th>Rating</th>
+                  <th>Public</th>
+                  <th>My Ratings</th>
                   <th>My notes</th>
-                  <th>My rating</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,8 +228,8 @@
                   <td>{{ st.exitNumber }}</td>
                   <td>{{ st.description }}</td>
                   <td>{{ st.publicRating ?? '' }}</td>
+                  <td>{{ formatRatings(st.myDifficultyRating, st.myReviewRating) }}</td>
                   <td>{{ st.myNotes ?? '' }}</td>
-                  <td>{{ st.myRating ?? '' }}</td>
                 </tr>
                 <tr v-if="currentStages.length === 0">
                   <td class="empty" colspan="7">No stages.</td>
@@ -277,6 +345,8 @@
                   <select v-model="entry.entryType">
                     <option value="game">Game</option>
                     <option value="stage">Stage</option>
+                    <option value="random_game">Random Game</option>
+                    <option value="random_stage">Random Stage</option>
                   </select>
                 </td>
                 <td>{{ entry.name }}</td>
@@ -309,6 +379,22 @@
           </table>
         </div>
       </section>
+    </div>
+  </div>
+
+  <!-- JSON Details Modal -->
+  <div v-if="jsonModalOpen" class="modal-backdrop" @click.self="closeJsonModal">
+    <div class="modal json-modal">
+      <header class="modal-header">
+        <h3>Game Details (JSON)</h3>
+        <button class="close" @click="closeJsonModal">✕</button>
+      </header>
+      <section class="modal-body json-body">
+        <pre>{{ jsonDetailsContent }}</pre>
+      </section>
+      <footer class="modal-footer">
+        <button @click="closeJsonModal">Close</button>
+      </footer>
     </div>
   </div>
 
@@ -519,19 +605,78 @@ type Item = {
   Id: string;
   Name: string;
   Type: string;
+  LegacyType?: string;
   Author: string;
   Length: string;
+  PublicDifficulty?: string;
   Status: ItemStatus;
-  Myrating?: number;
+  MyDifficultyRating?: number | null;
+  MyReviewRating?: number | null;
   Publicrating?: number;
   Hidden: boolean;
+  ExcludeFromRandom?: boolean;
   Mynotes?: string;
+  JsonData?: any;
+  AvailableVersions?: number[];
+  CurrentVersion?: number;
 };
 
 const items = reactive<Item[]>([
-  { Id: '11374', Name: 'Super Dram World', Type: 'Kaizo: Intermediate', Author: 'Panga', Length: '18 exits', Status: 'Default', Myrating: 4, Publicrating: 4.3, Hidden: false, Mynotes: '' },
-  { Id: '17289', Name: 'Storks, Apes, and Crocodiles', Type: 'Standard', Author: 'Morsel', Length: 'unknown', Status: 'In Progress', Myrating: 5, Publicrating: 4.6, Hidden: false, Mynotes: 'Practice level 0x0F' },
-  { Id: '20091', Name: 'Example Hack', Type: 'Traditional', Author: 'Someone', Length: '5 exits', Status: 'Finished', Myrating: 3, Publicrating: 3.8, Hidden: false, Mynotes: '' },
+  { 
+    Id: '11374', 
+    Name: 'Super Dram World', 
+    Type: 'Kaizo: Intermediate', 
+    Author: 'Panga', 
+    Length: '18 exits', 
+    PublicDifficulty: 'Advanced',
+    Status: 'Default', 
+    MyDifficultyRating: 4, 
+    MyReviewRating: 5,
+    Publicrating: 4.3, 
+    Hidden: false, 
+    ExcludeFromRandom: false,
+    Mynotes: '',
+    AvailableVersions: [1, 2, 3],
+    CurrentVersion: 3,
+    JsonData: { gameid: '11374', name: 'Super Dram World', version: 3 }
+  },
+  { 
+    Id: '17289', 
+    Name: 'Storks, Apes, and Crocodiles', 
+    Type: 'Standard', 
+    LegacyType: 'Standard: Hard',
+    Author: 'Morsel', 
+    Length: 'unknown', 
+    PublicDifficulty: 'Moderate',
+    Status: 'In Progress', 
+    MyDifficultyRating: 5, 
+    MyReviewRating: 4,
+    Publicrating: 4.6, 
+    Hidden: false, 
+    ExcludeFromRandom: false,
+    Mynotes: 'Practice level 0x0F',
+    AvailableVersions: [1, 2],
+    CurrentVersion: 2,
+    JsonData: { gameid: '17289', name: 'Storks, Apes, and Crocodiles', version: 2 }
+  },
+  { 
+    Id: '20091', 
+    Name: 'Example Hack', 
+    Type: 'Traditional', 
+    Author: 'Someone', 
+    Length: '5 exits', 
+    PublicDifficulty: 'Easy',
+    Status: 'Finished', 
+    MyDifficultyRating: 3, 
+    MyReviewRating: 2,
+    Publicrating: 3.8, 
+    Hidden: false, 
+    ExcludeFromRandom: true,
+    Mynotes: '',
+    AvailableVersions: [1],
+    CurrentVersion: 1,
+    JsonData: { gameid: '20091', name: 'Example Hack', version: 1 }
+  },
 ]);
 
 const selectedIds = ref<Set<string>>(new Set());
@@ -555,7 +700,8 @@ const filteredItems = computed(() => {
       it.Author,
       it.Length,
       it.Status,
-      String(it.Myrating ?? ''),
+      String(it.MyDifficultyRating ?? ''),
+      String(it.MyReviewRating ?? ''),
       String(it.Publicrating ?? ''),
       String(it.Mynotes ?? ''),
     ].join(' ').toLowerCase();
@@ -796,17 +942,18 @@ type Stage = {
   description: string;
   publicRating?: number;
   myNotes?: string;
-  myRating?: number;
+  myDifficultyRating?: number | null;
+  myReviewRating?: number | null;
 };
 
 // Demo stage data per item id
 const stagesByItemId = reactive<Record<string, Stage[]>>({
   '11374': [
-    { key: '11374-1', parentId: '11374', exitNumber: '1', description: 'Intro stage', publicRating: 4.2, myNotes: '', myRating: 4 },
-    { key: '11374-2', parentId: '11374', exitNumber: '2', description: 'Shell level', publicRating: 4.5, myNotes: 'practice', myRating: 5 },
+    { key: '11374-1', parentId: '11374', exitNumber: '1', description: 'Intro stage', publicRating: 4.2, myNotes: '', myDifficultyRating: 3, myReviewRating: 4 },
+    { key: '11374-2', parentId: '11374', exitNumber: '2', description: 'Shell level', publicRating: 4.5, myNotes: 'practice', myDifficultyRating: 5, myReviewRating: 5 },
   ],
   '17289': [
-    { key: '17289-0x0F', parentId: '17289', exitNumber: '0x0F', description: 'Custom level jump', publicRating: 4.6, myNotes: 'good practice', myRating: 5 },
+    { key: '17289-0x0F', parentId: '17289', exitNumber: '0x0F', description: 'Custom level jump', publicRating: 4.6, myNotes: 'good practice', myDifficultyRating: 5, myReviewRating: 4 },
   ],
   '20091': [],
 });
@@ -857,21 +1004,30 @@ function editStageNotes() {
   for (const st of currentStages.value) if (selectedStageIds.value.has(st.key)) st.myNotes = next;
 }
 
-function setStageRating() {
+function setStageRating(type: 'difficulty' | 'review') {
   const ids = Array.from(selectedStageIds.value.values());
   if (ids.length === 0) return;
-  const next = window.prompt('Set My rating (0-5) for selected stages:');
+  const label = type === 'difficulty' ? 'Difficulty' : 'Review';
+  const next = window.prompt(`Set ${label} rating (1-5) for selected stages:`);
   if (next === null) return;
   const n = Number(next);
-  if (Number.isNaN(n) || n < 0 || n > 5) return;
-  for (const st of currentStages.value) if (selectedStageIds.value.has(st.key)) st.myRating = n;
+  if (Number.isNaN(n) || n < 1 || n > 5) return;
+  for (const st of currentStages.value) {
+    if (selectedStageIds.value.has(st.key)) {
+      if (type === 'difficulty') {
+        st.myDifficultyRating = n;
+      } else {
+        st.myReviewRating = n;
+      }
+    }
+  }
 }
 
 // Prepare Run modal state and logic
 type RunEntry = {
   key: string;
   id: string;
-  entryType: 'game' | 'stage';
+  entryType: 'game' | 'stage' | 'random_game' | 'random_stage';
   name: string;
   stageNumber?: string;
   stageName?: string;
@@ -1040,6 +1196,74 @@ function stageRun(mode: 'save' | 'upload') {
   console.log('Stage run', mode, runEntries);
   // Placeholder: integrate with backend/IPC later
 }
+
+// Version management
+const selectedVersion = ref<number>(1);
+const availableVersions = computed(() => {
+  return selectedItem.value?.AvailableVersions || [1];
+});
+const latestVersion = computed(() => {
+  const versions = availableVersions.value;
+  return versions.length > 0 ? Math.max(...versions) : 1;
+});
+const isVersionSpecific = computed(() => {
+  // Check if current selection has version-specific annotations
+  // For now, just check if not latest version
+  return selectedVersion.value !== latestVersion.value;
+});
+
+// Rating display helpers
+function formatRatings(difficulty?: number | null, review?: number | null): string {
+  const d = difficulty ? `D:${difficulty}` : 'D:—';
+  const r = review ? `R:${review}` : 'R:—';
+  return `${d} ${r}`;
+}
+
+function difficultyLabel(rating?: number | null): string {
+  if (!rating) return '';
+  const labels = ['', 'Very Easy', 'Easy', 'Normal', 'Hard', 'Very Hard'];
+  return labels[rating] || '';
+}
+
+function reviewLabel(rating?: number | null): string {
+  if (!rating) return '';
+  const labels = ['', 'Not Recommended', 'Below Average', 'Average', 'Good', 'Excellent'];
+  return labels[rating] || '';
+}
+
+// JSON Details Modal
+const jsonModalOpen = ref(false);
+const jsonDetailsContent = computed(() => {
+  if (!selectedItem.value) return '';
+  return JSON.stringify(selectedItem.value.JsonData || selectedItem.value, null, 2);
+});
+
+function viewJsonDetails() {
+  jsonModalOpen.value = true;
+}
+
+function closeJsonModal() {
+  jsonModalOpen.value = false;
+}
+
+// Version-specific rating
+function setVersionSpecificRating() {
+  if (isVersionSpecific.value) {
+    alert('This version already has version-specific ratings.');
+    return;
+  }
+  
+  const confirmed = confirm(
+    `Set ratings specifically for version ${selectedVersion.value}?\n\n` +
+    'This will create a separate rating for this version only, ' +
+    'overriding the game-wide rating when viewing this version.'
+  );
+  
+  if (confirmed) {
+    // In real implementation, this would create a version-specific annotation
+    alert(`Version-specific rating enabled for version ${selectedVersion.value}`);
+  }
+}
 </script>
 
 <style>
@@ -1128,5 +1352,101 @@ button { padding: 6px 10px; }
 .modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb; }
 .btn-primary { padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; }
 .btn-primary:hover { background: #2563eb; }
+
+/* New UI Components */
+
+/* Read-only fields */
+.readonly-field { 
+  color: #374151; 
+  background: #f9fafb; 
+  padding: 6px 8px; 
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Star rating component */
+.star-rating { 
+  display: flex; 
+  align-items: center; 
+  gap: 4px; 
+}
+
+.star { 
+  font-size: 24px; 
+  cursor: pointer; 
+  color: #d1d5db; 
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.star:hover { 
+  color: #fbbf24;
+  transform: scale(1.1);
+}
+
+.star.filled { 
+  color: #f59e0b;
+}
+
+.btn-clear-rating {
+  padding: 2px 6px;
+  font-size: 12px;
+  margin-left: 4px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.btn-clear-rating:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.rating-label {
+  margin-left: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  font-style: italic;
+  min-width: 100px;
+}
+
+/* Detail action buttons */
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-actions button {
+  flex: 1;
+  min-width: 150px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* JSON Modal */
+.json-modal {
+  width: 900px;
+  max-width: 95vw;
+}
+
+.json-body {
+  padding: 20px;
+  max-height: 70vh;
+  overflow: auto;
+  background: #1f2937;
+}
+
+.json-body pre {
+  margin: 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e5e7eb;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
 </style>
 
