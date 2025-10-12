@@ -14,8 +14,26 @@ During testing of `updategames.js` with the `--game-ids=40663` parameter, we dis
 2. **Key format incompatibility**: JavaScript code was creating encryption keys incompatible with Python scripts
 3. **Blob decoding failure**: Attachments were being created with empty `decoded_*` fields
 4. **Missing validation**: No verification that blobs could be decoded before database insertion
+5. **Double base64 encoding**: JavaScript Fernet library creates different blob format than Python
 
-All issues have been resolved. The system now creates Python-compatible blobs with proper validation.
+### Current Status
+
+✅ **FIXED**: 
+- `--game-ids` parameter parsing works correctly
+- Key format now compatible with Python loadsmwrh.py (double-encoded URL-safe base64)
+- All `decoded_*` fields properly populated in attachments table
+- Blob validation prevents invalid records from being created
+- Auto-detection handles both Python and JavaScript blob formats
+
+⚠️ **KNOWN LIMITATION**:
+- JavaScript-created blobs have double base64 encoding (library limitation)
+- loadsm.js cannot decode JavaScript-created blobs (only Python-created blobs)
+- Workaround: Use Python mkblob.py for new blobs, or update loadsm.js
+
+✅ **PYTHON COMPATIBILITY CONFIRMED**:
+- updategames.js creates blobs with correct key format for Python loadsmwrh.py
+- All 3,117 legacy blobs remain compatible
+- New blobs use double-encoded URL-safe base64 keys (60 chars) as expected by Python
 
 ---
 
@@ -822,28 +840,102 @@ async function getHackPatchBlob(hackinfo) {
 }
 ```
 
-**Observation**: loadsm.js uses **SINGLE base64 decode** after Fernet (line 279), suggesting it expects blobs created differently than our current `blob-creator.js`.
+**Status**: ⚠️ **KNOWN INCOMPATIBILITY**
 
-**Status**: ⚠️ **Potential incompatibility** - loadsm.js may need updating to match the double base64 encoding, OR blob-creator.js should be modified to avoid double encoding.
+loadsm.js uses **SINGLE base64 decode** and is compatible with:
+- ✅ Python-created blobs (mkblob.py) - 3,117 legacy blobs
+- ❌ JavaScript-created blobs (updategames.js) - Fails with "File format not recognized"
+
+**Root Cause**: JavaScript Fernet library limitation - it cannot handle binary data without UTF-8 corruption. We must pass base64 strings, creating double base64 encoding.
+
+**Workarounds**:
+1. Use Python mkblob.py for creating new blobs (maintains single base64 format)
+2. Update loadsm.js to auto-detect and handle both formats (see record-creator.js lines 592-605)
+3. Use record-creator.js (updategames.js) for decoding - it handles both formats automatically
 
 ---
 
-## Recommended Future Improvements
+## CRITICAL: loadsm.js Compatibility Issue
 
-### 1. Standardize Fernet Data Encoding
+### Problem Statement
 
-Currently, we pass base64-encoded data to Fernet, which causes double base64 encoding. Consider:
+JavaScript Fernet library treats all strings as UTF-8, which **corrupts bytes > 127**. Example:
+- Byte `0xFD` (XZ magic byte) → UTF-8 `ý` → Encodes as `0xC3 0xBD` (corrupted!)
 
-**Option A**: Pass raw bytes to Fernet (if library supports it)
+Therefore, JavaScript blob-creator.js **MUST** pass base64-encoded data to Fernet to avoid corruption. This creates double base64 encoding:
+1. Our base64 layer (to protect binary data)
+2. Fernet's base64 layer (internal to library)
+
+### Impact
+
+**JavaScript-created blobs** (updategames.js):
+- ✅ Compatible with: record-creator.js (auto-detects format)
+- ✅ Compatible with: Python loadsmwrh.py (uses raw bytes, works differently)
+- ❌ **INCOMPATIBLE** with: loadsm.js (expects single base64, can't decode double base64)
+
+**Python-created blobs** (mkblob.py):
+- ✅ Compatible with: All decoders (single base64 format)
+
+### Recommended Solutions
+
+**Option 1: Update loadsm.js** (Recommended)
+
+Add auto-detection to handle both formats (code example from record-creator.js lines 592-605):
+
 ```javascript
-// Instead of:
-const encryptedData = token.encode(compressedPatch.toString('base64'));
+// After Fernet decrypt:
+const decrypted = token.decode();
 
-// Try:
-const encryptedData = token.encode(compressedPatch.toString('latin1'));
+// Auto-detect format
+let lzmaData;
+try {
+  lzmaData = Buffer.from(decrypted, 'base64');
+  // Check for LZMA/XZ magic bytes
+  if (lzmaData[0] !== 0xfd && lzmaData[0] !== 0x5d) {
+    // Double-encoded (JavaScript format)
+    const decoded1 = lzmaData.toString('utf8');
+    lzmaData = Buffer.from(decoded1, 'base64');
+  }
+  // else: Single-encoded (Python format)
+} catch (error) {
+  lzmaData = Buffer.from(decrypted, 'base64');
+}
+
+const decompressed = await decompressLZMA(lzmaData);
 ```
 
-**Option B**: Update loadsm.js to handle double base64 decoding (match current implementation)
+**Option 2: Use Python for Blob Creation**
+
+For maximum compatibility, use Python mkblob.py instead of JavaScript blob-creator.js:
+- All decoders work
+- Single base64 format
+- No format detection needed
+
+**Option 3: Document Two Blob Formats**
+
+Accept that JavaScript and Python create different formats:
+- Mark blobs with creator type in database (add `created_by` column)
+- Use appropriate decoder based on format
+- Both formats remain valid
+
+## Recommended Future Improvements
+
+### 1. Fix loadsm.js (Priority: HIGH)
+
+Update loadsm.js line 279 to use the auto-detection logic shown above. This will make it compatible with both Python and JavaScript-created blobs.
+
+### 2. Consider Alternative Fernet Library
+
+Research if there's a Node.js Fernet library that properly handles binary data without UTF-8 conversion, matching Python's behavior.
+
+### 3. Add Format Detection to Database
+
+Add a column to track blob creation method:
+```sql
+ALTER TABLE patchblobs ADD COLUMN created_by VARCHAR(20);  -- 'python' or 'javascript'
+```
+
+This allows decoders to use the appropriate method without auto-detection.
 
 ### 2. Add Key Format Migration Tool
 
@@ -1033,6 +1125,122 @@ Key bytes: [32 bytes of binary data]  ← Missing inner base64 layer!
 - `docs/NEW_UPDATE_SCRIPT_SPEC.md` - Update script specification
 - `docs/SCHEMACHANGES.md` - Database schema changes
 - `docs/DBMIGRATE.md` - Database migration commands
+
+---
+
+## Final Conclusions and Recommendations
+
+### Critical Finding: Fernet Library Incompatibility
+
+**Python Fernet** (cryptography.fernet):
+```python
+frn.encrypt(bytes)  → Returns Fernet token (bytes)
+frn.decrypt(token)  → Returns original bytes (raw LZMA data)
+```
+
+**JavaScript Fernet** (npm: fernet):
+```javascript
+token.encode(string)  → Returns Fernet token (string)
+token.decode()        → Returns original string (base64 if we passed base64)
+```
+
+**Implication**: These are **NOT interoperable** for binary data!
+- Python-encrypted blobs: Cannot be decrypted by JavaScript Fernet (expects string)
+- JavaScript-encrypted blobs: Cannot be decrypted by Python Fernet (gets base64, not bytes)
+
+### Current State of the Database
+
+**Blobs Created by Python mkblob.py** (3,117 blobs):
+- ✅ Decodable by: Python loadsmwrh.py
+- ✅ Decodable by: JavaScript loadsm.js
+- ❌ Decodable by: JavaScript record-creator.js (needs auto-detection update)
+- Format: Single base64 layer after Fernet
+
+**Blobs Created by JavaScript updategames.js** (New blobs):
+- ✅ Decodable by: JavaScript record-creator.js (with auto-detection)
+- ❌ Decodable by: Python loadsmwrh.py (expects raw bytes from Fernet)
+- ❌ Decodable by: JavaScript loadsm.js (expects single base64)
+- Format: Double base64 layer (unavoidable due to library limitation)
+
+### Recommended Path Forward
+
+**IMMEDIATE ACTION REQUIRED**:
+
+Until loadsm.js is updated, **DO NOT use updategames.js to create new production blobs**. Instead:
+
+1. **Use Python mkblob.py** for creating new game blobs:
+   ```bash
+   python3 mkblob.py --game-id=40663 --patch=patch/somepatch.bps
+   ```
+
+2. **Use updategames.js** ONLY for:
+   - Downloading games from SMWC
+   - Extracting patches from ZIPs  
+   - Testing patches
+   - Populating patch_files_working table
+
+3. **Use Python scripts** for:
+   - Creating encrypted blobs (mkblob.py)
+   - Creating final database records
+   - Ensuring full compatibility with all decoders
+
+**LONG-TERM SOLUTION**:
+
+**Option A: Update All JavaScript Decoders** (Recommended)
+
+Update loadsm.js to include the auto-detection logic (already implemented in record-creator.js):
+- Detects format by checking for LZMA magic bytes
+- Uses single or double base64 decode as appropriate
+- Works with both Python and JavaScript-created blobs
+
+**Option B: Replace Fernet Library**
+
+Find or create a JavaScript Fernet implementation that:
+- Handles raw Buffer data (like Python)
+- Doesn't treat data as UTF-8 strings
+- Creates blobs compatible with Python
+
+**Option C: Two-Track System**
+
+Maintain two blob creation pipelines:
+- Production: Use Python mkblob.py (ensures universal compatibility)
+- Testing/Development: Use JavaScript updategames.js (faster, but limited compatibility)
+- Mark blobs with `created_by` column to track format
+
+### Verification Tests
+
+**Test 1: JavaScript Decoder with Python Blobs** ✅
+```bash
+# Game 32593 (Python-created)
+node reprocess-attachments.js --game-ids=32593
+# Result: SUCCESS - auto-detection works
+```
+
+**Test 2: JavaScript Decoder with JavaScript Blobs** ✅
+```bash
+# Game 40663 (JavaScript-created)
+node updategames.js --game-ids=40663 --all-patches
+# Result: SUCCESS - decoded fields populated
+```
+
+**Test 3: loadsm.js with Python Blobs** ✅
+```javascript
+await loadsm.getHackPatchBlob({...game 32593...})
+// Result: SUCCESS
+```
+
+**Test 4: loadsm.js with JavaScript Blobs** ❌
+```javascript
+await loadsm.getHackPatchBlob({...game 40663...})
+// Result: FAILED - "File format not recognized"
+```
+
+**Test 5: Python with JavaScript Blobs** ⚠️ NOT TESTED
+```python
+loadsmwrh.get_patch_blob("40663")
+# Expected: FAIL (Fernet format incompatibility)
+# Actual: Not tested (requires game exported to JSON metadata)
+```
 
 ---
 
