@@ -31,10 +31,15 @@
     "client:migrate-apiserver": "node electron/migrate_apiservers.js",
     "client:add-apiserver": "node electron/manage_apiserver.js add",
     "client:list-apiservers": "node electron/manage_apiserver.js list",
-    "client:test-apiserver": "node electron/manage_apiserver.js test"
+    "client:test-apiserver": "node electron/manage_apiserver.js test",
+    "updategames": "node updategames.js",
+    "updategames:all": "node updategames.js --all-patches",
+    "updategames:test": "node updategames.js --dry-run --limit=5",
+    "updategames:resume": "node updategames.js --resume"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
+    "adm-zip": "^0.5.10",
     "ardrive-cli": "^3.0.3",
     "ardrive-core-js": "^3.0.3",
     "better-sqlite3": "^11.0.0",

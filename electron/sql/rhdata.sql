@@ -31,6 +31,10 @@ CREATE TABLE gameversions (
   gvchanges text,
   tags text,
   tags_href text,
+  fields_type varchar(255),
+  legacy_type varchar(255),
+  raw_difficulty varchar(255),
+  combinedtype varchar(255),
   gvimport_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   siglistuuid varchar(255),
   UNIQUE(gameid, version)

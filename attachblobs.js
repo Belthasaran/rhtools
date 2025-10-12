@@ -15,7 +15,9 @@
  * - Calculates CRC checksums (CRC16, CRC32)
  * - Calculates IPFS CIDs (v0 and v1)
  * - Handles encrypted files (decrypts using patchblob1_key)
- * - Inserts complete records into attachments table in patchbin.db
+ * - Inserts/updates records into attachments table in patchbin.db
+ * - Preserves existing non-NULL data in fields not being calculated
+ *   (e.g., arweave_file_name, arweave_file_id, arweave_file_path)
  */
 
 const fs = require('fs');
@@ -193,14 +195,14 @@ function findFileRecursive(dir, fileName, foundFiles = []) {
  */
 function getAttachmentStatus(db, fileName, fileHashSha224) {
   const query = `
-    SELECT auuid, file_size
+    SELECT *
     FROM attachments 
     WHERE file_name = ? AND file_hash_sha224 = ?
   `;
   const result = db.prepare(query).get(fileName, fileHashSha224);
   
   if (!result) {
-    return { exists: false, needsFileSizeUpdate: false, auuid: null };
+    return { exists: false, needsFileSizeUpdate: false, auuid: null, existingData: null };
   }
   
   // Check if file_size is missing (NULL or undefined)
@@ -209,7 +211,8 @@ function getAttachmentStatus(db, fileName, fileHashSha224) {
   return {
     exists: true,
     needsFileSizeUpdate: needsFileSizeUpdate,
-    auuid: result.auuid
+    auuid: result.auuid,
+    existingData: result
   };
 }
 
@@ -274,32 +277,8 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
   // Check if already exists
   const attachmentStatus = getAttachmentStatus(patchbinDb, patchblob1_name, fileHashSha224);
   
-  if (attachmentStatus.exists && !attachmentStatus.needsFileSizeUpdate) {
-    console.log(`  ⓘ Already exists in database with complete data, skipping`);
-    return;
-  }
-  
-  if (attachmentStatus.exists && attachmentStatus.needsFileSizeUpdate) {
-    // Update only the file_size field
-    console.log(`  ⓘ Record exists but file_size is missing, updating file_size to ${fileSize} bytes...`);
-    try {
-      const updateQuery = `
-        UPDATE attachments 
-        SET file_size = ?
-        WHERE auuid = ?
-      `;
-      patchbinDb.prepare(updateQuery).run(fileSize, attachmentStatus.auuid);
-      console.log(`  ✓ Updated file_size for existing record (auuid: ${attachmentStatus.auuid})`);
-      return;
-    } catch (error) {
-      console.error(`  ✗ Error updating file_size: ${error.message}`);
-      return;
-    }
-  }
-  
-  // Prepare attachment record
-  const attachment = {
-    auuid: generateUUID(),
+  // Prepare new calculated data
+  const newCalculatedData = {
     pbuuid: pbuuid,
     gvuuid: gvuuid,
     file_crc16: fileCrc16,
@@ -324,6 +303,29 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
     file_data: fileData
   };
   
+  // Prepare attachment record - merge with existing data to preserve non-NULL values
+  let attachment;
+  if (attachmentStatus.exists) {
+    console.log(`  ⓘ Record exists, merging with existing data to preserve non-NULL fields...`);
+    
+    // Start with existing data
+    attachment = { ...attachmentStatus.existingData };
+    
+    // Overwrite with new calculated data
+    Object.keys(newCalculatedData).forEach(key => {
+      attachment[key] = newCalculatedData[key];
+    });
+    
+    // Ensure we keep the existing auuid
+    attachment.auuid = attachmentStatus.auuid;
+  } else {
+    // New record - use calculated data and generate new UUID
+    attachment = {
+      auuid: generateUUID(),
+      ...newCalculatedData
+    };
+  }
+  
   // If encrypted, decode and calculate decoded hashes
   if (patchblob1_key && pat_sha224) {
     console.log(`  Decoding encrypted patchblob...`);
@@ -343,7 +345,7 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
       
       console.log(`  ✓ Decoded hash verified`);
       
-      // Calculate decoded hashes and IPFS CIDs
+      // Calculate and update decoded hashes and IPFS CIDs
       attachment.decoded_hash_sha224 = decodedHashSha224;
       attachment.decoded_hash_sha1 = sha1(decodedData);
       attachment.decoded_hash_md5 = md5(decodedData);
@@ -353,10 +355,12 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
       attachment.decoded_ipfs_cidv1 = decodedIPFS.cidv1;
     } else {
       console.log(`  ⚠ Failed to decode patchblob, continuing without decoded data`);
+      // If decoding failed but we have existing decoded data, preserve it
+      // (already preserved in the merge above if record exists)
     }
   }
   
-  // Insert into attachments table
+  // Insert or update attachments table
   try {
     const fields = Object.keys(attachment);
     const placeholders = fields.map(f => `@${f}`);
@@ -367,9 +371,14 @@ async function processPatchBlob(rhdataDb, patchbinDb, record) {
     `;
     
     patchbinDb.prepare(query).run(attachment);
-    console.log(`  ✓ Inserted into attachments table (auuid: ${attachment.auuid})`);
+    
+    if (attachmentStatus.exists) {
+      console.log(`  ✓ Updated attachments table (auuid: ${attachment.auuid}) - preserved existing data`);
+    } else {
+      console.log(`  ✓ Inserted into attachments table (auuid: ${attachment.auuid})`);
+    }
   } catch (error) {
-    console.error(`  ✗ Error inserting into database: ${error.message}`);
+    console.error(`  ✗ Error inserting/updating database: ${error.message}`);
   }
 }
 
