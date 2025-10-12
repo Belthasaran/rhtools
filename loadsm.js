@@ -276,7 +276,21 @@ async function getHackPatchBlob(hackinfo)
 	   //console.log(`X=${ sha224(data) }`)
 	   //
 	   //        const decompressedData = await lzma.decompress(Buffer.from(decryptedData, 'base64'));
-	   decomp2 = await decompressLZMA(Buffer.from(data, 'base64'))
+	   
+	   // Auto-detect format: Python blobs (single base64) vs JavaScript blobs (double base64)
+	   let lzmaData = Buffer.from(data, 'base64');
+	   // Check for LZMA/XZ magic bytes (0xFD or 0x5D)
+	   if (lzmaData[0] !== 0xfd && lzmaData[0] !== 0x5d) {
+	       // Not valid LZMA - might be double-encoded (JavaScript format)
+	       try {
+	           const decoded1 = lzmaData.toString('utf8');
+	           lzmaData = Buffer.from(decoded1, 'base64');
+	       } catch (e) {
+	           // Keep original if double-decode fails
+	       }
+	   }
+	   
+	   decomp2 = await decompressLZMA(lzmaData)
 
 	   console.log(`expected patch_sha224 = ${hackinfo.pat_sha224}`)
 	   console.log(`sha224(decoded_blob) = ${ sha224(decomp2) }`)

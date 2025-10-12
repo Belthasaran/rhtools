@@ -35,7 +35,11 @@
     "updategames": "node updategames.js",
     "updategames:all": "node updategames.js --all-patches",
     "updategames:test": "node updategames.js --dry-run --limit=5",
-    "updategames:resume": "node updategames.js --resume"
+    "updategames:resume": "node updategames.js --resume",
+    "test:blob-compat": "node tests/test_blob_compatibility.js",
+    "test:updategames": "node tests/test_updategames.js",
+    "utils:identify-keys": "node identify-incompatible-keys.js",
+    "utils:reprocess-attachments": "node reprocess-attachments.js"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
