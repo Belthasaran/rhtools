@@ -8,11 +8,14 @@
  *   node verify-all-blobs.js [options]
  * 
  * Options:
- *   --gameid=<id>          Verify specific game ID only
- *   --file-name=<name>     Verify specific blob file only
- *   --full-check           Test patches with flips (slow, comprehensive)
- *   --log-file=<path>      Log results to file (default: verification_results.log)
- *   --failed-file=<path>   Save failed items list (default: failed_blobs.json)
+ *   --verify-blobs=<source>  Source to verify: 'db' or 'files' (default: files)
+ *                            db = verify from patchbin.db file_data column
+ *                            files = verify from blob files in blobs/ directory
+ *   --gameid=<id>            Verify specific game ID only
+ *   --file-name=<name>       Verify specific blob file only
+ *   --full-check             Test patches with flips (slow, comprehensive)
+ *   --log-file=<path>        Log results to file (default: verification_results.log)
+ *   --failed-file=<path>     Save failed items list (default: failed_blobs.json)
  * 
  * Exit codes:
  *   0 - All blobs valid
@@ -35,6 +38,7 @@ const CONFIG = {
   TEMP_DIR: path.join(__dirname, 'temp'),
   LOG_FILE: 'verification_results.log',
   FAILED_FILE: 'failed_blobs.json',
+  VERIFY_SOURCE: 'files',  // 'files' or 'db'
   FULL_CHECK: false,
   GAMEID: null,
   FILE_NAME: null,
@@ -48,7 +52,11 @@ function parseArgs(args) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     
-    if (arg.startsWith('--gameid=')) {
+    if (arg.startsWith('--verify-blobs=')) {
+      parsed.verifySource = arg.split('=')[1];
+    } else if (arg === '--verify-blobs') {
+      parsed.verifySource = args[++i];
+    } else if (arg.startsWith('--gameid=')) {
       parsed.gameid = arg.split('=')[1];
     } else if (arg === '--gameid') {
       parsed.gameid = args[++i];
@@ -92,15 +100,15 @@ class VerificationLogger {
   }
 }
 
-async function verifyBlob(patchblob, recordCreator, logger, fullCheck = false) {
+async function verifyBlob(patchblob, recordCreator, patchbinDb, logger, fullCheck = false, verifySource = 'files') {
   const gameid = patchblob.gameid || 'N/A';
   const blobName = patchblob.patchblob1_name;
-  const blobPath = path.join(CONFIG.BLOBS_DIR, blobName);
   
   const result = {
     gameid,
     pbuuid: patchblob.pbuuid,
     patchblob1_name: blobName,
+    source_checked: verifySource,
     file_exists: false,
     file_hash_valid: false,
     decode_success: false,
@@ -109,16 +117,47 @@ async function verifyBlob(patchblob, recordCreator, logger, fullCheck = false) {
     errors: []
   };
   
+  let fileData = null;
+  
   try {
-    // Check 1: Blob file exists
-    if (!fs.existsSync(blobPath)) {
-      result.errors.push('Blob file not found');
-      return result;
+    // Get blob data from appropriate source
+    if (verifySource === 'db') {
+      // Check 1: Get blob from patchbin.db file_data column
+      const attachment = patchbinDb.prepare(`
+        SELECT file_data, file_hash_sha224 
+        FROM attachments 
+        WHERE file_name = ?
+      `).get(blobName);
+      
+      if (!attachment || !attachment.file_data) {
+        result.errors.push('Attachment not found in database or file_data is NULL');
+        return result;
+      }
+      result.file_exists = true;
+      
+      fileData = attachment.file_data;
+      
+      // Verify against stored hash
+      const fileHash = crypto.createHash('sha224').update(fileData).digest('hex');
+      if (fileHash !== attachment.file_hash_sha224) {
+        result.errors.push(`DB file_hash_sha224 mismatch: expected ${attachment.file_hash_sha224}, got ${fileHash}`);
+        return result;
+      }
+      
+    } else {
+      // Check 1: Blob file exists on filesystem
+      const blobPath = path.join(CONFIG.BLOBS_DIR, blobName);
+      
+      if (!fs.existsSync(blobPath)) {
+        result.errors.push('Blob file not found on filesystem');
+        return result;
+      }
+      result.file_exists = true;
+      
+      fileData = fs.readFileSync(blobPath);
     }
-    result.file_exists = true;
     
-    // Check 2: File hash matches
-    const fileData = fs.readFileSync(blobPath);
+    // Check 2: File hash matches patchblob1_sha224
     const fileHash = crypto.createHash('sha224').update(fileData).digest('hex');
     
     if (fileHash !== patchblob.patchblob1_sha224) {
@@ -179,15 +218,23 @@ async function verifyBlob(patchblob, recordCreator, logger, fullCheck = false) {
 async function main() {
   const argv = parseArgs(process.argv.slice(2));
   
+  CONFIG.VERIFY_SOURCE = argv.verifySource || CONFIG.VERIFY_SOURCE;
   CONFIG.GAMEID = argv.gameid || null;
   CONFIG.FILE_NAME = argv.fileName || null;
   CONFIG.FULL_CHECK = argv.fullCheck || false;
   CONFIG.LOG_FILE = argv.logFile || CONFIG.LOG_FILE;
   CONFIG.FAILED_FILE = argv.failedFile || CONFIG.FAILED_FILE;
   
+  // Validate verify source
+  if (CONFIG.VERIFY_SOURCE !== 'files' && CONFIG.VERIFY_SOURCE !== 'db') {
+    console.error(`Error: --verify-blobs must be 'files' or 'db', got '${CONFIG.VERIFY_SOURCE}'`);
+    process.exit(2);
+  }
+  
   console.log('='.repeat(70));
   console.log('BLOB VERIFICATION UTILITY');
   console.log('='.repeat(70));
+  console.log(`Verification source: ${CONFIG.VERIFY_SOURCE === 'db' ? 'patchbin.db file_data' : 'blob files'}\n`);
   
   if (CONFIG.FULL_CHECK) {
     console.log('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)\n');
@@ -213,6 +260,12 @@ async function main() {
   try {
     const dbManager = new DatabaseManager(CONFIG.DB_PATH);
     const recordCreator = new RecordCreator(dbManager, CONFIG.PATCHBIN_DB_PATH, CONFIG);
+    
+    // Open patchbin database if verifying from db
+    const Database = require('better-sqlite3');
+    const patchbinDb = CONFIG.VERIFY_SOURCE === 'db' 
+      ? new Database(CONFIG.PATCHBIN_DB_PATH, { readonly: true })
+      : null;
     
     // Build query
     let query = `
@@ -253,7 +306,7 @@ async function main() {
       
       logger.log(`\n${progress} Game ${pb.gameid || 'N/A'}: ${pb.patchblob1_name}`);
       
-      const result = await verifyBlob(pb, recordCreator, logger, CONFIG.FULL_CHECK);
+      const result = await verifyBlob(pb, recordCreator, patchbinDb, logger, CONFIG.FULL_CHECK, CONFIG.VERIFY_SOURCE);
       
       if (result.errors.length === 0 && result.patch_hash_valid) {
         logger.log(`  ✅ VALID${CONFIG.FULL_CHECK && result.flips_test_success ? ' (flips test passed)' : ''}`);
@@ -299,6 +352,9 @@ async function main() {
       logger.log(`\n❌ Failed blobs saved to: ${CONFIG.FAILED_FILE}`);
     }
     
+    if (patchbinDb) {
+      patchbinDb.close();
+    }
     recordCreator.close();
     dbManager.close();
     logger.close();

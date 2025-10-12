@@ -9,6 +9,9 @@ Usage:
 
 Options:
     --dbtype=<type>        Database type: 'sqlite' or 'rhmd' (default: sqlite)
+    --verify-blobs=<src>   Blob source: 'db' or 'files' (default: files)
+                           db = verify from patchbin.db file_data column
+                           files = verify from blob files in blobs/ directory
     --gameid=<id>          Verify specific game ID only
     --file-name=<name>     Verify specific blob file only
     --full-check           Test patches with flips (slow, comprehensive)
@@ -40,11 +43,13 @@ except ImportError:
 
 CONFIG = {
     'DB_PATH': 'electron/rhdata.db',
+    'PATCHBIN_DB_PATH': 'electron/patchbin.db',
     'BLOBS_DIR': 'blobs',
     'TEMP_DIR': 'temp',
     'LOG_FILE': 'verification_results_py.log',
     'FAILED_FILE': 'failed_blobs_py.json',
     'DBTYPE': 'sqlite',
+    'VERIFY_SOURCE': 'files',  # 'files' or 'db'
     'GAMEID': None,
     'FILE_NAME': None,
     'FULL_CHECK': False,
@@ -67,16 +72,16 @@ class VerificationLogger:
         if self.log_stream:
             self.log_stream.close()
 
-def verify_blob(patchblob, logger, full_check=False):
+def verify_blob(patchblob, patchbin_conn, logger, full_check=False, verify_source='files'):
     """Verify a single patchblob"""
     gameid = patchblob.get('gameid', 'N/A')
     blob_name = patchblob['patchblob1_name']
-    blob_path = os.path.join(CONFIG['BLOBS_DIR'], blob_name)
     
     result = {
         'gameid': gameid,
         'pbuuid': patchblob.get('pbuuid'),
         'patchblob1_name': blob_name,
+        'source_checked': verify_source,
         'file_exists': False,
         'file_hash_valid': False,
         'decode_success': False,
@@ -85,17 +90,46 @@ def verify_blob(patchblob, logger, full_check=False):
         'errors': []
     }
     
+    file_data = None
+    
     try:
-        # Check 1: Blob file exists
-        if not os.path.exists(blob_path):
-            result['errors'].append('Blob file not found')
-            return result
-        result['file_exists'] = True
+        # Get blob data from appropriate source
+        if verify_source == 'db':
+            # Check 1: Get blob from patchbin.db file_data column
+            cursor = patchbin_conn.cursor()
+            cursor.execute(
+                "SELECT file_data, file_hash_sha224 FROM attachments WHERE file_name = ?",
+                (blob_name,)
+            )
+            row = cursor.fetchone()
+            
+            if not row or not row[0]:
+                result['errors'].append('Attachment not found in database or file_data is NULL')
+                return result
+            result['file_exists'] = True
+            
+            file_data = row[0]
+            db_file_hash = row[1]
+            
+            # Verify against stored hash
+            file_hash = hashlib.sha224(file_data).hexdigest()
+            if file_hash != db_file_hash:
+                result['errors'].append(f"DB file_hash_sha224 mismatch: expected {db_file_hash}, got {file_hash}")
+                return result
+            
+        else:
+            # Check 1: Blob file exists on filesystem
+            blob_path = os.path.join(CONFIG['BLOBS_DIR'], blob_name)
+            
+            if not os.path.exists(blob_path):
+                result['errors'].append('Blob file not found on filesystem')
+                return result
+            result['file_exists'] = True
+            
+            with open(blob_path, 'rb') as f:
+                file_data = f.read()
         
-        # Check 2: File hash matches
-        with open(blob_path, 'rb') as f:
-            file_data = f.read()
-        
+        # Check 2: File hash matches patchblob1_sha224
         file_hash = hashlib.sha224(file_data).hexdigest()
         
         if file_hash != patchblob['patchblob1_sha224']:
@@ -240,6 +274,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='Verify all patchblobs')
     parser.add_argument('--dbtype', choices=['sqlite', 'rhmd'], default='sqlite', help='Database type')
+    parser.add_argument('--verify-blobs', choices=['db', 'files'], default='files', help='Blob source: db or files')
     parser.add_argument('--gameid', help='Verify specific game ID only')
     parser.add_argument('--file-name', help='Verify specific blob file only')
     parser.add_argument('--full-check', action='store_true', help='Test with flips (slow)')
@@ -249,6 +284,7 @@ def main():
     args = parser.parse_args()
     
     CONFIG['DBTYPE'] = args.dbtype
+    CONFIG['VERIFY_SOURCE'] = args.verify_blobs
     CONFIG['GAMEID'] = args.gameid
     CONFIG['FILE_NAME'] = args.file_name
     CONFIG['FULL_CHECK'] = args.full_check
@@ -259,6 +295,7 @@ def main():
     print('BLOB VERIFICATION UTILITY (Python)')
     print('=' * 70)
     print(f"Database type: {CONFIG['DBTYPE']}")
+    print(f"Verification source: {'patchbin.db file_data' if CONFIG['VERIFY_SOURCE'] == 'db' else 'blob files'}\n")
     
     if CONFIG['FULL_CHECK']:
         print('⚠️  FULL CHECK MODE - Will test patches with flips (SLOW)\n')
@@ -292,6 +329,11 @@ def main():
     
     logger = VerificationLogger(CONFIG['LOG_FILE'])
     
+    # Open patchbin database if verifying from db
+    patchbin_conn = None
+    if CONFIG['VERIFY_SOURCE'] == 'db':
+        patchbin_conn = sqlite3.connect(CONFIG['PATCHBIN_DB_PATH'])
+    
     try:
         # Get patchblobs from appropriate source
         if CONFIG['DBTYPE'] == 'sqlite':
@@ -310,7 +352,7 @@ def main():
             progress = f"[{i + 1}/{len(patchblobs)}]"
             logger.log(f"\n{progress} Game {pb.get('gameid', 'N/A')}: {pb['patchblob1_name']}")
             
-            result = verify_blob(pb, logger, CONFIG['FULL_CHECK'])
+            result = verify_blob(pb, patchbin_conn, logger, CONFIG['FULL_CHECK'], CONFIG['VERIFY_SOURCE'])
             
             if not result['errors'] and result['patch_hash_valid']:
                 flips_msg = ' (flips test passed)' if CONFIG['FULL_CHECK'] and result['flips_test_success'] else ''
@@ -346,6 +388,9 @@ def main():
             
             logger.log(f"\n❌ Failed blobs saved to: {CONFIG['FAILED_FILE']}")
         
+        if patchbin_conn:
+            patchbin_conn.close()
+        
         logger.close()
         sys.exit(1 if failed > 0 else 0)
         
@@ -353,6 +398,10 @@ def main():
         logger.log(f"\n❌ Fatal error: {e}")
         import traceback
         logger.log(traceback.format_exc())
+        
+        if patchbin_conn:
+            patchbin_conn.close()
+        
         logger.close()
         sys.exit(2)
 

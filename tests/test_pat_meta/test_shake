@@ -5,11 +5,10 @@
   "pat_sha1": "c158b0600db2d70a2261a23566f7c90533e2fa13",
   "pat_sha224": "18fc917495b57a640792a6b3f73602473c87e37a6622780c3effa05e",
   "pat_shake_128": "test_shake",
-  "result_sha1": null,
-  "result_sha224": null,
   "result_shake1": null,
   "rom": null,
-  "patchblob1_name": "pblob_test_game_21a6bf46ce",
-  "patchblob1_key": "YktqeWxveUZOWWJZMEQxbnNhb2d6SE13WVZkQWpsY0FrQThjcktPSlgwQT0=",
-  "patchblob1_sha224": "21a6bf46ced84640e295d508c90154a3b4439f2f2f0a040bb4c3447a"
+  "patchblob1_name": "pblob_test_game_402a8ec069",
+  "patchblob1_key": "LThabjdWR2VPaTVKaXRwYjJieG56RHYzY0xrTmFHdlFOZHBOSVNuUGhPZz0=",
+  "patchblob1_sha224": "402a8ec0696b2db1d4881fb41b405cf264c133b02e3ca0666b9be3f2",
+  "romblob_salt": "oRH-RkRes1iKu8N5Y7MV2g=="
 }
