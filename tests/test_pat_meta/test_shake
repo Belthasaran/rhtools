@@ -1,0 +1,15 @@
+{
+  "id": "test_game",
+  "patch": "/home/main/proj/rhtools/tests/test_patches/test.bps",
+  "patch_filename": "test.bps",
+  "pat_sha1": "c158b0600db2d70a2261a23566f7c90533e2fa13",
+  "pat_sha224": "18fc917495b57a640792a6b3f73602473c87e37a6622780c3effa05e",
+  "pat_shake_128": "test_shake",
+  "result_sha1": null,
+  "result_sha224": null,
+  "result_shake1": null,
+  "rom": null,
+  "patchblob1_name": "pblob_test_game_db3c95a022",
+  "patchblob1_key": "dTBkc2pUS3NkOGdBT29hNnpTUDhPdWNCN3RPNTBlTHV3eTMxN3k5MmVsUT0=",
+  "patchblob1_sha224": "db3c95a0222de5fac8b9df64cc2498db2e06f70a285a422d685567d7"
+}
