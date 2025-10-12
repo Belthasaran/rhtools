@@ -870,5 +870,88 @@ DETACH DATABASE clientdata;
 
 ---
 
+## Migration 003: Skill Rating and Conditions (clientdata.db)
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Add skill rating columns (0-10 scale) and challenge conditions support to run system.
+
+### Command
+```bash
+sqlite3 electron/clientdata.db < electron/sql/migrations/003_clientdata_skill_rating_and_conditions.sql
+```
+
+### What It Does
+**Adds Skill Rating**:
+- `user_skill_rating` column to `user_game_annotations` (0-10 scale)
+- `user_skill_rating` column to `user_game_version_annotations` (0-10 scale)
+- `user_skill_rating` column to `user_stage_annotations` (0-10 scale)
+
+**Adds Challenge Conditions**:
+- `global_conditions` column to `runs` table (JSON array)
+- `conditions` column to `run_plan_entries` table (JSON array)
+- `conditions` column to `run_results` table (JSON array)
+
+**Updates Views**:
+- `v_games_with_annotations` - Includes user_skill_rating
+- `v_stages_with_annotations` - Includes user_skill_rating
+
+### Skill Rating Scale (0-10)
+
+| Rating | Label | Meaning |
+|--------|-------|---------|
+| 0 | Observer | Watched others play |
+| 1 | Casual | Basic skills |
+| 2 | Apprentice | Learning advanced techniques |
+| 3 | Advanced | Comfortable with hard hacks |
+| 4 | Expert | Can complete expert-level hacks |
+| 5 | Master | Mastery of mechanics |
+| 6 | Legend | Among the greats (Glitchcat7, Panga, etc.) |
+| 7 | Champion | Beat legendary hacks (JUMP, Hackers Dragon) |
+| 8 | Deity | Would replay legendary hacks |
+| 9 | Speedrunner | Speedrun capable |
+| 10 | Pro Speedrunner | Active speedrunner |
+
+### Challenge Conditions
+
+Available conditions (stored as JSON array):
+- "Hitless" - No getting hit
+- "Deathless" - No dying
+- "No Coins" - Don't collect coins
+- "No Powerups" - Don't use powerups
+- "No Midway" - Don't use midway points
+
+### Prerequisites
+- Migration 001 and 002 must be run first
+- Database must be accessible
+
+### Expected Outcome
+- 3 new skill_rating columns
+- 3 new conditions columns in run tables
+- Updated views include skill rating
+- Ready for skill-based filtering
+
+### Warnings
+- Safe to run multiple times
+- Note about rating constraints (existing remain 1-5, new accepts 0-5)
+- Conditions stored as JSON - validate on read/write
+
+### Verification
+```bash
+# Check skill rating column
+sqlite3 electron/clientdata.db "PRAGMA table_info(user_game_annotations);" | grep skill
+
+# Check conditions columns
+sqlite3 electron/clientdata.db "PRAGMA table_info(runs);" | grep conditions
+
+# Verify views updated
+sqlite3 electron/clientdata.db "SELECT * FROM v_games_with_annotations LIMIT 1;"
+```
+
+---
+
 *Last Updated: October 12, 2025*  
-*Total Migrations: 8 (4 rhdata schema + 1 Phase 1 tables + 1 rhdata runexcluded + 2 clientdata)*
+*Total Migrations: 9 (4 rhdata schema + 1 Phase 1 tables + 1 rhdata runexcluded + 3 clientdata)*
+*Status: ALL MIGRATIONS APPLIED AND TESTED ✅*
