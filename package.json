@@ -42,8 +42,10 @@
     "utils:identify-keys": "node identify-incompatible-keys.js",
     "utils:reprocess-attachments": "node reprocess-attachments.js",
     "utils:backfill-rhmd": "node backfill_rhmd.js",
-    "verify:blobs": "node verify-all-blobs.js",
-    "verify:blobs-full": "node verify-all-blobs.js --full-check"
+    "verify:blobs": "node verify-all-blobs.js --verify-blobs=files",
+    "verify:blobs-db": "node verify-all-blobs.js --verify-blobs=db",
+    "verify:blobs-full": "node verify-all-blobs.js --verify-blobs=files --full-check",
+    "verify:blobs-db-full": "node verify-all-blobs.js --verify-blobs=db --full-check"
   },
   "dependencies": {
     "@poeticode/js-lzma": "^1.0.0",
