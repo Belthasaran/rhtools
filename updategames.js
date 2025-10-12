@@ -27,7 +27,7 @@ const BlobCreator = require('./lib/blob-creator');
 const RecordCreator = require('./lib/record-creator');
 const UpdateProcessor = require('./lib/update-processor');
 const StatsManager = require('./lib/stats-manager');
-const { getFlipsPath } = require('./lib/flips-finder');
+const { getFlipsPath, getSmwRomPath, SMW_EXPECTED_SHA224 } = require('./lib/binary-finder');
 
 // Configuration
 const CONFIG = {
@@ -50,9 +50,9 @@ const CONFIG = {
   PAT_META_DIR: path.join(__dirname, 'pat_meta'),
   ROM_META_DIR: path.join(__dirname, 'rom_meta'),
   
-  // Base ROM
-  BASE_ROM_PATH: path.join(__dirname, 'smw.sfc'),
-  BASE_ROM_SHA224: 'fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08',
+  // Base ROM (will be set during initialization)
+  BASE_ROM_PATH: null,
+  BASE_ROM_SHA224: SMW_EXPECTED_SHA224,
   
   // SMWC API
   SMWC_BASE_URL: 'https://www.smwcentral.net/',
@@ -279,21 +279,15 @@ async function main() {
 async function verifyPrerequisites() {
   console.log('  Verifying prerequisites...');
   
-  // Check base ROM
-  if (!fs.existsSync(CONFIG.BASE_ROM_PATH)) {
-    throw new Error(`Base ROM not found: ${CONFIG.BASE_ROM_PATH}\nPlease place smw.sfc in the project root directory.`);
-  }
-  
-  const romData = fs.readFileSync(CONFIG.BASE_ROM_PATH);
-  const romHash = crypto.createHash('sha224').update(romData).digest('hex');
-  
-  if (romHash !== CONFIG.BASE_ROM_SHA224) {
-    console.warn(`    ⚠ Base ROM hash mismatch!`);
-    console.warn(`      Expected: ${CONFIG.BASE_ROM_SHA224}`);
-    console.warn(`      Got:      ${romHash}`);
-    console.warn(`    This may cause issues with patching.`);
-  } else {
+  // Check base ROM using the finder
+  try {
+    CONFIG.BASE_ROM_PATH = getSmwRomPath({ 
+      projectRoot: __dirname,
+      throwOnError: true
+    });
     console.log(`    ✓ Base ROM verified`);
+  } catch (error) {
+    throw error;
   }
   
   // Check flips utility using the finder
