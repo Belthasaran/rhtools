@@ -883,6 +883,12 @@ function closeSettings() {
 async function saveSettings() {
   console.log('Saving settings:', settings);
   
+  if (!isElectronAvailable()) {
+    console.warn('Mock mode: Settings not saved (Electron not available)');
+    closeSettings();
+    return;
+  }
+  
   try {
     // Convert settings to object with string values
     const settingsToSave = {
@@ -1349,6 +1355,79 @@ function editGlobalConditions() {
 // ===========================================================================
 
 /**
+ * Check if running in Electron or standalone browser
+ */
+const isElectronAvailable = () => {
+  return typeof (window as any).electronAPI !== 'undefined';
+};
+
+/**
+ * Get mock data for development mode (Vite only, no Electron)
+ */
+function getMockGames(): Item[] {
+  return [
+    { 
+      Id: '11374', 
+      Name: 'Super Dram World', 
+      Type: 'Kaizo: Intermediate', 
+      Author: 'Panga', 
+      Length: '18 exits', 
+      PublicDifficulty: 'Advanced',
+      Status: 'Default', 
+      MyDifficultyRating: 4, 
+      MyReviewRating: 5,
+      MySkillRating: 5,
+      Publicrating: 4.3, 
+      Hidden: false, 
+      ExcludeFromRandom: false,
+      Mynotes: '',
+      AvailableVersions: [1, 2, 3],
+      CurrentVersion: 3,
+      JsonData: { gameid: '11374', name: 'Super Dram World', version: 3 }
+    },
+    { 
+      Id: '17289', 
+      Name: 'Storks, Apes, and Crocodiles', 
+      Type: 'Standard', 
+      LegacyType: 'Standard: Hard',
+      Author: 'Morsel', 
+      Length: 'unknown', 
+      PublicDifficulty: 'Moderate',
+      Status: 'In Progress', 
+      MyDifficultyRating: 5, 
+      MyReviewRating: 4,
+      MySkillRating: 3,
+      Publicrating: 4.6, 
+      Hidden: false, 
+      ExcludeFromRandom: false,
+      Mynotes: 'Practice level 0x0F',
+      AvailableVersions: [1, 2],
+      CurrentVersion: 2,
+      JsonData: { gameid: '17289', name: 'Storks, Apes, and Crocodiles', version: 2 }
+    },
+    { 
+      Id: '20091', 
+      Name: 'Example Hack', 
+      Type: 'Traditional', 
+      Author: 'Someone', 
+      Length: '5 exits', 
+      PublicDifficulty: 'Easy',
+      Status: 'Finished', 
+      MyDifficultyRating: 2, 
+      MyReviewRating: 2,
+      MySkillRating: 1,
+      Publicrating: 3.8, 
+      Hidden: false, 
+      ExcludeFromRandom: true,
+      Mynotes: '',
+      AvailableVersions: [1],
+      CurrentVersion: 1,
+      JsonData: { gameid: '20091', name: 'Example Hack', version: 1 }
+    },
+  ];
+}
+
+/**
  * Load all games from database
  */
 async function loadGames() {
@@ -1356,6 +1435,15 @@ async function loadGames() {
   loadError.value = null;
   
   try {
+    if (!isElectronAvailable()) {
+      // Development mode without Electron - use mock data
+      console.warn('Electron not available, using mock data');
+      const mockGames = getMockGames();
+      items.splice(0, items.length, ...mockGames);
+      isLoading.value = false;
+      return;
+    }
+    
     const games = await (window as any).electronAPI.getGames();
     
     // Get available versions for each game
@@ -1383,6 +1471,21 @@ async function loadGames() {
  * Load stages for currently selected game
  */
 async function loadStages(gameid: string) {
+  if (!isElectronAvailable()) {
+    // Mock stages data
+    const mockStages: Record<string, Stage[]> = {
+      '11374': [
+        { key: '11374-1', parentId: '11374', exitNumber: '1', description: 'Intro stage', publicRating: 4.2, myNotes: '', myDifficultyRating: 3, myReviewRating: 4 },
+        { key: '11374-2', parentId: '11374', exitNumber: '2', description: 'Shell level', publicRating: 4.5, myNotes: 'practice', myDifficultyRating: 5, myReviewRating: 5 },
+      ],
+      '17289': [
+        { key: '17289-0x0F', parentId: '17289', exitNumber: '0x0F', description: 'Custom level jump', publicRating: 4.6, myNotes: 'good practice', myDifficultyRating: 5, myReviewRating: 4 },
+      ],
+    };
+    stagesByItemId[gameid] = mockStages[gameid] || [];
+    return mockStages[gameid] || [];
+  }
+  
   try {
     const stages = await (window as any).electronAPI.getStages(gameid);
     stagesByItemId[gameid] = stages;
@@ -1397,6 +1500,11 @@ async function loadStages(gameid: string) {
  * Load settings from database
  */
 async function loadSettings() {
+  if (!isElectronAvailable()) {
+    console.warn('Electron not available, using default settings');
+    return;
+  }
+  
   try {
     const savedSettings = await (window as any).electronAPI.getSettings();
     
@@ -1424,6 +1532,11 @@ async function loadSettings() {
  * Save annotation to database (debounced)
  */
 const debouncedSaveAnnotation = debounce(async (item: Item) => {
+  if (!isElectronAvailable()) {
+    console.log('Mock mode: Would save annotation for', item.Id);
+    return;
+  }
+  
   try {
     const annotation = {
       gameid: item.Id,
@@ -1449,6 +1562,11 @@ const debouncedSaveAnnotation = debounce(async (item: Item) => {
  * Load specific game version
  */
 async function loadGameVersion(gameid: string, version: number) {
+  if (!isElectronAvailable()) {
+    console.log(`Mock mode: Would load game ${gameid} version ${version}`);
+    return;
+  }
+  
   try {
     const game = await (window as any).electronAPI.getGame(gameid, version);
     if (game) {
