@@ -28,8 +28,9 @@
 - Implemented `usb2snesTypeA` ✅ COMPLETE - JavaScript port of py2snes Python library
   - Core connection methods: connect, disconnect, DeviceList, Attach, Info, Name
   - Console control: Boot, Menu, Reset
-  - Memory operations: GetAddress (read), PutAddress (write)
-  - File operations: PutFile (upload), List (directory), MakeDir, Remove ✅ NEW
+  - Memory operations: GetAddress (read), PutAddress (write with full SD2SNES support) ✅ COMPLETE
+  - File operations: PutFile (upload), List (directory), MakeDir, Remove ✅ COMPLETE
+  - SD2SNES special handling: Generates 65816 assembly for CMD space writes ✅ NEW
 - Added USB2SNES IPC handlers in `electron/ipc-handlers.js` using SNESWrapper singleton
 - Added SMW-specific IPC handlers:
   - Grant cape powerup (`usb2snes:smw:grantCape`)
@@ -56,6 +57,11 @@
 **USB2SNES Tools Modal - Full Implementation**
 - Updated connection functions to use real IPC instead of simulation ✅
 - Connected successfully displays device name, firmware version, version string, ROM running
+- Added "Create Required Upload Directory" button after Connect/Disconnect ✅ NEW
+  - Creates directory specified in Settings → USB2SNES Upload Directory (default: /work)
+  - Shows caption indicating which directory will be created
+  - Only visible when connected
+  - Handles "already exists" gracefully
 - Added Console Control section with quick action buttons:
   - "Reboot SNES" - Resets the console
   - "Return to Menu" - Returns console to menu
@@ -70,7 +76,7 @@
   - Progress indication during upload
 - All buttons properly disabled when not connected
 - Real-time firmware and device status display
-- Files modified: `electron/renderer/src/App.vue`
+- Files modified: `electron/renderer/src/App.vue`, `electron/ipc-handlers.js`, `electron/preload.js`
 
 **UI Reorganization with Dropdown Menus**
 - Reorganized toolbar buttons for cleaner, more organized interface
