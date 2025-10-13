@@ -14,6 +14,17 @@
 - Files modified: `package.json`
 - Files created: `docs/BUILD_WINDOWS.md`
 
+**JavaScript Capabilities Documentation**
+- Created comprehensive documentation of all JavaScript features and capabilities
+- Documented Electron app architecture and components
+- Catalogued all core utilities (60+ JavaScript files)
+- Documented library modules (lib/) with purposes and features
+- Documented testing suite (20+ test files)
+- Documented metadata server (mdserver/) API and authentication
+- Listed all native dependencies with usage details
+- Documented build and deployment configuration
+- Files created: `docs/JAVASCRIPT_CAPABILITIES.md`
+
 **USB2SNES Multi-Library Support**
 - Added USB2SNES implementation library selector with 4 options:
   - usb2snes_a (Type A - Python port) - Primary implementation
