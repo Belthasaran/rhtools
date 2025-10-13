@@ -7,6 +7,66 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const crypto = require('crypto');
+const lzma = require('lzma-native');
+const fernet = require('fernet');
+
+/**
+ * Decode encrypted/compressed blob data
+ * @param {Buffer} encryptedData - Raw blob data
+ * @param {string} keyBase64 - Base64-encoded key
+ * @returns {Promise<Buffer>} Decoded patch data
+ */
+async function decodeBlob(encryptedData, keyBase64) {
+  // Step 1: Decompress LZMA
+  const decompressed1 = await new Promise((resolve, reject) => {
+    lzma.decompress(encryptedData, (result, error) => {
+      if (error) reject(error);
+      else resolve(Buffer.from(result));
+    });
+  });
+  
+  // Step 2: Decrypt Fernet
+  let fernetKey;
+  try {
+    const decoded = Buffer.from(keyBase64, 'base64').toString('utf8');
+    if (/^[A-Za-z0-9+/\-_]+=*$/.test(decoded) && decoded.length >= 40) {
+      fernetKey = decoded;
+    } else {
+      fernetKey = keyBase64;
+    }
+  } catch (error) {
+    fernetKey = keyBase64;
+  }
+  
+  const frnsecret = new fernet.Secret(fernetKey);
+  const token = new fernet.Token({ 
+    secret: frnsecret, 
+    ttl: 0, 
+    token: decompressed1.toString()
+  });
+  const decrypted = token.decode();
+  
+  // Step 3: Decompress again
+  let lzmaData;
+  try {
+    lzmaData = Buffer.from(decrypted, 'base64');
+    if (lzmaData[0] !== 0xfd && lzmaData[0] !== 0x5d) {
+      const decoded1 = lzmaData.toString('utf8');
+      lzmaData = Buffer.from(decoded1, 'base64');
+    }
+  } catch (error) {
+    lzmaData = Buffer.from(decrypted, 'base64');
+  }
+  
+  const decompressed2 = await new Promise((resolve, reject) => {
+    lzma.decompress(lzmaData, (result, error) => {
+      if (error) reject(error);
+      else resolve(Buffer.from(result));
+    });
+  });
+  
+  return decompressed2;
+}
 
 /**
  * Get staging folder path
@@ -50,7 +110,7 @@ async function createPatchedSFC(params) {
     // Get game version from rhdata.db
     const rhdb = dbManager.getConnection('rhdata');
     const gameVersion = rhdb.prepare(`
-      SELECT gv.*, pb.patchblob1_name, pb.patchblob1_sha224
+      SELECT gv.*, pb.patchblob1_name, pb.patchblob1_sha224, pb.patchblob1_key
       FROM gameversions gv
       LEFT JOIN patchblobs pb ON gv.patchblob1_name = pb.patchblob1_name
       WHERE gv.gameid = ? AND gv.version = ?
@@ -64,10 +124,14 @@ async function createPatchedSFC(params) {
       return { success: false, error: `No patch blob for ${gameid} v${version}` };
     }
     
+    if (!gameVersion.patchblob1_key) {
+      return { success: false, error: `No decryption key for ${gameid} v${version}` };
+    }
+    
     // Get patch file data from patchbin.db
     const patchbinDb = dbManager.getConnection('patchbin');
     const attachment = patchbinDb.prepare(`
-      SELECT file_data, file_hash_sha224
+      SELECT file_data, file_hash_sha224, decoded_hash_sha224
       FROM attachments
       WHERE file_name = ?
     `).get(gameVersion.patchblob1_name);
@@ -76,14 +140,35 @@ async function createPatchedSFC(params) {
       return { success: false, error: `Patch file ${gameVersion.patchblob1_name} not found in patchbin.db` };
     }
     
+    if (!attachment.file_data) {
+      return { success: false, error: `Patch file ${gameVersion.patchblob1_name} has no file_data` };
+    }
+    
     // Create temp directory for patching
     const tempDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'rhtools-patch-'));
     const patchPath = path.join(tempDir, 'patch.bps');
     const tempOutputPath = path.join(tempDir, 'output.sfc');
     
     try {
-      // Write patch file
-      fs.writeFileSync(patchPath, attachment.file_data);
+      // Decode the compressed/encrypted patch data
+      let decodedData;
+      try {
+        decodedData = await decodeBlob(attachment.file_data, gameVersion.patchblob1_key);
+      } catch (decodeError) {
+        return { success: false, error: `Failed to decode patch: ${decodeError.message}` };
+      }
+      
+      // Verify decoded hash
+      const decodedHash = crypto.createHash('sha224').update(decodedData).digest('hex');
+      if (attachment.decoded_hash_sha224 && decodedHash !== attachment.decoded_hash_sha224) {
+        return { 
+          success: false, 
+          error: `Decoded hash mismatch for ${gameVersion.patchblob1_name}: expected ${attachment.decoded_hash_sha224}, got ${decodedHash}` 
+        };
+      }
+      
+      // Write decoded patch file
+      fs.writeFileSync(patchPath, decodedData);
       
       // Verify vanilla ROM exists
       if (!fs.existsSync(vanillaRomPath)) {
