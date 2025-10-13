@@ -20,8 +20,29 @@
   - Proper connection state management (must disconnect before changing library)
 - Library selection persists across sessions and initializes from settings default
 - Unimplemented libraries show "not implemented" error when attempting to connect
-- Current implementation shows simulated connection (actual protocol implementation pending)
 - Files modified: `electron/renderer/src/App.vue`
+
+**SNESWrapper Unified Interface Architecture**
+- Created `SNESWrapper` module as unified interface for all USB2SNES implementations (Strategy Pattern)
+- Created `BaseUsb2snes` abstract base class defining common interface for all implementations
+- Implemented `usb2snesTypeA` (partial) - JavaScript port of py2snes Python library
+  - Core connection methods: connect, disconnect, DeviceList, Attach, Info, Name
+  - Console control: Boot, Menu, Reset
+  - Memory operations: GetAddress (read), PutAddress (write - basic)
+  - Pending: File operations (PutFile, List, MakeDir, Remove), SD2SNES special handling
+- Added USB2SNES IPC handlers in `electron/ipc-handlers.js` using SNESWrapper singleton
+- Exposed USB2SNES APIs in `electron/preload.js` for renderer process
+- All application code now uses SNESWrapper exclusively - no direct implementation access
+- Prevents implementation switching while connected for safety
+- Comprehensive error handling and logging
+- Files created:
+  - `electron/main/usb2snes/BaseUsb2snes.js` - Abstract interface
+  - `electron/main/usb2snes/SNESWrapper.js` - Unified wrapper
+  - `electron/main/usb2snes/usb2snesTypeA.js` - Type A implementation
+- Files modified:
+  - `electron/ipc-handlers.js` - Added USB2SNES handlers
+  - `electron/preload.js` - Added USB2SNES APIs
+- See: `devdocs/SNESWRAPPER_ARCHITECTURE.md` for architecture documentation
 - See: `devdocs/USB2SNES_IMPLEMENTATION_PLAN.md` for complete implementation roadmap
 
 **UI Reorganization with Dropdown Menus**

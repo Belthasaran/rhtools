@@ -1529,8 +1529,229 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  // ===========================================================================
+  // USB2SNES OPERATIONS
+  // ===========================================================================
+
+  const { SNESWrapper } = require('./main/usb2snes/SNESWrapper');
+  
+  // Global SNES wrapper instance (singleton pattern)
+  let snesWrapper = null;
+  
+  /**
+   * Get or create SNES wrapper instance
+   * @private
+   */
+  function getSnesWrapper() {
+    if (!snesWrapper) {
+      snesWrapper = new SNESWrapper();
+    }
+    return snesWrapper;
+  }
+
+  /**
+   * Connect to USB2SNES server
+   * Channel: usb2snes:connect
+   * @param {string} library - Implementation type ('usb2snes_a', etc.)
+   * @param {string} address - WebSocket address
+   * @returns {Object} Connection info (device, firmware, etc.)
+   */
+  ipcMain.handle('usb2snes:connect', async (event, library, address) => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      // Full connect: set implementation, connect, attach to first device
+      const result = await wrapper.fullConnect(library, address);
+      
+      console.log('[USB2SNES] Connected successfully:', result);
+      
+      return {
+        connected: true,
+        device: result.device,
+        devices: result.devices,
+        firmwareVersion: result.info.firmwareversion || 'N/A',
+        versionString: result.info.versionstring || 'N/A',
+        romRunning: result.info.romrunning || 'N/A'
+      };
+    } catch (error) {
+      console.error('[USB2SNES] Connection error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Disconnect from USB2SNES server
+   * Channel: usb2snes:disconnect
+   */
+  ipcMain.handle('usb2snes:disconnect', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      await wrapper.disconnect();
+      
+      console.log('[USB2SNES] Disconnected');
+      
+      return { connected: false };
+    } catch (error) {
+      console.error('[USB2SNES] Disconnect error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Get USB2SNES connection status
+   * Channel: usb2snes:status
+   */
+  ipcMain.handle('usb2snes:status', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      return {
+        hasImplementation: wrapper.hasImplementation(),
+        implementationType: wrapper.getImplementationType(),
+        connected: wrapper.isConnected(),
+        attached: wrapper.isAttached(),
+        device: wrapper.getDevice(),
+        state: wrapper.getState()
+      };
+    } catch (error) {
+      console.error('[USB2SNES] Status error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Reset the console
+   * Channel: usb2snes:reset
+   */
+  ipcMain.handle('usb2snes:reset', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      await wrapper.Reset();
+      
+      console.log('[USB2SNES] Console reset');
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Reset error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Return to menu
+   * Channel: usb2snes:menu
+   */
+  ipcMain.handle('usb2snes:menu', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      await wrapper.Menu();
+      
+      console.log('[USB2SNES] Returned to menu');
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Menu error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Boot a ROM file
+   * Channel: usb2snes:boot
+   * @param {string} romPath - Path to ROM on console
+   */
+  ipcMain.handle('usb2snes:boot', async (event, romPath) => {
+    try {
+      const wrapper = getSnesWrapper();
+      await wrapper.Boot(romPath);
+      
+      console.log('[USB2SNES] Booted ROM:', romPath);
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Boot error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Upload ROM file to console
+   * Channel: usb2snes:uploadRom
+   * @param {string} srcPath - Source file path (local)
+   * @param {string} dstPath - Destination path on console
+   */
+  ipcMain.handle('usb2snes:uploadRom', async (event, srcPath, dstPath) => {
+    try {
+      const wrapper = getSnesWrapper();
+      const success = await wrapper.PutFile(srcPath, dstPath);
+      
+      console.log('[USB2SNES] Uploaded ROM:', srcPath, '->', dstPath);
+      return { success };
+    } catch (error) {
+      console.error('[USB2SNES] Upload error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Read memory from console
+   * Channel: usb2snes:readMemory
+   * @param {number} address - Memory address
+   * @param {number} size - Number of bytes
+   */
+  ipcMain.handle('usb2snes:readMemory', async (event, address, size) => {
+    try {
+      const wrapper = getSnesWrapper();
+      const data = await wrapper.GetAddress(address, size);
+      
+      // Convert Buffer to array for IPC transfer
+      return { data: Array.from(data) };
+    } catch (error) {
+      console.error('[USB2SNES] Read memory error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Write memory to console
+   * Channel: usb2snes:writeMemory
+   * @param {Array} writeList - Array of [address, data] tuples
+   */
+  ipcMain.handle('usb2snes:writeMemory', async (event, writeList) => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      // Convert data arrays to Buffers
+      const processedList = writeList.map(([addr, data]) => [
+        addr,
+        Buffer.from(data)
+      ]);
+      
+      const success = await wrapper.PutAddress(processedList);
+      return { success };
+    } catch (error) {
+      console.error('[USB2SNES] Write memory error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * List directory on console
+   * Channel: usb2snes:listDir
+   * @param {string} dirPath - Directory path
+   */
+  ipcMain.handle('usb2snes:listDir', async (event, dirPath) => {
+    try {
+      const wrapper = getSnesWrapper();
+      const listing = await wrapper.List(dirPath);
+      
+      return { files: listing };
+    } catch (error) {
+      console.error('[USB2SNES] List directory error:', error);
+      throw error;
+    }
+  });
+
   console.log('IPC handlers registered successfully');
 }
 
 module.exports = { registerDatabaseHandlers };
+
 

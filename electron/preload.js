@@ -263,4 +263,77 @@ contextBridge.exposeInMainWorld('electronAPI', {
   validatePath: (filePath) => ipcRenderer.invoke('file:validate-path', { filePath }),
   validateAsarFile: (filePath) => ipcRenderer.invoke('file:validate-asar', { filePath }),
   validateUberAsmFile: (filePath) => ipcRenderer.invoke('file:validate-uberasm', { filePath }),
+  
+  // =============================
+  // USB2SNES Operations
+  // =============================
+  
+  /**
+   * Connect to USB2SNES server
+   * @param {string} library - Implementation type ('usb2snes_a', etc.)
+   * @param {string} address - WebSocket address
+   * @returns {Promise<Object>} Connection info
+   */
+  usb2snesConnect: (library, address) => ipcRenderer.invoke('usb2snes:connect', library, address),
+  
+  /**
+   * Disconnect from USB2SNES server
+   * @returns {Promise<{connected: boolean}>}
+   */
+  usb2snesDisconnect: () => ipcRenderer.invoke('usb2snes:disconnect'),
+  
+  /**
+   * Get USB2SNES connection status
+   * @returns {Promise<Object>} Status info
+   */
+  usb2snesStatus: () => ipcRenderer.invoke('usb2snes:status'),
+  
+  /**
+   * Reset the console
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesReset: () => ipcRenderer.invoke('usb2snes:reset'),
+  
+  /**
+   * Return to menu
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesMenu: () => ipcRenderer.invoke('usb2snes:menu'),
+  
+  /**
+   * Boot a ROM file
+   * @param {string} romPath - Path to ROM on console
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesBoot: (romPath) => ipcRenderer.invoke('usb2snes:boot', romPath),
+  
+  /**
+   * Upload ROM file to console
+   * @param {string} srcPath - Source file path (local)
+   * @param {string} dstPath - Destination path on console
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesUploadRom: (srcPath, dstPath) => ipcRenderer.invoke('usb2snes:uploadRom', srcPath, dstPath),
+  
+  /**
+   * Read memory from console
+   * @param {number} address - Memory address
+   * @param {number} size - Number of bytes
+   * @returns {Promise<{data: Array}>}
+   */
+  usb2snesReadMemory: (address, size) => ipcRenderer.invoke('usb2snes:readMemory', address, size),
+  
+  /**
+   * Write memory to console
+   * @param {Array} writeList - Array of [address, data] tuples
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesWriteMemory: (writeList) => ipcRenderer.invoke('usb2snes:writeMemory', writeList),
+  
+  /**
+   * List directory on console
+   * @param {string} dirPath - Directory path
+   * @returns {Promise<{files: Array}>}
+   */
+  usb2snesListDir: (dirPath) => ipcRenderer.invoke('usb2snes:listDir', dirPath),
 });
