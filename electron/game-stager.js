@@ -69,12 +69,25 @@ async function decodeBlob(encryptedData, keyBase64) {
 }
 
 /**
- * Get staging folder path (uses OS temp directory)
+ * Get staging folder path (uses OS temp directory or override)
+ * @param {string} tempDirOverride - Optional custom temp directory base path
  * @returns {string} Path to staging folder
  */
-function getStagingBasePath() {
+function getStagingBasePath(tempDirOverride = '') {
   const os = require('os');
-  return path.join(os.tmpdir(), 'RHTools-Runs');
+  const baseDir = tempDirOverride && tempDirOverride.trim() ? tempDirOverride : os.tmpdir();
+  return path.join(baseDir, 'RHTools-Runs');
+}
+
+/**
+ * Get quick launch folder path (uses OS temp directory or override)
+ * @param {string} tempDirOverride - Optional custom temp directory base path
+ * @returns {string} Path to quick launch folder
+ */
+function getQuickLaunchBasePath(tempDirOverride = '') {
+  const os = require('os');
+  const baseDir = tempDirOverride && tempDirOverride.trim() ? tempDirOverride : os.tmpdir();
+  return path.join(baseDir, 'RHTools-QuickLaunch');
 }
 
 /**
@@ -378,10 +391,141 @@ function calculateRunElapsed(run) {
   return Math.max(0, totalElapsed - pausedTime);
 }
 
+/**
+ * Stage games for quick launch (direct launch without creating a run)
+ * @param {Object} params
+ * @param {Object} params.dbManager - Database manager
+ * @param {Array} params.gameIds - Array of game IDs to stage
+ * @param {string} params.vanillaRomPath - Path to vanilla ROM
+ * @param {string} params.flipsPath - Path to FLIPS
+ * @param {string} params.tempDirOverride - Optional custom temp directory base path
+ * @param {Function} params.onProgress - Progress callback (current, total, gameName)
+ * @returns {Promise<{success: boolean, folderPath?: string, gamesStaged?: number, error?: string}>}
+ */
+async function stageQuickLaunchGames(params) {
+  const { dbManager, gameIds, vanillaRomPath, flipsPath, tempDirOverride = '', onProgress } = params;
+  
+  try {
+    // Create quick launch base directory if it doesn't exist
+    const quickLaunchBase = getQuickLaunchBasePath(tempDirOverride);
+    if (!fs.existsSync(quickLaunchBase)) {
+      fs.mkdirSync(quickLaunchBase, { recursive: true });
+    }
+    
+    console.log(`Quick launch folder: ${quickLaunchBase}`);
+    
+    // Get game information from database
+    const rhdb = dbManager.getConnection('rhdata');
+    const gameInfos = [];
+    
+    for (const gameId of gameIds) {
+      // Get latest version of the game
+      const gameVersion = rhdb.prepare(`
+        SELECT *
+        FROM gameversions
+        WHERE gameid = ?
+        ORDER BY version DESC
+        LIMIT 1
+      `).get(gameId);
+      
+      if (gameVersion) {
+        gameInfos.push(gameVersion);
+      } else {
+        console.warn(`Game ${gameId} not found in database`);
+      }
+    }
+    
+    if (gameInfos.length === 0) {
+      return { success: false, error: 'No valid games found to stage' };
+    }
+    
+    // Stage each game
+    let successCount = 0;
+    const errors = [];
+    
+    for (let i = 0; i < gameInfos.length; i++) {
+      const gameInfo = gameInfos[i];
+      const sfcFilename = `smw${gameInfo.gameid}_${gameInfo.version}.sfc`;
+      const jsonFilename = `md${gameInfo.gameid}_${gameInfo.version}.json`;
+      const sfcPath = path.join(quickLaunchBase, sfcFilename);
+      const jsonPath = path.join(quickLaunchBase, jsonFilename);
+      
+      if (onProgress) {
+        onProgress(i + 1, gameInfos.length, gameInfo.name);
+      }
+      
+      // Create patched SFC
+      const patchResult = await createPatchedSFC({
+        dbManager,
+        gameid: gameInfo.gameid,
+        version: gameInfo.version,
+        vanillaRomPath,
+        flipsPath,
+        outputPath: sfcPath
+      });
+      
+      if (patchResult.success) {
+        successCount++;
+        console.log(`✓ Created ${sfcFilename}: ${gameInfo.name}`);
+        
+        // Save game metadata as JSON
+        const metadata = {
+          gameid: gameInfo.gameid,
+          version: gameInfo.version,
+          name: gameInfo.name,
+          authors: gameInfo.authors,
+          author: gameInfo.author,
+          gametype: gameInfo.gametype,
+          length: gameInfo.length,
+          difficulty: gameInfo.difficulty,
+          demo: gameInfo.demo,
+          featured: gameInfo.featured,
+          description: gameInfo.description,
+          added: gameInfo.added,
+          moderated: gameInfo.moderated,
+          staged_at: new Date().toISOString(),
+          sfc_file: sfcFilename
+        };
+        
+        fs.writeFileSync(jsonPath, JSON.stringify(metadata, null, 2));
+        console.log(`✓ Created ${jsonFilename}`);
+      } else {
+        errors.push(`Game ${gameInfo.gameid} (${gameInfo.name}): ${patchResult.error}`);
+        console.error(`✗ Failed ${sfcFilename}: ${patchResult.error}`);
+      }
+    }
+    
+    if (errors.length > 0) {
+      return {
+        success: false,
+        folderPath: quickLaunchBase,
+        gamesStaged: successCount,
+        error: `Failed to stage ${errors.length} games:\n${errors.join('\n')}`
+      };
+    }
+    
+    console.log(`Quick launch staging complete! Folder: ${quickLaunchBase}, Games: ${successCount}`);
+    
+    return {
+      success: true,
+      folderPath: quickLaunchBase,
+      gamesStaged: successCount
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   createPatchedSFC,
   stageRunGames,
+  stageQuickLaunchGames,
   getStagingBasePath,
+  getQuickLaunchBasePath,
   generateRunFolderName,
   getActiveRun,
   isRunPaused,

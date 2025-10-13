@@ -39,7 +39,7 @@
 
       <div class="right-actions">
         <button @click="openRunModal">Prepare Run</button>
-        <button @click="startSelected" :disabled="!exactlyOneSelected">Start</button>
+        <button @click="startSelected" :disabled="!canStartGames">Start</button>
         <button @click="editNotes" :disabled="!exactlyOneSelected">Edit notes</button>
         <button @click="setMyRating" :disabled="!exactlyOneSelected">My rating</button>
       </div>
@@ -685,6 +685,25 @@
             Download UberASM from <a href="https://smwc.me/s/39036" target="_blank">https://smwc.me/s/39036</a>
           </div>
         </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
+            <label class="setting-label">
+              <span class="status-icon">{{ settings.tempDirValid ? '✓' : '✗' }}</span>
+              Temporary Directory Override
+            </label>
+            <div class="setting-control">
+              <input type="text" v-model="settings.tempDirOverride" placeholder="Leave blank for OS default temp dir" />
+            </div>
+          </div>
+          <div v-if="settings.tempDirOverride" class="setting-current-path">
+            Current: <code>{{ settings.tempDirOverride }}</code>
+          </div>
+          <div class="setting-caption">
+            Optional: Override the base path for temporary directories used by RHTools.<br>
+            Leave blank to use the OS-specific temporary directory. If specified, the path must exist.
+          </div>
+        </div>
       </section>
 
       <footer class="modal-footer">
@@ -827,6 +846,61 @@
       </footer>
     </div>
   </div>
+
+  <!-- Quick Launch Progress Modal -->
+  <div v-if="quickLaunchProgressModalOpen" class="modal-backdrop">
+    <div class="modal staging-progress-modal">
+      <header class="modal-header">
+        <h3>🎮 Staging Games for Quick Launch...</h3>
+      </header>
+      <section class="modal-body">
+        <div class="progress-info">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: (quickLaunchProgressCurrent / quickLaunchProgressTotal * 100) + '%' }"></div>
+          </div>
+          <p class="progress-text">{{ quickLaunchProgressCurrent }} / {{ quickLaunchProgressTotal }}</p>
+          <p class="progress-game">{{ quickLaunchProgressGameName }}</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Quick Launch Success Modal -->
+  <div v-if="quickLaunchSuccessModalOpen" class="modal-backdrop">
+    <div class="modal staging-success-modal">
+      <header class="modal-header">
+        <h3>✅ Games Staged Successfully!</h3>
+      </header>
+      <section class="modal-body">
+        <div class="success-info">
+          <p class="success-message">
+            <strong>{{ quickLaunchSfcCount }}</strong> game file{{ quickLaunchSfcCount === 1 ? '' : 's' }} {{ quickLaunchSfcCount === 1 ? 'has' : 'have' }} been prepared for quick launch.
+          </p>
+          <div class="folder-info">
+            <label class="folder-label">Staged Games Folder:</label>
+            <div class="folder-path">
+              <input type="text" readonly :value="quickLaunchFolderPath" class="folder-path-input" />
+              <button @click="openQuickLaunchFolder" class="btn-open-folder" title="Open Folder">📁</button>
+            </div>
+          </div>
+
+          <div class="launch-instructions">
+            <h4>🚀 How to Launch:</h4>
+            <ol>
+              <li>Navigate to the folder above (click the 📁 button)</li>
+              <li>Find the game file(s): <code>smw&lt;GAMEID&gt;_&lt;VERSION&gt;.sfc</code></li>
+              <li>Load the .sfc file in your preferred emulator or device</li>
+              <li>Check the corresponding <code>md&lt;GAMEID&gt;_&lt;VERSION&gt;.json</code> file for game metadata</li>
+            </ol>
+            <p class="tip">💡 <strong>Tip:</strong> You can configure a launch program in Settings to automatically open games.</p>
+          </div>
+        </div>
+      </section>
+      <footer class="modal-footer">
+        <button @click="closeQuickLaunchSuccess" class="btn-primary">OK</button>
+      </footer>
+    </div>
+  </div>
   
 </template>
 
@@ -909,6 +983,7 @@ const hasActiveFilters = computed(() => searchQuery.value.trim().length > 0 || h
 
 const numChecked = computed(() => selectedIds.value.size);
 const exactlyOneSelected = computed(() => selectedIds.value.size === 1);
+const canStartGames = computed(() => selectedIds.value.size >= 1 && selectedIds.value.size <= 21);
 
 const allVisibleChecked = computed(() => {
   if (filteredItems.value.length === 0) return false;
@@ -1020,11 +1095,83 @@ function getSingleSelected(): Item | null {
   return items.find((it) => it.Id === id) ?? null;
 }
 
-function startSelected() {
-  const it = getSingleSelected();
-  if (!it) return;
-  // Replace with actual start logic when integrated
-  console.log('Start item', it.Id, it.Name);
+async function startSelected() {
+  // Get selected game IDs
+  const selectedGameIds = Array.from(selectedIds.value);
+  
+  if (selectedGameIds.length === 0 || selectedGameIds.length > 21) {
+    alert('Please select between 1 and 21 games to launch.');
+    return;
+  }
+  
+  if (!isElectronAvailable()) {
+    alert('Quick launch requires Electron environment');
+    return;
+  }
+  
+  // Validate settings
+  if (!settings.vanillaRomPath || !settings.vanillaRomValid) {
+    alert('Please configure a valid vanilla SMW ROM in Settings before staging games.');
+    openSettings();
+    return;
+  }
+  
+  if (!settings.flipsPath || !settings.flipsValid) {
+    alert('Please configure FLIPS executable in Settings before staging games.');
+    openSettings();
+    return;
+  }
+  
+  try {
+    // Show progress modal
+    quickLaunchProgressModalOpen.value = true;
+    quickLaunchProgressCurrent.value = 0;
+    quickLaunchProgressTotal.value = selectedGameIds.length;
+    quickLaunchProgressGameName.value = 'Preparing games...';
+    
+    // Listen for progress updates
+    const ipcRenderer = (window as any).electronAPI.ipcRenderer;
+    if (ipcRenderer) {
+      ipcRenderer.on('quick-launch-progress', (_event: any, data: any) => {
+        quickLaunchProgressCurrent.value = data.current;
+        quickLaunchProgressTotal.value = data.total;
+        quickLaunchProgressGameName.value = data.gameName || 'Processing...';
+      });
+    }
+    
+    // Stage games for quick launch
+    const stagingResult = await (window as any).electronAPI.stageQuickLaunchGames({
+      gameIds: selectedGameIds,
+      vanillaRomPath: settings.vanillaRomPath,
+      flipsPath: settings.flipsPath,
+      tempDirOverride: settings.tempDirOverride || ''
+    });
+    
+    // Clean up progress listener
+    if (ipcRenderer) {
+      ipcRenderer.removeAllListeners('quick-launch-progress');
+    }
+    
+    // Hide progress modal
+    quickLaunchProgressModalOpen.value = false;
+    
+    console.log('Quick launch staging result:', stagingResult);
+    
+    if (!stagingResult.success) {
+      alert('Failed to stage games: ' + stagingResult.error);
+      return;
+    }
+    
+    // Show success modal
+    quickLaunchFolderPath.value = stagingResult.folderPath;
+    quickLaunchSfcCount.value = stagingResult.gamesStaged;
+    quickLaunchSuccessModalOpen.value = true;
+    
+  } catch (error) {
+    console.error('Error staging games for quick launch:', error);
+    quickLaunchProgressModalOpen.value = false;
+    alert('Error staging games: ' + error.message);
+  }
 }
 
 function editNotes() {
@@ -1064,6 +1211,8 @@ const settings = reactive({
   usb2snesLaunchPref: 'auto' as 'auto' | 'manual' | 'reset',
   usb2snesUploadPref: 'manual' as 'manual' | 'check' | 'always',
   usb2snesUploadDir: '/work',
+  tempDirOverride: '',
+  tempDirValid: true,
 });
 
 function openSettings() {
@@ -1081,6 +1230,25 @@ async function saveSettings() {
     console.warn('Mock mode: Settings not saved (Electron not available)');
     closeSettings();
     return;
+  }
+  
+  // Validate tempDirOverride if set
+  if (settings.tempDirOverride && settings.tempDirOverride.trim() !== '') {
+    try {
+      const validation = await (window as any).electronAPI.validatePath(settings.tempDirOverride);
+      if (!validation.exists || !validation.isDirectory) {
+        alert('Temporary directory override path does not exist or is not a directory. Please provide a valid path or leave blank.');
+        settings.tempDirValid = false;
+        return;
+      }
+      settings.tempDirValid = true;
+    } catch (error) {
+      alert('Error validating temporary directory path: ' + error.message);
+      settings.tempDirValid = false;
+      return;
+    }
+  } else {
+    settings.tempDirValid = true;
   }
   
   try {
@@ -1102,6 +1270,8 @@ async function saveSettings() {
       usb2snesLaunchPref: settings.usb2snesLaunchPref,
       usb2snesUploadPref: settings.usb2snesUploadPref,
       usb2snesUploadDir: settings.usb2snesUploadDir,
+      tempDirOverride: settings.tempDirOverride,
+      tempDirValid: String(settings.tempDirValid),
     };
     
     const result = await (window as any).electronAPI.saveSettings(settingsToSave);
@@ -1557,6 +1727,17 @@ const stagingSuccessModalOpen = ref(false);
 const stagingFolderPath = ref('');
 const stagingSfcCount = ref(0);
 
+// Quick launch progress modal
+const quickLaunchProgressModalOpen = ref(false);
+const quickLaunchProgressCurrent = ref(0);
+const quickLaunchProgressTotal = ref(0);
+const quickLaunchProgressGameName = ref('');
+
+// Quick launch success modal
+const quickLaunchSuccessModalOpen = ref(false);
+const quickLaunchFolderPath = ref('');
+const quickLaunchSfcCount = ref(0);
+
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
 const isRunSaved = computed(() => currentRunUuid.value !== null && currentRunStatus.value === 'preparing');
@@ -1928,6 +2109,20 @@ function openStagingFolder() {
     const shell = (window as any).electronAPI.shell;
     if (shell && shell.openPath) {
       shell.openPath(stagingFolderPath.value);
+    }
+  }
+}
+
+function closeQuickLaunchSuccess() {
+  quickLaunchSuccessModalOpen.value = false;
+}
+
+function openQuickLaunchFolder() {
+  if (quickLaunchFolderPath.value) {
+    // Use shell to open folder
+    const shell = (window as any).electronAPI.shell;
+    if (shell && shell.openPath) {
+      shell.openPath(quickLaunchFolderPath.value);
     }
   }
 }
@@ -2647,6 +2842,8 @@ async function loadSettings() {
     if (savedSettings.usb2snesLaunchPref) settings.usb2snesLaunchPref = savedSettings.usb2snesLaunchPref as any;
     if (savedSettings.usb2snesUploadPref) settings.usb2snesUploadPref = savedSettings.usb2snesUploadPref as any;
     if (savedSettings.usb2snesUploadDir) settings.usb2snesUploadDir = savedSettings.usb2snesUploadDir;
+    if (savedSettings.tempDirOverride !== undefined) settings.tempDirOverride = savedSettings.tempDirOverride;
+    if (savedSettings.tempDirValid) settings.tempDirValid = savedSettings.tempDirValid === 'true';
     
     console.log('Settings loaded from database');
   } catch (error) {
@@ -3435,6 +3632,53 @@ button { padding: 6px 10px; }
   border-radius: 3px;
   font-weight: 600;
   color: #92400e;
+}
+
+.launch-instructions {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.launch-instructions h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 16px;
+}
+
+.launch-instructions ol {
+  margin: 0 0 12px 0;
+  padding-left: 24px;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.launch-instructions li {
+  margin-bottom: 8px;
+}
+
+.launch-instructions code {
+  background: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.9em;
+}
+
+.launch-instructions .tip {
+  margin: 12px 0 0 0;
+  padding: 12px;
+  background: #dbeafe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.launch-instructions .tip strong {
+  font-weight: 600;
 }
 
 /* New UI Components */

@@ -204,9 +204,11 @@ Purpose: Manage individual stages/exits within selected game
   - Launch from USB2Snes
 
 #### 4. Launch Program
-- **Purpose**: Path to external launch program
-- **Type**: Text input
+- **Purpose**: Path to external launch program (e.g., RetroArch, emulator)
+- **Controls**: Drag-and-drop zone + Browse button
+- **Type**: File path
 - **Default**: Empty
+- **Display**: Shows current path below the controls when set
 
 #### 5. Launch Program Arguments
 - **Purpose**: Command-line arguments for launch program

@@ -4,6 +4,18 @@
 
 ### Features
 
+**Quick Launch Feature (Start Button)**
+- Implemented "Start" button functionality to stage and launch games directly without creating a run
+- Allows selection of 1-21 games at a time for quick launching
+- Added Quick Launch staging process that creates `smw<GAMEID>_<VERSION>.sfc` and `md<GAMEID>_<VERSION>.json` files
+- Files staged in `<temp_base>/RHTools-QuickLaunch/` directory
+- Added progress modal showing real-time staging progress
+- Added success modal with folder path, launch instructions, and "Open Folder" button
+- Added temporary directory override setting in Settings dialog (optional custom base path for temp directories)
+- Added path validation for temporary directory override
+- Files modified: `electron/renderer/src/App.vue`, `electron/game-stager.js`, `electron/ipc-handlers.js`, `electron/preload.js`
+- See: `docs/QUICK_LAUNCH_FEATURE.md`
+
 **Launch Program Browse and Drag-Drop Support**
 - Added Browse button for Launch Program setting (matching FLIPS executable UI pattern)
 - Added drag-and-drop zone for Launch Program setting

@@ -1117,6 +1117,31 @@ function registerDatabaseHandlers(dbManager) {
   });
 
   /**
+   * Stage games for quick launch (direct launch without creating a run)
+   * Channel: db:games:quick-launch-stage
+   */
+  ipcMain.handle('db:games:quick-launch-stage', async (event, { gameIds, vanillaRomPath, flipsPath, tempDirOverride }) => {
+    try {
+      const result = await gameStager.stageQuickLaunchGames({
+        dbManager,
+        gameIds,
+        vanillaRomPath,
+        flipsPath,
+        tempDirOverride,
+        onProgress: (current, total, gameName) => {
+          // Send progress updates to renderer
+          event.sender.send('quick-launch-progress', { current, total, gameName });
+        }
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error staging games for quick launch:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
    * Reveal a random challenge (select and update with actual game)
    * Channel: db:runs:reveal-challenge
    */
@@ -1425,6 +1450,26 @@ function registerDatabaseHandlers(dbManager) {
     } catch (error) {
       console.error('Error validating FLIPS:', error);
       return { valid: false, error: error.message };
+    }
+  });
+
+  /**
+   * Validate directory path
+   * Channel: file:validate-path
+   */
+  ipcMain.handle('file:validate-path', async (event, { filePath }) => {
+    try {
+      const fs = require('fs');
+      
+      if (!fs.existsSync(filePath)) {
+        return { exists: false, isDirectory: false, error: 'Path not found' };
+      }
+      
+      const stats = fs.statSync(filePath);
+      return { exists: true, isDirectory: stats.isDirectory(), filePath };
+    } catch (error) {
+      console.error('Error validating path:', error);
+      return { exists: false, isDirectory: false, error: error.message };
     }
   });
 

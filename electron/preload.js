@@ -200,6 +200,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{success: boolean, stagingFolder?: string, error?: string}>}
    */
   stageRunGames: (params) => ipcRenderer.invoke('db:runs:stage-games', params),
+  stageQuickLaunchGames: (params) => ipcRenderer.invoke('db:games:quick-launch-stage', params),
   
   // =============================
   // Seed Management
@@ -259,6 +260,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFile: (options) => ipcRenderer.invoke('file:select', options),
   validateRomFile: (filePath) => ipcRenderer.invoke('file:validate-rom', { filePath }),
   validateFlipsFile: (filePath) => ipcRenderer.invoke('file:validate-flips', { filePath }),
+  validatePath: (filePath) => ipcRenderer.invoke('file:validate-path', { filePath }),
   validateAsarFile: (filePath) => ipcRenderer.invoke('file:validate-asar', { filePath }),
   validateUberAsmFile: (filePath) => ipcRenderer.invoke('file:validate-uberasm', { filePath }),
 });
