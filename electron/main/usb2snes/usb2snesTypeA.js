@@ -457,27 +457,155 @@ class Usb2snesTypeA extends BaseUsb2snes {
 
   /**
    * Upload file to console
-   * NOTE: Basic implementation - optimizations to be added
    * @param {string} srcFile - Source file path
    * @param {string} dstFile - Destination file path
    * @returns {Promise<boolean>} Success status
    */
   async PutFile(srcFile, dstFile) {
-    // TODO: Implement file upload
-    // See py2snes lines 334-368
-    throw new Error('PutFile not yet implemented');
+    const fs = require('fs').promises;
+    const path = require('path');
+    
+    while (this.requestLock) {
+      await this._sleep(10);
+    }
+    this.requestLock = true;
+
+    try {
+      if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        return false;
+      }
+
+      const stats = await fs.stat(srcFile);
+      const size = stats.size;
+      
+      const request = {
+        Opcode: "PutFile",
+        Space: "SNES",
+        Operands: [dstFile, size.toString(16)]
+      };
+
+      this.socket.send(JSON.stringify(request));
+
+      // Read and send file in chunks
+      const fileHandle = await fs.open(srcFile, 'r');
+      const buffer = Buffer.alloc(4096);
+      
+      try {
+        let bytesRead;
+        while ((bytesRead = (await fileHandle.read(buffer, 0, 4096)).bytesRead) > 0) {
+          const chunk = buffer.slice(0, bytesRead);
+          this.socket.send(chunk);
+        }
+      } finally {
+        await fileHandle.close();
+      }
+
+      // Delay for large files (from Python implementation)
+      if (size > 2048 * 1024) {
+        await this._sleep(20000);
+      }
+      
+      // Verify upload by listing root (from Python implementation)
+      await this.List('/');
+
+      return true;
+    } catch (error) {
+      console.error('[usb2snesTypeA] PutFile error:', error);
+      return false;
+    } finally {
+      this.requestLock = false;
+    }
   }
 
   /**
    * List directory contents
-   * NOTE: Basic implementation to be added
    * @param {string} dirPath - Directory path
    * @returns {Promise<Array>} Directory listing
    */
   async List(dirPath) {
-    // TODO: Implement directory listing
-    // See py2snes lines 385-448
-    throw new Error('List not yet implemented');
+    if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
+
+    // Validate path
+    if (!dirPath.startsWith('/') && !['',' /'].includes(dirPath)) {
+      throw new Error(`Path "${dirPath}" should start with "/"`);
+    }
+    if (dirPath.endsWith('/') && !['', '/'].includes(dirPath)) {
+      throw new Error(`Path "${dirPath}" should not end with "/"`);
+    }
+
+    // Validate path exists by checking parents
+    if (!['',' /'].includes(dirPath)) {
+      const pathParts = dirPath.toLowerCase().split('/');
+      for (let idx = 0; idx < pathParts.length; idx++) {
+        const node = pathParts[idx];
+        if (node === '') continue;
+        
+        const parent = pathParts.slice(0, idx).join('/') || '/';
+        const parentList = await this._list(parent);
+        
+        if (!parentList.some(d => d.filename.toLowerCase() === node)) {
+          throw new Error(`Directory ${dirPath} does not exist on usb2snes`);
+        }
+      }
+    }
+
+    return await this._list(dirPath);
+  }
+
+  /**
+   * Internal list implementation
+   * @private
+   */
+  async _list(dirPath) {
+    while (this.requestLock) {
+      await this._sleep(10);
+    }
+    this.requestLock = true;
+
+    try {
+      if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        return null;
+      }
+
+      const request = {
+        Opcode: 'List',
+        Space: 'SNES',
+        Flags: null,
+        Operands: [dirPath]
+      };
+
+      this.socket.send(JSON.stringify(request));
+      
+      const reply = await this._waitForResponse(5000);
+      const results = reply.Results || [];
+
+      // Results alternate: type, filename, type, filename, ...
+      const resultList = [];
+      for (let i = 0; i < results.length; i += 2) {
+        const filetype = results[i];
+        const filename = results[i + 1];
+        
+        if (filename !== '.' && filename !== '..') {
+          resultList.push({
+            type: filetype,
+            filename: filename
+          });
+        }
+      }
+
+      return resultList;
+    } catch (error) {
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+      this.state = SNES_DISCONNECTED;
+      throw error;
+    } finally {
+      this.requestLock = false;
+    }
   }
 
   /**
@@ -486,9 +614,54 @@ class Usb2snesTypeA extends BaseUsb2snes {
    * @returns {Promise<void>}
    */
   async MakeDir(dirPath) {
-    // TODO: Implement MakeDir
-    // See py2snes lines 450-480
-    throw new Error('MakeDir not yet implemented');
+    if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
+    
+    if (dirPath === '' || dirPath === '/') {
+      throw new Error('MakeDir: dirpath cannot be blank or "/"');
+    }
+
+    const pathParts = dirPath.split('/');
+    const parent = pathParts.slice(0, -1).join('/');
+    
+    // Check parent exists
+    await this.List(parent);
+    
+    // Try to list the directory - if it fails, create it
+    try {
+      await this.List(dirPath);
+    } catch (error) {
+      await this._mkdir(dirPath);
+    }
+  }
+
+  /**
+   * Internal mkdir implementation
+   * @private
+   */
+  async _mkdir(dirPath) {
+    if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
+
+    try {
+      const request = {
+        Opcode: 'MakeDir',
+        Space: 'SNES',
+        Flags: null,
+        Operands: [dirPath]
+      };
+
+      this.socket.send(JSON.stringify(request));
+    } catch (error) {
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+      this.state = SNES_DISCONNECTED;
+      throw error;
+    }
   }
 
   /**
@@ -497,9 +670,27 @@ class Usb2snesTypeA extends BaseUsb2snes {
    * @returns {Promise<void>}
    */
   async Remove(path) {
-    // TODO: Implement Remove
-    // See py2snes lines 482-500
-    throw new Error('Remove not yet implemented');
+    if (this.state !== SNES_ATTACHED || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return null;
+    }
+
+    try {
+      const request = {
+        Opcode: 'Remove',
+        Space: 'SNES',
+        Flags: null,
+        Operands: [path]
+      };
+
+      this.socket.send(JSON.stringify(request));
+    } catch (error) {
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+      this.state = SNES_DISCONNECTED;
+      throw error;
+    }
   }
 
   // ========================================

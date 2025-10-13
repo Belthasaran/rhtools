@@ -930,7 +930,51 @@
         </div>
 
         <div class="usb2snes-section">
-          <h4>Quick Actions</h4>
+          <h4>Console Control</h4>
+          <div class="action-buttons">
+            <button @click="rebootSnes" :disabled="!usb2snesStatus.connected" class="btn-secondary">Reboot SNES</button>
+            <button @click="returnToMenu" :disabled="!usb2snesStatus.connected" class="btn-secondary">Return to Menu</button>
+          </div>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>SMW Quick Actions</h4>
+          <div class="action-buttons">
+            <button @click="grantCape" :disabled="!usb2snesStatus.connected" class="btn-secondary">Grant Cape</button>
+            <button @click="startTimerChallenge" :disabled="!usb2snesStatus.connected" class="btn-secondary">Timer Challenge (60s)</button>
+          </div>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>File Upload</h4>
+          <div class="file-upload-section">
+            <input 
+              type="file" 
+              ref="usb2snesFileInput" 
+              @change="handleFileSelect"
+              accept=".sfc,.smc,.bin"
+              style="display: none"
+            />
+            <div class="file-upload-row">
+              <button @click="selectFileToUpload" class="btn-secondary">Select File</button>
+              <span v-if="selectedFile" class="selected-file">{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})</span>
+              <span v-else class="no-file">No file selected</span>
+            </div>
+            <button 
+              @click="uploadFile" 
+              :disabled="!usb2snesStatus.connected || !selectedFile || selectedFile.size > 15 * 1024 * 1024" 
+              class="btn-primary"
+            >
+              Upload to /work
+            </button>
+            <div v-if="selectedFile && selectedFile.size > 15 * 1024 * 1024" class="setting-caption warning">
+              ⚠ File too large (max 15 MB)
+            </div>
+          </div>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>Diagnostics</h4>
           <div class="action-buttons">
             <button @click="resetUsb2snesConnection" class="btn-secondary">Reset Connection</button>
             <button @click="openUsb2snesWebsite" class="btn-secondary">Open USB2SNES Website</button>
@@ -1462,25 +1506,18 @@ async function connectUsb2snes() {
   usb2snesStatus.lastAttempt = new Date().toLocaleString();
   try {
     const library = usb2snesCurrentLibrary.value;
+    const address = settings.usb2snesAddress;
     
-    // Check if library is not implemented yet
-    if (library === 'usb2snes_b' || library === 'qusb2snes' || library === 'node-usb') {
-      throw new Error(`${library} is not implemented yet. Only usb2snes_a is currently available.`);
-    }
+    const result = await (window as any).electronAPI.usb2snesConnect(library, address);
     
-    // TODO: Implement actual USB2SNES connection for usb2snes_a
-    // For now, just simulate a connection
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Simulate connection success (replace with actual implementation)
     usb2snesStatus.connected = true;
-    usb2snesStatus.device = 'Simulated Device';
-    usb2snesStatus.firmwareVersion = 'N/A (not implemented)';
-    usb2snesStatus.versionString = 'N/A (not implemented)';
-    usb2snesStatus.romRunning = 'N/A (not implemented)';
+    usb2snesStatus.device = result.device;
+    usb2snesStatus.firmwareVersion = result.firmwareVersion || 'N/A';
+    usb2snesStatus.versionString = result.versionString || 'N/A';
+    usb2snesStatus.romRunning = result.romRunning || 'N/A';
     usb2snesStatus.lastError = '';
     
-    alert(`Connected using ${library}\n\nConnection implementation is pending.`);
+    alert(`Connected successfully using ${library}\nDevice: ${result.device}`);
   } catch (error) {
     usb2snesStatus.lastError = String(error);
     usb2snesStatus.connected = false;
@@ -1490,12 +1527,14 @@ async function connectUsb2snes() {
 
 async function disconnectUsb2snes() {
   try {
-    // TODO: Implement actual USB2SNES disconnection
+    await (window as any).electronAPI.usb2snesDisconnect();
+    
     usb2snesStatus.connected = false;
     usb2snesStatus.device = '';
     usb2snesStatus.firmwareVersion = '';
     usb2snesStatus.versionString = '';
     usb2snesStatus.romRunning = '';
+    
     alert('Disconnected from USB2SNES');
   } catch (error) {
     usb2snesStatus.lastError = String(error);
@@ -1521,6 +1560,107 @@ function resetUsb2snesConnection() {
 
 function openUsb2snesWebsite() {
   window.open('https://usb2snes.com/', '_blank');
+}
+
+// Console control functions
+async function rebootSnes() {
+  try {
+    await (window as any).electronAPI.usb2snesReset();
+    alert('SNES console has been rebooted');
+  } catch (error) {
+    alert(`Reboot failed: ${error}`);
+  }
+}
+
+async function returnToMenu() {
+  try {
+    await (window as any).electronAPI.usb2snesMenu();
+    alert('Returned to menu');
+  } catch (error) {
+    alert(`Menu command failed: ${error}`);
+  }
+}
+
+// SMW quick actions
+async function grantCape() {
+  try {
+    await (window as any).electronAPI.usb2snesGrantCape();
+    alert('Cape powerup granted!');
+  } catch (error) {
+    alert(`Grant cape failed: ${error}`);
+  }
+}
+
+async function startTimerChallenge() {
+  try {
+    alert('Timer challenge started! Waiting for player to enter level...\n(Will set timer to 1 second upon level entry, timeout in 60 seconds)');
+    const result = await (window as any).electronAPI.usb2snesTimerChallenge();
+    alert(result.message);
+  } catch (error) {
+    alert(`Timer challenge failed: ${error}`);
+  }
+}
+
+// File upload
+const selectedFile = ref(null as File | null);
+const usb2snesFileInput = ref(null as HTMLInputElement | null);
+
+function selectFileToUpload() {
+  usb2snesFileInput.value?.click();
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (input.files && input.files.length > 0) {
+    selectedFile.value = input.files[0];
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+async function uploadFile() {
+  if (!selectedFile.value) {
+    alert('No file selected');
+    return;
+  }
+
+  if (selectedFile.value.size > 15 * 1024 * 1024) {
+    alert('File is too large (max 15 MB)');
+    return;
+  }
+
+  try {
+    const fileName = selectedFile.value.name;
+    const dstPath = `/work/${fileName}`;
+    
+    // Get the file path - in Electron, file.path is available
+    const filePath = (selectedFile.value as any).path;
+    
+    if (!filePath) {
+      alert('Could not get file path');
+      return;
+    }
+    
+    alert(`Uploading ${fileName} to ${dstPath}...\nThis may take a moment for large files.`);
+    
+    const result = await (window as any).electronAPI.usb2snesUploadRom(filePath, dstPath);
+    
+    if (result.success) {
+      alert(`File uploaded successfully to ${dstPath}!`);
+      selectedFile.value = null;
+      if (usb2snesFileInput.value) {
+        usb2snesFileInput.value.value = '';
+      }
+    } else {
+      alert('File upload failed');
+    }
+  } catch (error) {
+    alert(`Upload failed: ${error}`);
+  }
 }
 
 // Global keyboard shortcut handler
@@ -4661,6 +4801,30 @@ button:disabled {
 
 .btn-danger:hover {
   background: #dc2626;
+}
+
+.file-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.file-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selected-file {
+  color: var(--text-primary);
+  font-size: var(--small-font-size);
+  font-family: monospace;
+}
+
+.no-file {
+  color: var(--text-tertiary);
+  font-size: var(--small-font-size);
+  font-style: italic;
 }
 
 .status-row {

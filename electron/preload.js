@@ -336,4 +336,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{files: Array}>}
    */
   usb2snesListDir: (dirPath) => ipcRenderer.invoke('usb2snes:listDir', dirPath),
+  
+  // =============================
+  // SMW-Specific Operations
+  // =============================
+  
+  /**
+   * Grant cape powerup to player
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesGrantCape: () => ipcRenderer.invoke('usb2snes:smw:grantCape'),
+  
+  /**
+   * Check if player is in a level
+   * @returns {Promise<{inLevel: boolean}>}
+   */
+  usb2snesInLevel: () => ipcRenderer.invoke('usb2snes:smw:inLevel'),
+  
+  /**
+   * Set game timer
+   * @param {number} seconds - Time in seconds
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesSetTime: (seconds) => ipcRenderer.invoke('usb2snes:smw:setTime', seconds),
+  
+  /**
+   * Timer challenge: Wait for player to enter level, then set timer to 1 second
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  usb2snesTimerChallenge: () => ipcRenderer.invoke('usb2snes:smw:timerChallenge'),
 });

@@ -25,25 +25,52 @@
 **SNESWrapper Unified Interface Architecture**
 - Created `SNESWrapper` module as unified interface for all USB2SNES implementations (Strategy Pattern)
 - Created `BaseUsb2snes` abstract base class defining common interface for all implementations
-- Implemented `usb2snesTypeA` (partial) - JavaScript port of py2snes Python library
+- Implemented `usb2snesTypeA` ✅ COMPLETE - JavaScript port of py2snes Python library
   - Core connection methods: connect, disconnect, DeviceList, Attach, Info, Name
   - Console control: Boot, Menu, Reset
-  - Memory operations: GetAddress (read), PutAddress (write - basic)
-  - Pending: File operations (PutFile, List, MakeDir, Remove), SD2SNES special handling
+  - Memory operations: GetAddress (read), PutAddress (write)
+  - File operations: PutFile (upload), List (directory), MakeDir, Remove ✅ NEW
 - Added USB2SNES IPC handlers in `electron/ipc-handlers.js` using SNESWrapper singleton
+- Added SMW-specific IPC handlers:
+  - Grant cape powerup (`usb2snes:smw:grantCape`)
+  - Check if in level (`usb2snes:smw:inLevel`)
+  - Set game timer (`usb2snes:smw:setTime`)
+  - Timer challenge - wait for level entry, set timer to 1 second (`usb2snes:smw:timerChallenge`)
 - Exposed USB2SNES APIs in `electron/preload.js` for renderer process
 - All application code now uses SNESWrapper exclusively - no direct implementation access
 - Prevents implementation switching while connected for safety
 - Comprehensive error handling and logging
+- Installed `ws` WebSocket package (v8.18.3)
 - Files created:
   - `electron/main/usb2snes/BaseUsb2snes.js` - Abstract interface
   - `electron/main/usb2snes/SNESWrapper.js` - Unified wrapper
-  - `electron/main/usb2snes/usb2snesTypeA.js` - Type A implementation
+  - `electron/main/usb2snes/usb2snesTypeA.js` - Type A implementation (COMPLETE)
 - Files modified:
-  - `electron/ipc-handlers.js` - Added USB2SNES handlers
-  - `electron/preload.js` - Added USB2SNES APIs
+  - `electron/ipc-handlers.js` - Added USB2SNES and SMW handlers
+  - `electron/preload.js` - Added USB2SNES and SMW APIs
+  - `electron/renderer/src/App.vue` - Updated with real USB2SNES integration
+  - `package.json` - Added ws dependency
 - See: `devdocs/SNESWRAPPER_ARCHITECTURE.md` for architecture documentation
 - See: `devdocs/USB2SNES_IMPLEMENTATION_PLAN.md` for complete implementation roadmap
+
+**USB2SNES Tools Modal - Full Implementation**
+- Updated connection functions to use real IPC instead of simulation ✅
+- Connected successfully displays device name, firmware version, version string, ROM running
+- Added Console Control section with quick action buttons:
+  - "Reboot SNES" - Resets the console
+  - "Return to Menu" - Returns console to menu
+- Added SMW Quick Actions section:
+  - "Grant Cape" - Grants cape powerup to player (from smwusbtest.py capepower())
+  - "Timer Challenge (60s)" - Waits for player to enter level (polls inlevel() every second for 60 seconds), then sets timer to 1 second (from smwusbtest.py settime())
+- Added File Upload section:
+  - File picker with .sfc, .smc, .bin file filter
+  - Displays selected file name and size
+  - Upload button uploads to `/work` directory on console
+  - 15 MB file size limit with warning message
+  - Progress indication during upload
+- All buttons properly disabled when not connected
+- Real-time firmware and device status display
+- Files modified: `electron/renderer/src/App.vue`
 
 **UI Reorganization with Dropdown Menus**
 - Reorganized toolbar buttons for cleaner, more organized interface

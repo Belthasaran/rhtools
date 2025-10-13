@@ -1749,6 +1749,130 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  // ========================================
+  // SMW-SPECIFIC OPERATIONS
+  // ========================================
+
+  /**
+   * Grant cape powerup to player
+   * Channel: usb2snes:smw:grantCape
+   */
+  ipcMain.handle('usb2snes:smw:grantCape', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      // Set powerup status to cape (0x02)
+      await wrapper.PutAddress([[0xF50019, Buffer.from([0x02])]]);
+      
+      console.log('[USB2SNES] Granted cape powerup');
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Grant cape error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Check if player is in a level
+   * Channel: usb2snes:smw:inLevel
+   */
+  ipcMain.handle('usb2snes:smw:inLevel', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      // Check multiple conditions (from smwusbtest.py inlevel())
+      const runGame = (await wrapper.GetAddress(0xF50010, 1))[0] === 0x00;
+      const gameUnpaused = (await wrapper.GetAddress(0xF513D4, 1))[0] === 0x00;
+      const noAnimation = (await wrapper.GetAddress(0xF50071, 1))[0] === 0x00;
+      const noEndlevelKeyhole = (await wrapper.GetAddress(0xF51434, 1))[0] === 0x00;
+      const noEndlevelTimer = (await wrapper.GetAddress(0xF51493, 1))[0] === 0x00;
+      const normalLevel = (await wrapper.GetAddress(0xF50D9B, 1))[0] === 0x00;
+      
+      const inLevel = runGame && gameUnpaused && noAnimation && 
+                      noEndlevelKeyhole && noEndlevelTimer && normalLevel;
+      
+      return { inLevel };
+    } catch (error) {
+      console.error('[USB2SNES] Check in level error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Set game timer
+   * Channel: usb2snes:smw:setTime
+   * @param {number} seconds - Time in seconds
+   */
+  ipcMain.handle('usb2snes:smw:setTime', async (event, seconds) => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      // Break down time into hundreds, tens, ones (from smwusbtest.py settime())
+      const hundreds = Math.floor(seconds / 100);
+      const tens = Math.floor((seconds - hundreds * 100) / 10);
+      const ones = (seconds - hundreds * 100 - tens * 10) % 10;
+      
+      await wrapper.PutAddress([
+        [0xF50F31, Buffer.from([hundreds])],
+        [0xF50F32, Buffer.from([tens])],
+        [0xF50F33, Buffer.from([ones])]
+      ]);
+      
+      console.log('[USB2SNES] Set time to:', seconds, 'seconds');
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Set time error:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Timer challenge: Wait for player to enter level, then set timer to 1 second
+   * Channel: usb2snes:smw:timerChallenge
+   */
+  ipcMain.handle('usb2snes:smw:timerChallenge', async () => {
+    try {
+      const wrapper = getSnesWrapper();
+      
+      console.log('[USB2SNES] Starting timer challenge - waiting for level entry...');
+      
+      // Poll for 60 seconds
+      for (let i = 0; i < 60; i++) {
+        // Check if in level
+        const runGame = (await wrapper.GetAddress(0xF50010, 1))[0] === 0x00;
+        const gameUnpaused = (await wrapper.GetAddress(0xF513D4, 1))[0] === 0x00;
+        const noAnimation = (await wrapper.GetAddress(0xF50071, 1))[0] === 0x00;
+        const noEndlevelKeyhole = (await wrapper.GetAddress(0xF51434, 1))[0] === 0x00;
+        const noEndlevelTimer = (await wrapper.GetAddress(0xF51493, 1))[0] === 0x00;
+        const normalLevel = (await wrapper.GetAddress(0xF50D9B, 1))[0] === 0x00;
+        
+        const inLevel = runGame && gameUnpaused && noAnimation && 
+                        noEndlevelKeyhole && noEndlevelTimer && normalLevel;
+        
+        if (inLevel) {
+          // Player entered level! Set timer to 1 second
+          await wrapper.PutAddress([
+            [0xF50F31, Buffer.from([0])],  // hundreds
+            [0xF50F32, Buffer.from([0])],  // tens
+            [0xF50F33, Buffer.from([1])]   // ones
+          ]);
+          
+          console.log('[USB2SNES] Timer challenge complete - set timer to 1 second');
+          return { success: true, message: 'Player entered level - timer set to 1 second!' };
+        }
+        
+        // Wait 1 second before next check
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Timeout
+      console.log('[USB2SNES] Timer challenge timeout - player did not enter level');
+      return { success: false, message: 'Timeout: Player did not enter level within 60 seconds' };
+    } catch (error) {
+      console.error('[USB2SNES] Timer challenge error:', error);
+      throw error;
+    }
+  });
+
   console.log('IPC handlers registered successfully');
 }
 
