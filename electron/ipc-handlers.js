@@ -1749,6 +1749,24 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  /**
+   * Create directory on console
+   * Channel: usb2snes:createDir
+   * @param {string} dirPath - Directory path to create
+   */
+  ipcMain.handle('usb2snes:createDir', async (event, dirPath) => {
+    try {
+      const wrapper = getSnesWrapper();
+      await wrapper.MakeDir(dirPath);
+      
+      console.log('[USB2SNES] Created directory:', dirPath);
+      return { success: true };
+    } catch (error) {
+      console.error('[USB2SNES] Create directory error:', error);
+      throw error;
+    }
+  });
+
   // ========================================
   // SMW-SPECIFIC OPERATIONS
   // ========================================

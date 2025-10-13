@@ -337,6 +337,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   usb2snesListDir: (dirPath) => ipcRenderer.invoke('usb2snes:listDir', dirPath),
   
+  /**
+   * Create directory on console
+   * @param {string} dirPath - Directory path to create
+   * @returns {Promise<{success: boolean}>}
+   */
+  usb2snesCreateDir: (dirPath) => ipcRenderer.invoke('usb2snes:createDir', dirPath),
+  
   // =============================
   // SMW-Specific Operations
   // =============================

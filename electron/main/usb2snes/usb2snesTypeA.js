@@ -412,7 +412,7 @@ class Usb2snesTypeA extends BaseUsb2snes {
 
   /**
    * Write memory to console
-   * NOTE: Full implementation with SD2SNES special handling to be added
+   * Includes SD2SNES special handling (CMD space with 65816 assembly)
    * @param {Array<[number, Buffer]>} writeList - Array of [address, data] tuples
    * @returns {Promise<boolean>} Success status
    */
@@ -433,10 +433,51 @@ class Usb2snesTypeA extends BaseUsb2snes {
       };
 
       if (this.isSD2SNES) {
-        // TODO: Implement SD2SNES special handling (CMD space with assembly)
-        // See py2snes lines 257-280
-        throw new Error('SD2SNES PutAddress not yet implemented');
+        // SD2SNES requires special CMD space handling with 65816 assembly
+        // Build assembly command to write values
+        let cmd = Buffer.from([0x00, 0xE2, 0x20, 0x48, 0xEB, 0x48]);
+        
+        for (const [address, data] of writeList) {
+          // Validate address is in WRAM range
+          if (address < WRAM_START || (address + data.length) > (WRAM_START + WRAM_SIZE)) {
+            console.error(`[usb2snesTypeA] SD2SNES: Write out of range ${address.toString(16)} (${data.length} bytes)`);
+            return false;
+          }
+          
+          // Generate assembly instructions for each byte
+          for (let i = 0; i < data.length; i++) {
+            const byte = data[i];
+            const ptr = address + i + 0x7E0000 - WRAM_START;
+            
+            // LDA #byte
+            cmd = Buffer.concat([cmd, Buffer.from([0xA9, byte])]);
+            
+            // STA.l ptr (long addressing)
+            cmd = Buffer.concat([
+              cmd,
+              Buffer.from([
+                0x8F,
+                ptr & 0xFF,
+                (ptr >> 8) & 0xFF,
+                (ptr >> 16) & 0xFF
+              ])
+            ]);
+          }
+        }
+        
+        // Epilogue
+        cmd = Buffer.concat([
+          cmd,
+          Buffer.from([0xA9, 0x00, 0x8F, 0x00, 0x2C, 0x00, 0x68, 0xEB, 0x68, 0x28, 0x6C, 0xEA, 0xFF, 0x08])
+        ]);
+        
+        request.Space = 'CMD';
+        request.Operands = ["2C00", (cmd.length - 1).toString(16), "2C00", "1"];
+        
+        this.socket.send(JSON.stringify(request));
+        this.socket.send(cmd);
       } else {
+        // Regular SNES space for non-SD2SNES devices
         request.Space = 'SNES';
         
         for (const [address, data] of writeList) {
