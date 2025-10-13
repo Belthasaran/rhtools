@@ -4,6 +4,24 @@
 
 ### Features
 
+**Advanced Search/Filter System**
+- Added "Search/Filters" dropdown button next to "Open Settings" with down arrow indicator
+- Moved search textbox and Clear filters button into dropdown dialog for cleaner UI
+- Added visual indicator on button when filters are active (blue highlight + dot indicator)
+- Implemented keyboard shortcut: Press `/` key to instantly open filters and focus search
+- Added clickable common filter tags below search box:
+  - Game types: Kaizo, Standard, Puzzle, Troll, Vanilla
+  - Time-based: Added: 2025, Added: 2024
+  - Rating filters: Rating > 3, Rating: 5, Rating: 4
+- Implemented advanced attribute search syntax: `<attribute>:<value>`
+  - Examples: `added:2025`, `author:FuSoYa`, `name:Cave`
+- Implemented comparison operators for ratings: `rating:5`, `rating:>3`, `rating:<4`, `rating:>=3`, `rating:<=4`
+- Version filtering support: `version:1` (specific), `version:*` (all versions) - placeholder for future enhancement
+- Searches JSON data attributes (added, difficulty, etc.) in addition to standard fields
+- Dropdown closes on Escape key or clicking outside
+- Built-in filter syntax help guide in collapsible section
+- Files modified: `electron/renderer/src/App.vue`
+
 **Theme and Text Size Customization**
 - Added comprehensive theming system with 4 theme options:
   - Light Theme (default)
