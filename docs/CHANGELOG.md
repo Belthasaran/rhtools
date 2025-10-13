@@ -4,6 +4,26 @@
 
 ### Features
 
+**USB2SNES Multi-Library Support**
+- Added USB2SNES implementation library selector with 4 options:
+  - usb2snes_a (Type A - Python port) - Primary implementation
+  - usb2snes_b (Type B - 3rd party JS) - Alternative implementation
+  - qusb2snes (Local server) - For QUsb2snes compatibility
+  - node-usb (Direct hardware) - Direct USB hardware communication
+- Added "Default usb2snes library" setting in Settings dialog (above USB2snes Websocket address)
+- Enhanced USB2SNES Tools modal with:
+  - Library implementation selector dropdown (disabled when connected)
+  - Warning message when attempting to change library while connected
+  - Connect/Disconnect button functionality (replaces Test Connection)
+  - Expanded connection status display with firmware version, version string, and ROM running
+  - Visual connection state indicator (connected/disconnected)
+  - Proper connection state management (must disconnect before changing library)
+- Library selection persists across sessions and initializes from settings default
+- Unimplemented libraries show "not implemented" error when attempting to connect
+- Current implementation shows simulated connection (actual protocol implementation pending)
+- Files modified: `electron/renderer/src/App.vue`
+- See: `devdocs/USB2SNES_IMPLEMENTATION_PLAN.md` for complete implementation roadmap
+
 **UI Reorganization with Dropdown Menus**
 - Reorganized toolbar buttons for cleaner, more organized interface
 - Added "Select" dropdown button (with down arrow) containing:
