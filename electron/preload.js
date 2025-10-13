@@ -152,4 +152,48 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<Array>} Array of run results
    */
   getRunResults: (params) => ipcRenderer.invoke('db:runs:get-results', params),
+  
+  /**
+   * Reveal a random challenge (select game and update)
+   * @param {Object} params - {runUuid: string, resultUuid: string, revealedEarly: boolean}
+   * @returns {Promise<{success: boolean, gameid?: string, gameName?: string}>}
+   */
+  revealChallenge: (params) => ipcRenderer.invoke('db:runs:reveal-challenge', params),
+  
+  // =============================
+  // Seed Management
+  // =============================
+  
+  /**
+   * Generate a new random seed
+   * @returns {Promise<{success: boolean, seed: string, mapId: string, gameCount: number}>}
+   */
+  generateSeed: () => ipcRenderer.invoke('db:seeds:generate'),
+  
+  /**
+   * Get all available seed mappings
+   * @returns {Promise<Array>} Array of seed mappings
+   */
+  getSeedMappings: () => ipcRenderer.invoke('db:seeds:get-mappings'),
+  
+  /**
+   * Validate a seed
+   * @param {string} seed - Seed to validate
+   * @returns {Promise<{valid: boolean, mapId?: string, gameCount?: number}>}
+   */
+  validateSeed: (seed) => ipcRenderer.invoke('db:seeds:validate', { seed }),
+  
+  /**
+   * Export run with seed mappings
+   * @param {string} runUuid - Run UUID
+   * @returns {Promise<{success: boolean, data?: Object}>}
+   */
+  exportRun: (runUuid) => ipcRenderer.invoke('db:runs:export', { runUuid }),
+  
+  /**
+   * Import run with seed mappings
+   * @param {Object} importData - Import data
+   * @returns {Promise<{success: boolean, runUuid?: string, warnings?: Array}>}
+   */
+  importRun: (importData) => ipcRenderer.invoke('db:runs:import', { importData }),
 });

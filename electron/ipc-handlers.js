@@ -7,6 +7,7 @@
 
 const { ipcMain } = require('electron');
 const crypto = require('crypto');
+const seedManager = require('./seed-manager');
 
 /**
  * Register all IPC handlers with the database manager
@@ -573,6 +574,9 @@ function registerDatabaseHandlers(dbManager) {
         
         let resultSequence = 1;  // Unique sequence number for actual results
         
+        // Track used gameids to avoid duplicates within same run
+        const usedGameids = [];
+        
         planEntries.forEach((planEntry) => {
           const count = planEntry.count || 1;
           const isRandom = planEntry.entry_type === 'random_game' || planEntry.entry_type === 'random_stage';
@@ -581,15 +585,50 @@ function registerDatabaseHandlers(dbManager) {
           for (let i = 0; i < count; i++) {
             const resultUuid = crypto.randomUUID();
             
-            // For random entries, mask name until attempted and leave gameid NULL
             let gameName = '???';
             let gameid = null;
             
-            // For specific entries, use the gameid
-            if (!isRandom) {
+            if (isRandom) {
+              // Select random game based on filters and seed
+              try {
+                const selected = seedManager.selectRandomGame({
+                  dbManager,
+                  seed: planEntry.filter_seed,
+                  challengeIndex: resultSequence,  // Use sequence for uniqueness
+                  filterType: planEntry.filter_type,
+                  filterDifficulty: planEntry.filter_difficulty,
+                  filterPattern: planEntry.filter_pattern,
+                  excludeGameids: usedGameids
+                });
+                
+                // Keep gameid NULL for masking, but store in metadata
+                // We'll reveal it when player reaches this challenge
+                gameid = null;  // Masked
+                gameName = '???';  // Masked
+                
+                // Store actual selection in a temporary field for later reveal
+                // For now, we just track that it's random
+                usedGameids.push(selected.gameid);  // Avoid reuse in same run
+                
+              } catch (error) {
+                console.error('Error selecting random game:', error);
+                // Fallback: leave as ??? with null gameid
+              }
+            } else {
+              // For specific entries, use the gameid from plan
               gameid = planEntry.gameid;
-              // Placeholder - in full implementation, fetch actual name from gameversions
-              gameName = planEntry.gameid || 'Unknown';
+              usedGameids.push(gameid);  // Track usage
+              
+              // Fetch actual game name from gameversions
+              const rhdb = dbManager.getConnection('rhdata');
+              const game = rhdb.prepare(`
+                SELECT name FROM gameversions 
+                WHERE gameid = ? AND version = (
+                  SELECT MAX(version) FROM gameversions WHERE gameid = ?
+                )
+              `).get(planEntry.gameid, planEntry.gameid);
+              
+              gameName = game ? game.name : planEntry.gameid;
             }
             
             insertStmt.run(
@@ -597,8 +636,8 @@ function registerDatabaseHandlers(dbManager) {
               runId,
               planEntry.entry_uuid,
               resultSequence++,  // Use unique sequence number for each result
-              gameid,  // NULL for random challenges
-              gameName,  // "???" for random challenges
+              gameid,  // NULL for random challenges (masked)
+              gameName,  // "???" for random, actual name for specific
               planEntry.exit_number || null,
               planEntry.entry_type === 'stage' ? 'Stage' : null,
               isRandom ? 1 : 0,
@@ -731,6 +770,178 @@ function registerDatabaseHandlers(dbManager) {
     } catch (error) {
       console.error('Error getting run results:', error);
       throw error;
+    }
+  });
+
+  /**
+   * Reveal a random challenge (select and update with actual game)
+   * Channel: db:runs:reveal-challenge
+   */
+  ipcMain.handle('db:runs:reveal-challenge', async (event, { runUuid, resultUuid, revealedEarly }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      // Get the result and its plan entry
+      const result = db.prepare(`
+        SELECT rr.*, rpe.filter_type, rpe.filter_difficulty, rpe.filter_pattern, rpe.filter_seed
+        FROM run_results rr
+        JOIN run_plan_entries rpe ON rr.plan_entry_uuid = rpe.entry_uuid
+        WHERE rr.result_uuid = ?
+      `).get(resultUuid);
+      
+      if (!result) {
+        throw new Error('Challenge not found');
+      }
+      
+      if (!result.was_random) {
+        // Not a random challenge, nothing to reveal
+        return { 
+          success: true, 
+          gameid: result.gameid, 
+          gameName: result.game_name 
+        };
+      }
+      
+      if (result.gameid) {
+        // Already revealed
+        return { 
+          success: true, 
+          gameid: result.gameid, 
+          gameName: result.game_name,
+          alreadyRevealed: true
+        };
+      }
+      
+      // Get already used gameids in this run to avoid duplicates
+      const usedGames = db.prepare(`
+        SELECT gameid FROM run_results 
+        WHERE run_uuid = ? AND gameid IS NOT NULL
+      `).all(runUuid).map(r => r.gameid);
+      
+      // Select random game
+      const selected = seedManager.selectRandomGame({
+        dbManager,
+        seed: result.filter_seed,
+        challengeIndex: result.sequence_number,
+        filterType: result.filter_type,
+        filterDifficulty: result.filter_difficulty,
+        filterPattern: result.filter_pattern,
+        excludeGameids: usedGames
+      });
+      
+      // Update run_results with selected game
+      db.prepare(`
+        UPDATE run_results
+        SET gameid = ?,
+            game_name = ?,
+            revealed_early = ?,
+            started_at = CURRENT_TIMESTAMP
+        WHERE result_uuid = ?
+      `).run(selected.gameid, selected.name, revealedEarly ? 1 : 0, resultUuid);
+      
+      console.log(`Revealed random challenge: ${selected.name} (${selected.gameid}), early=${revealedEarly}`);
+      
+      return { 
+        success: true, 
+        gameid: selected.gameid, 
+        gameName: selected.name,
+        gameType: selected.type,
+        gameDifficulty: selected.difficulty
+      };
+    } catch (error) {
+      console.error('Error revealing challenge:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ===========================================================================
+  // SEED MANAGEMENT OPERATIONS
+  // ===========================================================================
+
+  /**
+   * Generate a new random seed with default mapping
+   * Channel: db:seeds:generate
+   */
+  ipcMain.handle('db:seeds:generate', async (event) => {
+    try {
+      const defaultMapping = seedManager.getOrCreateDefaultMapping(dbManager);
+      const seed = seedManager.generateSeedWithMap(defaultMapping.mapId);
+      
+      return { 
+        success: true, 
+        seed,
+        mapId: defaultMapping.mapId,
+        gameCount: defaultMapping.gameCount
+      };
+    } catch (error) {
+      console.error('Error generating seed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Get all available seed mappings
+   * Channel: db:seeds:get-mappings
+   */
+  ipcMain.handle('db:seeds:get-mappings', async (event) => {
+    try {
+      const mappings = seedManager.getAllSeedMappings(dbManager);
+      return mappings;
+    } catch (error) {
+      console.error('Error getting mappings:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Validate a seed
+   * Channel: db:seeds:validate
+   */
+  ipcMain.handle('db:seeds:validate', async (event, { seed }) => {
+    try {
+      const isValid = seedManager.validateSeed(dbManager, seed);
+      
+      if (isValid) {
+        const { mapId } = seedManager.parseSeed(seed);
+        const mapping = seedManager.getSeedMapping(dbManager, mapId);
+        return { 
+          valid: true, 
+          mapId,
+          gameCount: mapping ? mapping.gameCount : 0
+        };
+      }
+      
+      return { valid: false };
+    } catch (error) {
+      return { valid: false, error: error.message };
+    }
+  });
+
+  /**
+   * Export run with seed mappings
+   * Channel: db:runs:export
+   */
+  ipcMain.handle('db:runs:export', async (event, { runUuid }) => {
+    try {
+      const exportData = seedManager.exportRun(dbManager, runUuid);
+      return { success: true, data: exportData };
+    } catch (error) {
+      console.error('Error exporting run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Import run with seed mappings
+   * Channel: db:runs:import
+   */
+  ipcMain.handle('db:runs:import', async (event, { importData }) => {
+    try {
+      const result = seedManager.importRun(dbManager, importData);
+      return result;
+    } catch (error) {
+      console.error('Error importing run:', error);
+      return { success: false, error: error.message };
     }
   });
 
