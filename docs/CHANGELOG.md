@@ -2,6 +2,23 @@
 
 ## 2025-10-13
 
+### Features
+
+**Launch Program Browse and Drag-Drop Support**
+- Added Browse button for Launch Program setting (matching FLIPS executable UI pattern)
+- Added drag-and-drop zone for Launch Program setting
+- Displays current path below controls when Launch Program is set
+- Supports common executable extensions (.exe, .sh, .bat, .cmd)
+- Files modified: `electron/renderer/src/App.vue`, `electron/GUI_README.md`
+
+**attachblobs.js --newonly Option**
+- Added `--newonly` command line option to skip patchblobs where file_name already exists in attachments table
+- Significantly speeds up incremental processing (~20x faster for mostly-existing files)
+- Added comprehensive test suite in `tests/test_attachblobs.js`
+- Added `--help` option to display usage information
+- Files modified: `attachblobs.js`
+- See: `tests/README_ATTACHBLOBS_TESTS.md`
+
 ### Bug Fixes
 
 **Settings File Paths Not Being Saved/Loaded**
