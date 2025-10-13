@@ -4,6 +4,26 @@
 
 ### Features
 
+**UI Reorganization with Dropdown Menus**
+- Reorganized toolbar buttons for cleaner, more organized interface
+- Added "Select" dropdown button (with down arrow) containing:
+  - Check all
+  - Uncheck all
+  - Check random
+- Added "Ignore" dropdown button (with down arrow) containing:
+  - Hide checked
+  - Unhide checked
+- Added conditional "USB2SNES Tools" button that appears next to "Open Settings" when USB2SNES is enabled
+- Added USB2SNES Tools modal dialog with diagnostics and tools:
+  - Connection status display (connected/disconnected indicator)
+  - WebSocket address and device information
+  - Upload settings display
+  - Connection testing functionality
+  - Diagnostic information (last connection attempt, error logs)
+  - Quick actions (reset connection, open USB2SNES website)
+- Dropdown menus close on Escape key or clicking outside
+- Files modified: `electron/renderer/src/App.vue`
+
 **Advanced Search/Filter System**
 - Added "Search/Filters" dropdown button next to "Open Settings" with down arrow indicator
 - Moved search textbox and Clear filters button into dropdown dialog for cleaner UI
