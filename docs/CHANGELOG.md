@@ -4,6 +4,16 @@
 
 ### Features
 
+**Windows Build Support**
+- Added electron-builder configuration for creating portable Windows executables
+- Added build scripts: `npm run build:win` (portable), `npm run build:win-all` (portable + installer)
+- Configured cross-platform build support from Linux without requiring Windows machine
+- Native modules (better-sqlite3, lzma-native) automatically rebuilt for target platform
+- Portable executable runs on Windows 10/11 without installation or dependencies
+- Build output directory: `dist-builds/`
+- Files modified: `package.json`
+- Files created: `docs/BUILD_WINDOWS.md`
+
 **USB2SNES Multi-Library Support**
 - Added USB2SNES implementation library selector with 4 options:
   - usb2snes_a (Type A - Python port) - Primary implementation

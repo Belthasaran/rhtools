@@ -1,4 +1,8 @@
 {
+  "name": "rhtools",
+  "version": "1.0.0",
+  "description": "RHTools - ROM Hack Tools Application",
+  "author": "RHTools Team",
   "main": "electron/main.js",
   "scripts": {
     "electron:start": "cross-env ELECTRON_START_URL=http://localhost:5173 electron electron/main.js",
@@ -8,6 +12,9 @@
     "app:dev": "run-p renderer:dev electron:start",
     "app:dev-smart": "cd electron && ./smart-start.sh",
     "app:build": "npm run renderer:build",
+    "build:win": "npm run renderer:build && electron-builder --win portable",
+    "build:win-all": "npm run renderer:build && electron-builder --win nsis,portable",
+    "build:linux": "npm run renderer:build && electron-builder --linux AppImage",
     "loaddata": "node loaddata.js",
     "attachblobs": "node attachblobs.js",
     "fetchpatches": "node fetchpatches.js",
@@ -76,7 +83,47 @@
     "@electron/rebuild": "^4.0.1",
     "cross-env": "^7.0.3",
     "electron": "^30.0.0",
+    "electron-builder": "^26.0.12",
     "electron-rebuild": "^3.2.9",
     "npm-run-all": "^4.1.5"
+  },
+  "build": {
+    "appId": "com.rhtools.app",
+    "productName": "RHTools",
+    "directories": {
+      "output": "dist-builds"
+    },
+    "files": [
+      "electron/**/*",
+      "!electron/renderer/node_modules/**/*",
+      "!electron/renderer/src/**/*",
+      "!electron/test_data/**/*",
+      "!electron/tests/**/*",
+      "!electron/backup/**/*",
+      "!electron/**/*.db-shm",
+      "!electron/**/*.db-wal",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-${version}-setup.exe"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility"
+    }
   }
 }
