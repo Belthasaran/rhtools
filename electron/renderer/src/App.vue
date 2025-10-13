@@ -731,6 +731,80 @@
       </footer>
     </div>
   </div>
+
+  <!-- Staging Progress Modal -->
+  <div v-if="stagingProgressModalOpen" class="modal-backdrop">
+    <div class="modal staging-progress-modal">
+      <header class="modal-header">
+        <h3>🎮 Staging Run Games...</h3>
+      </header>
+      <section class="modal-body">
+        <div class="progress-info">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: (stagingProgressCurrent / stagingProgressTotal * 100) + '%' }"></div>
+          </div>
+          <p class="progress-text">{{ stagingProgressCurrent }} / {{ stagingProgressTotal }}</p>
+          <p class="progress-game">{{ stagingProgressGameName }}</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Staging Success Modal -->
+  <div v-if="stagingSuccessModalOpen" class="modal-backdrop">
+    <div class="modal staging-success-modal">
+      <header class="modal-header">
+        <h3>✅ Run Staged Successfully!</h3>
+      </header>
+      <section class="modal-body">
+        <div class="success-info">
+          <p class="success-message">
+            <strong>{{ stagingSfcCount }}</strong> game files have been prepared for your run.
+          </p>
+          <div class="folder-info">
+            <label class="folder-label">Run Folder:</label>
+            <div class="folder-path">
+              <input type="text" readonly :value="stagingFolderPath" class="folder-path-input" />
+              <button @click="openStagingFolder" class="btn-open-folder" title="Open Folder">📁</button>
+            </div>
+          </div>
+
+          <!-- Conditional action buttons based on settings -->
+          <div class="staging-actions">
+            <!-- Launch Program option -->
+            <button 
+              v-if="settings.launchMethod === 'program' && settings.launchProgram"
+              @click="launchGameProgram" 
+              class="btn-action btn-launch">
+              🚀 Launch Game
+            </button>
+
+            <!-- USB2SNES Upload option (not manual transfer) -->
+            <button 
+              v-if="settings.launchMethod === 'usb2snes' && settings.usb2snesUploadPref !== 'manual'"
+              @click="uploadToUsb2Snes" 
+              class="btn-action btn-upload">
+              📤 Upload to USB2SNES
+            </button>
+
+            <!-- USB2SNES Manual transfer instructions -->
+            <div v-if="settings.launchMethod === 'usb2snes' && settings.usb2snesUploadPref === 'manual'" class="manual-upload-instructions">
+              <p class="instruction-text">
+                📋 Please manually upload the run folder to your USB2SNES device at:<br/>
+                <code>{{ settings.usb2snesUploadDir }}</code>
+              </p>
+              <button @click="manuallyUploadedConfirm" class="btn-action btn-manual-confirm">
+                ✓ Manually Uploaded - Launch USB2SNES
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <footer class="modal-footer">
+        <button @click="closeStagingSuccess" class="btn-primary">OK</button>
+      </footer>
+    </div>
+  </div>
   
 </template>
 
@@ -952,9 +1026,13 @@ function setMyRating() {
 // Settings modal state and logic
 const settingsModalOpen = ref(false);
 const settings = reactive({
+  vanillaRomPath: '',
   vanillaRomValid: false,
+  flipsPath: '',
   flipsValid: false,
+  asarPath: '',
   asarValid: false,
+  uberAsmPath: '',
   uberAsmValid: false,
   launchMethod: 'manual' as 'manual' | 'program' | 'usb2snes',
   launchProgram: '',
@@ -1242,6 +1320,17 @@ const runNameInput = ref<string>('My Challenge Run');
 const resumeRunModalOpen = ref(false);
 const resumeRunData = ref<any>(null);
 
+// Staging progress modal
+const stagingProgressModalOpen = ref(false);
+const stagingProgressCurrent = ref(0);
+const stagingProgressTotal = ref(0);
+const stagingProgressGameName = ref('');
+
+// Staging success modal
+const stagingSuccessModalOpen = ref(false);
+const stagingFolderPath = ref('');
+const stagingSfcCount = ref(0);
+
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
 const isRunSaved = computed(() => currentRunUuid.value !== null && currentRunStatus.value === 'preparing');
@@ -1507,17 +1596,81 @@ async function saveRunToDatabase() {
       plainRunEntries
     );
     
-    if (planResult.success) {
-      currentRunUuid.value = result.runUuid;
-      currentRunStatus.value = 'preparing';
-      console.log('Run saved with UUID:', result.runUuid);
-      alert(`Run "${runName}" saved successfully!`);
-    } else {
+    if (!planResult.success) {
       alert('Failed to save run plan: ' + planResult.error);
+      return;
     }
+    
+    currentRunUuid.value = result.runUuid;
+    currentRunStatus.value = 'preparing';
+    console.log('Run saved with UUID:', result.runUuid);
+    
+    // Now stage the run (generate SFC files)
+    await stageRunGames(result.runUuid, runName);
+    
   } catch (error) {
     console.error('Error saving run:', error);
-    alert('Error saving run');
+    alert('Error saving run: ' + error.message);
+  }
+}
+
+async function stageRunGames(runUuid: string, runName: string) {
+  try {
+    // Show progress modal
+    stagingProgressModalOpen.value = true;
+    stagingProgressCurrent.value = 0;
+    stagingProgressTotal.value = runEntries.length;
+    stagingProgressGameName.value = 'Expanding run plan...';
+    
+    // Step 1: Expand plan and select all random games
+    const expandResult = await (window as any).electronAPI.expandAndStageRun({ runUuid });
+    
+    if (!expandResult.success) {
+      stagingProgressModalOpen.value = false;
+      alert('Failed to expand run plan: ' + expandResult.error);
+      return;
+    }
+    
+    // Listen for progress updates
+    const ipcRenderer = (window as any).electronAPI.ipcRenderer;
+    if (ipcRenderer) {
+      ipcRenderer.on('staging-progress', (_event: any, data: any) => {
+        stagingProgressCurrent.value = data.current;
+        stagingProgressTotal.value = data.total;
+        stagingProgressGameName.value = data.gameName || 'Processing...';
+      });
+    }
+    
+    // Step 2: Stage games (create SFC files)
+    stagingProgressGameName.value = 'Creating game files...';
+    const stagingResult = await (window as any).electronAPI.stageRunGames({
+      runUuid,
+      vanillaRomPath: settings.romPath,
+      flipsPath: settings.flipsPath
+    });
+    
+    // Clean up progress listener
+    if (ipcRenderer) {
+      ipcRenderer.removeAllListeners('staging-progress');
+    }
+    
+    // Hide progress modal
+    stagingProgressModalOpen.value = false;
+    
+    if (!stagingResult.success) {
+      alert('Failed to stage run games: ' + stagingResult.error);
+      return;
+    }
+    
+    // Show success modal
+    stagingFolderPath.value = stagingResult.folderPath;
+    stagingSfcCount.value = stagingResult.gamesStaged;
+    stagingSuccessModalOpen.value = true;
+    
+  } catch (error) {
+    console.error('Error staging run games:', error);
+    stagingProgressModalOpen.value = false;
+    alert('Error staging run games: ' + error.message);
   }
 }
 
@@ -1533,6 +1686,38 @@ function confirmRunName() {
 
 function cancelRunName() {
   runNameModalOpen.value = false;
+}
+
+function closeStagingSuccess() {
+  stagingSuccessModalOpen.value = false;
+}
+
+function openStagingFolder() {
+  if (stagingFolderPath.value) {
+    // Use shell to open folder
+    const shell = (window as any).electronAPI.shell;
+    if (shell && shell.openPath) {
+      shell.openPath(stagingFolderPath.value);
+    }
+  }
+}
+
+function launchGameProgram() {
+  // TODO: Implement launching the configured game program with first SFC file
+  alert('Launch game program - to be implemented');
+  // This will be implemented in a later phase
+}
+
+function uploadToUsb2Snes() {
+  // TODO: Implement USB2SNES upload
+  alert('USB2SNES upload - to be implemented');
+  // This will be implemented in a later phase
+}
+
+function manuallyUploadedConfirm() {
+  // TODO: Implement USB2SNES launch after manual upload
+  alert('USB2SNES launch - to be implemented');
+  // This will be implemented in a later phase
 }
 
 async function startRun() {
@@ -1574,13 +1759,16 @@ async function startRun() {
       // Replace runEntries with expanded results
       runEntries.length = 0;  // Clear array
       expandedResults.forEach((res: any) => {
+        // Mask random games that haven't been revealed yet
+        const isUnrevealed = res.was_random && !res.revealed_early;
+        
         runEntries.push({
           key: res.result_uuid,
-          id: res.gameid || '(random)',
+          id: isUnrevealed ? '(random)' : (res.gameid || '(random)'),
           entryType: res.was_random ? 'random_game' : 'game',
-          name: res.game_name || '???',
+          name: isUnrevealed ? '???' : (res.game_name || '???'),
           stageNumber: res.exit_number,
-          stageName: res.stage_description,
+          stageName: isUnrevealed ? null : res.stage_description,
           count: 1,  // Each result is now a single challenge
           isLocked: true,  // All entries locked during active run
           conditions: JSON.parse(res.conditions || '[]')
@@ -1762,9 +1950,9 @@ async function skipChallenge() {
   const idx = currentChallengeIndex.value;
   const entry = runEntries[idx];
   
-  // If this is a random challenge, reveal it first (marked as revealed early)
+  // If this is a random challenge, reveal it first (so user sees what they're skipping)
   if ((entry.entryType === 'random_game' || entry.entryType === 'random_stage') && entry.name === '???') {
-    await revealCurrentChallenge(true);  // Revealed early = true
+    await revealCurrentChallenge(false);  // Normal reveal (not early)
   }
   
   const confirmed = confirm(`Skip challenge ${idx + 1}: ${entry.name}?`);
@@ -1816,6 +2004,34 @@ async function undoChallenge() {
   
   const previousState = undoStack.value.pop()!;
   const idx = previousState.index;
+  
+  // Before going back, mark any challenges AFTER this point as revealed_early
+  // because the user has already seen them
+  for (let i = idx + 1; i < challengeResults.value.length; i++) {
+    const result = challengeResults.value[i];
+    const entry = runEntries[i];
+    
+    // If it's a random challenge that's been revealed, mark it as revealed early
+    if ((entry.entryType === 'random_game' || entry.entryType === 'random_stage') && 
+        entry.name !== '???' && 
+        result.status !== 'pending') {
+      result.revealedEarly = true;
+      challengeResults.value[i] = { ...result, revealedEarly: true };
+      
+      // Update in database
+      try {
+        if (isElectronAvailable()) {
+          await (window as any).electronAPI.markChallengeRevealedEarly({
+            runUuid: currentRunUuid.value,
+            challengeIndex: i,
+            revealedEarly: true
+          });
+        }
+      } catch (error) {
+        console.error('Error marking challenge as revealed early:', error);
+      }
+    }
+  }
   
   // Restore previous state
   challengeResults.value[idx] = { ...previousState };
@@ -2834,6 +3050,130 @@ button { padding: 6px 10px; }
 .btn-secondary:hover { background: #4b5563; }
 .btn-danger { background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; }
 .btn-danger:hover { background: #dc2626; }
+
+/* Staging Progress Modal */
+.staging-progress-modal { width: 500px; max-width: 90vw; }
+.progress-info { padding: 24px; }
+.progress-bar { 
+  width: 100%; 
+  height: 30px; 
+  background: #e5e7eb; 
+  border-radius: 15px; 
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.progress-fill { 
+  height: 100%; 
+  background: linear-gradient(90deg, #3b82f6, #2563eb); 
+  transition: width 0.3s ease;
+}
+.progress-text { 
+  text-align: center; 
+  font-size: 18px; 
+  font-weight: 600; 
+  color: #1f2937;
+  margin: 8px 0;
+}
+.progress-game { 
+  text-align: center; 
+  font-size: 14px; 
+  color: #6b7280;
+  margin: 8px 0;
+  min-height: 20px;
+}
+
+/* Staging Success Modal */
+.staging-success-modal { width: 700px; max-width: 95vw; }
+.success-info { padding: 24px; }
+.success-message { 
+  font-size: 16px; 
+  margin-bottom: 20px; 
+  text-align: center;
+  color: #374151;
+}
+.folder-info { margin: 20px 0; }
+.folder-label { 
+  display: block; 
+  font-weight: 600; 
+  margin-bottom: 8px; 
+  color: #374151;
+}
+.folder-path { 
+  display: flex; 
+  gap: 8px; 
+  align-items: center;
+}
+.folder-path-input { 
+  flex: 1; 
+  padding: 8px 12px; 
+  border: 1px solid #d1d5db; 
+  border-radius: 4px;
+  background: #f9fafb;
+  font-family: monospace;
+  font-size: 13px;
+}
+.btn-open-folder { 
+  padding: 8px 16px; 
+  background: #3b82f6; 
+  color: white; 
+  border: none; 
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+}
+.btn-open-folder:hover { background: #2563eb; }
+.staging-actions { 
+  margin-top: 24px; 
+  display: flex; 
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.btn-action { 
+  padding: 12px 24px; 
+  font-size: 16px; 
+  font-weight: 600;
+  border: none; 
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 200px;
+}
+.btn-launch { 
+  background: #10b981; 
+  color: white;
+}
+.btn-launch:hover { background: #059669; }
+.btn-upload { 
+  background: #8b5cf6; 
+  color: white;
+}
+.btn-upload:hover { background: #7c3aed; }
+.btn-manual-confirm { 
+  background: #f59e0b; 
+  color: white;
+  margin-top: 12px;
+}
+.btn-manual-confirm:hover { background: #d97706; }
+.manual-upload-instructions { 
+  background: #fef3c7; 
+  border: 2px solid #fbbf24;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  width: 100%;
+}
+.instruction-text { 
+  margin: 0 0 12px 0; 
+  color: #92400e;
+  line-height: 1.6;
+}
+.instruction-text code { 
+  background: #fef3c7; 
+  padding: 2px 6px; 
+  border-radius: 3px;
+  font-weight: 600;
+  color: #92400e;
+}
 
 /* New UI Components */
 

@@ -50,9 +50,9 @@ async function createPatchedSFC(params) {
     // Get game version from rhdata.db
     const rhdb = dbManager.getConnection('rhdata');
     const gameVersion = rhdb.prepare(`
-      SELECT gv.*, pb.pblob_filename, pb.pblob_sha224
+      SELECT gv.*, pb.patchblob1_name, pb.patchblob1_sha224
       FROM gameversions gv
-      LEFT JOIN patchblobs pb ON gv.patchblob1_name = pb.pblob_name
+      LEFT JOIN patchblobs pb ON gv.patchblob1_name = pb.patchblob1_name
       WHERE gv.gameid = ? AND gv.version = ?
     `).get(gameid, version);
     
@@ -60,20 +60,20 @@ async function createPatchedSFC(params) {
       return { success: false, error: `Game ${gameid} version ${version} not found` };
     }
     
-    if (!gameVersion.pblob_filename) {
+    if (!gameVersion.patchblob1_name) {
       return { success: false, error: `No patch blob for ${gameid} v${version}` };
     }
     
     // Get patch file data from patchbin.db
     const patchbinDb = dbManager.getConnection('patchbin');
     const attachment = patchbinDb.prepare(`
-      SELECT file_data, file_sha224
+      SELECT file_data, file_hash_sha224
       FROM attachments
       WHERE file_name = ?
-    `).get(gameVersion.pblob_filename);
+    `).get(gameVersion.patchblob1_name);
     
     if (!attachment) {
-      return { success: false, error: `Patch file ${gameVersion.pblob_filename} not found in patchbin.db` };
+      return { success: false, error: `Patch file ${gameVersion.patchblob1_name} not found in patchbin.db` };
     }
     
     // Create temp directory for patching
@@ -153,7 +153,7 @@ async function stageRunGames(params) {
     
     // Create run-specific folder
     const runFolderName = generateRunFolderName();
-    const runFolder = path.join(stagingBase, runFolderName);
+    let runFolder = path.join(stagingBase, runFolderName);
     
     if (fs.existsSync(runFolder)) {
       // Folder exists, append timestamp to make unique

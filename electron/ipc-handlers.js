@@ -545,6 +545,13 @@ function registerDatabaseHandlers(dbManager) {
     try {
       const db = dbManager.getConnection('clientdata');
       
+      // Check if run_results exist (from staging)
+      const resultsCount = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE run_uuid = ?`).get(runUuid);
+      
+      if (!resultsCount || resultsCount.count === 0) {
+        return { success: false, error: 'Run has not been staged yet. Please save and stage the run first.' };
+      }
+      
       const transaction = db.transaction((runId) => {
         // Cancel any other active runs (only one run can be active at a time)
         db.prepare(`
@@ -553,10 +560,7 @@ function registerDatabaseHandlers(dbManager) {
           WHERE status = 'active' AND run_uuid != ?
         `).run(runId);
         
-        // Clean up any existing run_results for this run (in case of previous failed attempt)
-        db.prepare(`DELETE FROM run_results WHERE run_uuid = ?`).run(runId);
-        
-        // Update run status
+        // Update run status to active (run_results already exist from staging)
         db.prepare(`
           UPDATE runs 
           SET status = 'active', 
@@ -577,8 +581,8 @@ function registerDatabaseHandlers(dbManager) {
           INSERT INTO run_results
             (result_uuid, run_uuid, plan_entry_uuid, sequence_number, 
              gameid, game_name, exit_number, stage_description,
-             was_random, status, conditions)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+             was_random, revealed_early, status, conditions)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         `);
         
         let resultSequence = 1;  // Unique sequence number for actual results
@@ -656,6 +660,7 @@ function registerDatabaseHandlers(dbManager) {
               planEntry.exit_number || null,
               planEntry.entry_type === 'stage' ? 'Stage' : null,
               isRandom ? 1 : 0,
+              0,  // revealed_early: false (not revealed yet)
               planEntry.conditions || null
             );
             
@@ -935,12 +940,161 @@ function registerDatabaseHandlers(dbManager) {
   });
 
   /**
+   * Expand run plan and prepare for staging (select & reveal all random games)
+   * Channel: db:runs:expand-and-prepare
+   */
+  ipcMain.handle('db:runs:expand-and-prepare', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      const transaction = db.transaction((runId) => {
+        // Clean up any existing run_results (in case of re-staging)
+        db.prepare(`DELETE FROM run_results WHERE run_uuid = ?`).run(runId);
+        
+        // Get plan entries
+        const planEntries = db.prepare(`
+          SELECT * FROM run_plan_entries 
+          WHERE run_uuid = ? 
+          ORDER BY sequence_number
+        `).all(runId);
+        
+        // Expand plan entries to run_results
+        const insertStmt = db.prepare(`
+          INSERT INTO run_results
+            (result_uuid, run_uuid, plan_entry_uuid, sequence_number, 
+             gameid, game_name, exit_number, stage_description,
+             was_random, revealed_early, status, conditions)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+        `);
+        
+        let resultSequence = 1;
+        const usedGameids = [];
+        
+        planEntries.forEach((planEntry) => {
+          const count = planEntry.count || 1;
+          const isRandom = planEntry.entry_type === 'random_game' || planEntry.entry_type === 'random_stage';
+          
+          // Create multiple results if count > 1
+          for (let i = 0; i < count; i++) {
+            const resultUuid = crypto.randomUUID();
+            let gameName = '???';
+            let gameid = null;
+            let exitNumber = planEntry.exit_number;
+            let stageDescription = null;
+            
+            if (isRandom) {
+              // Select random game and REVEAL it immediately (for staging)
+              try {
+                const selected = seedManager.selectRandomGame({
+                  dbManager,
+                  seed: planEntry.filter_seed,
+                  challengeIndex: resultSequence,
+                  filterType: planEntry.filter_type,
+                  filterDifficulty: planEntry.filter_difficulty,
+                  filterPattern: planEntry.filter_pattern,
+                  excludeGameids: usedGameids
+                });
+                
+                // Store the game internally (for staging) but keep it masked for UI
+                gameid = selected.gameid;  // Store actual gameid
+                gameName = '???';  // Keep masked for UI
+                exitNumber = selected.exit_number;
+                stageDescription = null;  // Keep masked for UI
+                usedGameids.push(selected.gameid);
+                
+              } catch (error) {
+                console.error('Error selecting random game:', error);
+                throw error;  // Fail staging if we can't select a game
+              }
+            } else {
+              // For specific entries, use the gameid from plan
+              gameid = planEntry.gameid;
+              exitNumber = planEntry.exit_number;
+              usedGameids.push(gameid);
+              
+              // Fetch game name
+              const rhdb = dbManager.getConnection('rhdata');
+              const game = rhdb.prepare(`
+                SELECT name FROM gameversions 
+                WHERE gameid = ? AND version = (
+                  SELECT MAX(version) FROM gameversions WHERE gameid = ?
+                )
+              `).get(gameid, gameid);
+              
+              gameName = game ? game.name : 'Unknown';
+              
+              // Fetch stage description if exit specified
+              if (exitNumber) {
+                const exitInfo = rhdb.prepare(`
+                  SELECT description FROM exits 
+                  WHERE gameid = ? AND exit_number = ?
+                `).get(gameid, exitNumber);
+                stageDescription = exitInfo ? exitInfo.description : null;
+              }
+            }
+            
+            // Insert result
+            insertStmt.run(
+              resultUuid,
+              runId,
+              planEntry.entry_uuid,
+              resultSequence,
+              gameid,
+              gameName,
+              exitNumber,
+              stageDescription,
+              isRandom ? 1 : 0,
+              0,  // revealed_early: false (not revealed yet)
+              JSON.stringify(planEntry.conditions || [])
+            );
+            
+            resultSequence++;
+          }
+        });
+        
+        console.log(`Expanded ${planEntries.length} plan entries to ${resultSequence - 1} results`);
+      });
+      
+      transaction(runUuid);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error expanding run plan:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
    * Stage run games (create SFC files)
    * Channel: db:runs:stage-games
    */
-  ipcMain.handle('db:runs:stage-games', async (event, { runUuid, expandedResults, vanillaRomPath, flipsPath }) => {
+  ipcMain.handle('db:runs:stage-games', async (event, { runUuid, vanillaRomPath, flipsPath }) => {
     try {
+      const db = dbManager.getConnection('clientdata');
       const userDataPath = app.getPath('userData');
+      
+      // Fetch run_results (already expanded with all games revealed)
+      const expandedResults = db.prepare(`
+        SELECT 
+          result_uuid,
+          run_uuid,
+          plan_entry_uuid,
+          sequence_number,
+          gameid,
+          game_name,
+          exit_number,
+          stage_description,
+          was_random,
+          status,
+          conditions
+        FROM run_results
+        WHERE run_uuid = ?
+        ORDER BY sequence_number
+      `).all(runUuid);
+      
+      if (expandedResults.length === 0) {
+        return { success: false, error: 'No games found in run results. Please expand run plan first.' };
+      }
       
       const result = await gameStager.stageRunGames({
         dbManager,
@@ -1043,6 +1197,42 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  /**
+   * Mark a challenge as revealed early (after using Back button)
+   * Channel: db:runs:mark-revealed-early
+   */
+  ipcMain.handle('db:runs:mark-revealed-early', async (event, { runUuid, challengeIndex, revealedEarly }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      // Get the result at this index
+      const result = db.prepare(`
+        SELECT result_uuid FROM run_results 
+        WHERE run_uuid = ? 
+        ORDER BY sequence_number 
+        LIMIT 1 OFFSET ?
+      `).get(runUuid, challengeIndex);
+      
+      if (!result) {
+        throw new Error('Challenge not found at index ' + challengeIndex);
+      }
+      
+      // Update revealed_early flag
+      db.prepare(`
+        UPDATE run_results
+        SET revealed_early = ?
+        WHERE result_uuid = ?
+      `).run(revealedEarly ? 1 : 0, result.result_uuid);
+      
+      console.log(`Marked challenge ${challengeIndex + 1} as revealed_early=${revealedEarly}`);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error marking challenge as revealed early:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ===========================================================================
   // SEED MANAGEMENT OPERATIONS
   // ===========================================================================
@@ -1130,6 +1320,25 @@ function registerDatabaseHandlers(dbManager) {
       return result;
     } catch (error) {
       console.error('Error importing run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ===========================================================================
+  // Shell Operations
+  // ===========================================================================
+
+  /**
+   * Open a folder or file in the system's default file manager/application
+   * Channel: shell:open-path
+   */
+  ipcMain.handle('shell:open-path', async (event, path) => {
+    try {
+      const { shell } = require('electron');
+      await shell.openPath(path);
+      return { success: true };
+    } catch (error) {
+      console.error('Error opening path:', error);
       return { success: false, error: error.message };
     }
   });

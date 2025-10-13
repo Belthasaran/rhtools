@@ -161,6 +161,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   revealChallenge: (params) => ipcRenderer.invoke('db:runs:reveal-challenge', params),
   
   /**
+   * Mark a challenge as revealed early (after using Back button)
+   * @param {Object} params - {runUuid: string, challengeIndex: number, revealedEarly: boolean}
+   * @returns {Promise<{success: boolean}>}
+   */
+  markChallengeRevealedEarly: (params) => ipcRenderer.invoke('db:runs:mark-revealed-early', params),
+  
+  /**
    * Get active run (for startup check)
    * @returns {Promise<Object|null>} Active run with calculated elapsed time
    */
@@ -179,6 +186,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{success: boolean}>}
    */
   unpauseRun: (runUuid) => ipcRenderer.invoke('db:runs:unpause', { runUuid }),
+  
+  /**
+   * Expand run plan and select all random games
+   * @param {Object} params - {runUuid}
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  expandAndStageRun: (params) => ipcRenderer.invoke('db:runs:expand-and-prepare', params),
   
   /**
    * Stage run games (create SFC files)
@@ -223,4 +237,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{success: boolean, runUuid?: string, warnings?: Array}>}
    */
   importRun: (importData) => ipcRenderer.invoke('db:runs:import', { importData }),
+  
+  /**
+   * Access to ipcRenderer for event listeners
+   */
+  ipcRenderer: {
+    on: (channel, func) => ipcRenderer.on(channel, func),
+    removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  },
+  
+  /**
+   * Shell operations for opening folders/files
+   */
+  shell: {
+    openPath: (path) => ipcRenderer.invoke('shell:open-path', path)
+  }
 });
