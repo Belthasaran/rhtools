@@ -698,6 +698,20 @@
 
         <div class="settings-section">
           <div class="setting-row">
+            <label class="setting-label">Default usb2snes library</label>
+            <div class="setting-control">
+              <select v-model="settings.usb2snesLibrary">
+                <option value="usb2snes_a">usb2snes_a (Type A - Python port)</option>
+                <option value="usb2snes_b">usb2snes_b (Type B - 3rd party JS)</option>
+                <option value="qusb2snes">Qusb2snes (Local server)</option>
+                <option value="node-usb">node-usb (Direct hardware)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-row">
             <label class="setting-label">USB2snes Websocket address</label>
             <div class="setting-control">
               <input type="text" v-model="settings.usb2snesAddress" />
@@ -841,6 +855,22 @@
 
       <div class="modal-body">
         <div class="usb2snes-section">
+          <h4>USB2SNES Implementation</h4>
+          <div class="status-row">
+            <label>USB2SNES Library:</label>
+            <select v-model="usb2snesCurrentLibrary" :disabled="usb2snesStatus.connected" class="usb2snes-library-select">
+              <option value="usb2snes_a">usb2snes_a (Type A - Python port)</option>
+              <option value="usb2snes_b">usb2snes_b (Type B - 3rd party JS)</option>
+              <option value="qusb2snes">Qusb2snes (Local server)</option>
+              <option value="node-usb">node-usb (Direct hardware)</option>
+            </select>
+          </div>
+          <div v-if="usb2snesStatus.connected" class="setting-caption warning">
+            ⚠ Disconnect to change library implementation
+          </div>
+        </div>
+
+        <div class="usb2snes-section">
           <h4>Connection Status</h4>
           <div class="status-row">
             <label>WebSocket Address:</label>
@@ -856,7 +886,22 @@
             <label>Device:</label>
             <span>{{ usb2snesStatus.device || 'N/A' }}</span>
           </div>
-          <button @click="testUsb2snesConnection" class="btn-primary">Test Connection</button>
+          <div v-if="usb2snesStatus.connected" class="status-row">
+            <label>Firmware:</label>
+            <span>{{ usb2snesStatus.firmwareVersion || 'N/A' }}</span>
+          </div>
+          <div v-if="usb2snesStatus.connected" class="status-row">
+            <label>Version String:</label>
+            <span>{{ usb2snesStatus.versionString || 'N/A' }}</span>
+          </div>
+          <div v-if="usb2snesStatus.connected" class="status-row">
+            <label>ROM Running:</label>
+            <span>{{ usb2snesStatus.romRunning || 'N/A' }}</span>
+          </div>
+          <div class="action-buttons">
+            <button v-if="!usb2snesStatus.connected" @click="connectUsb2snes" class="btn-primary">Connect</button>
+            <button v-if="usb2snesStatus.connected" @click="disconnectUsb2snes" class="btn-danger">Disconnect</button>
+          </div>
         </div>
 
         <div class="usb2snes-section">
@@ -1161,11 +1206,15 @@ const ignoreDropdownOpen = ref(false);
 
 // USB2SNES Tools modal state
 const usb2snesToolsModalOpen = ref(false);
+const usb2snesCurrentLibrary = ref('usb2snes_a' as 'usb2snes_a' | 'usb2snes_b' | 'qusb2snes' | 'node-usb');
 const usb2snesStatus = reactive({
   connected: false,
   device: '',
   lastAttempt: '',
-  lastError: ''
+  lastError: '',
+  firmwareVersion: '',
+  versionString: '',
+  romRunning: ''
 });
 
 // Version management (must be declared before watchers use it)
@@ -1400,6 +1449,8 @@ function closeIgnoreDropdown() {
 
 // USB2SNES Tools modal functions
 function openUsb2snesTools() {
+  // Set current library to the default from settings when opening modal
+  usb2snesCurrentLibrary.value = settings.usb2snesLibrary;
   usb2snesToolsModalOpen.value = true;
 }
 
@@ -1407,18 +1458,48 @@ function closeUsb2snesTools() {
   usb2snesToolsModalOpen.value = false;
 }
 
-async function testUsb2snesConnection() {
+async function connectUsb2snes() {
   usb2snesStatus.lastAttempt = new Date().toLocaleString();
   try {
-    // TODO: Implement actual USB2SNES connection test
-    // For now, just simulate a test
+    const library = usb2snesCurrentLibrary.value;
+    
+    // Check if library is not implemented yet
+    if (library === 'usb2snes_b' || library === 'qusb2snes' || library === 'node-usb') {
+      throw new Error(`${library} is not implemented yet. Only usb2snes_a is currently available.`);
+    }
+    
+    // TODO: Implement actual USB2SNES connection for usb2snes_a
+    // For now, just simulate a connection
     await new Promise(resolve => setTimeout(resolve, 500));
-    alert('USB2SNES connection test - to be implemented');
-    // usb2snesStatus.connected = true;
-    // usb2snesStatus.device = 'SD2SNES';
+    
+    // Simulate connection success (replace with actual implementation)
+    usb2snesStatus.connected = true;
+    usb2snesStatus.device = 'Simulated Device';
+    usb2snesStatus.firmwareVersion = 'N/A (not implemented)';
+    usb2snesStatus.versionString = 'N/A (not implemented)';
+    usb2snesStatus.romRunning = 'N/A (not implemented)';
+    usb2snesStatus.lastError = '';
+    
+    alert(`Connected using ${library}\n\nConnection implementation is pending.`);
   } catch (error) {
     usb2snesStatus.lastError = String(error);
     usb2snesStatus.connected = false;
+    alert(`Connection failed: ${error}`);
+  }
+}
+
+async function disconnectUsb2snes() {
+  try {
+    // TODO: Implement actual USB2SNES disconnection
+    usb2snesStatus.connected = false;
+    usb2snesStatus.device = '';
+    usb2snesStatus.firmwareVersion = '';
+    usb2snesStatus.versionString = '';
+    usb2snesStatus.romRunning = '';
+    alert('Disconnected from USB2SNES');
+  } catch (error) {
+    usb2snesStatus.lastError = String(error);
+    alert(`Disconnection error: ${error}`);
   }
 }
 
@@ -1430,6 +1511,9 @@ function clearUsb2snesErrors() {
 function resetUsb2snesConnection() {
   usb2snesStatus.connected = false;
   usb2snesStatus.device = '';
+  usb2snesStatus.firmwareVersion = '';
+  usb2snesStatus.versionString = '';
+  usb2snesStatus.romRunning = '';
   usb2snesStatus.lastError = '';
   usb2snesStatus.lastAttempt = '';
   alert('USB2SNES connection reset');
@@ -1641,6 +1725,7 @@ const settings = reactive({
   launchProgramArgs: '%file',
   usb2snesAddress: 'ws://localhost:64213',
   usb2snesEnabled: 'no' as 'yes' | 'no',
+  usb2snesLibrary: 'usb2snes_a' as 'usb2snes_a' | 'usb2snes_b' | 'qusb2snes' | 'node-usb',
   usb2snesLaunchPref: 'auto' as 'auto' | 'manual' | 'reset',
   usb2snesUploadPref: 'manual' as 'manual' | 'check' | 'always',
   usb2snesUploadDir: '/work',
@@ -4545,6 +4630,37 @@ button:disabled {
   color: var(--text-primary);
   font-size: var(--medium-font-size);
   font-weight: 600;
+}
+
+.usb2snes-library-select {
+  flex: 1;
+  padding: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: var(--small-font-size);
+}
+
+.usb2snes-library-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--small-font-size);
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
 }
 
 .status-row {
