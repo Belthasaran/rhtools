@@ -6,6 +6,44 @@ This document lists all interactive programs and utilities in the rhtools projec
 
 ## Main Programs
 
+### Electron App (electron/)
+**Purpose**: Multi-platform desktop GUI for browsing games, rating, and planning challenge runs
+
+**Usage**:
+```bash
+# Development mode
+cd electron
+./smart-start.sh
+
+# Or manually
+cd electron/renderer && npm run dev &
+cd /home/main/proj/rhtools && npx electron electron/main.js
+```
+
+**Features**:
+- Browse 3,168+ SMW ROM hacks from database
+- Triple rating system (Difficulty, Review, Skill Level)
+- Version management with version-specific annotations
+- Challenge run planning and execution
+- Settings persistence (ROMs, tools, launch config)
+
+**Key Files**:
+- `electron/main.js` - Main Electron process
+- `electron/renderer/src/App.vue` - Vue.js UI (1900+ lines)
+- `electron/database-manager.js` - Database connections
+- `electron/ipc-handlers.js` - IPC request handlers
+
+**Documentation**:
+- `docs/ELECTRON_APP_MASTER_REFERENCE.md` - **Complete technical reference (850+ lines)**
+- `docs/RUN_EXECUTION_IMPLEMENTATION.md` - Run execution system (Start, Cancel, Next, Skip)
+- `docs/ELECTRON_APP_QUICK_START.md` - User guide
+- `docs/ELECTRON_DATABASE_INTEGRATION_PLAN.md` - Integration architecture
+- `docs/ELECTRON_IPC_ARCHITECTURE.md` - IPC specifications
+- `docs/ENHANCED_RATINGS_AND_RUN_SYSTEM.md` - Rating + run system
+- `docs/CLIENTDATA_USER_ANNOTATIONS.md` - User annotation guide
+
+---
+
 ### updategames.js
 **Purpose**: Main script to update game database from SMWC
 
@@ -358,14 +396,27 @@ See `docs/DBMIGRATE.md` for detailed migration instructions.
 ## Documentation Reference
 
 ### Complete Documentation
+
+**Electron App**:
+- `docs/ELECTRON_APP_MASTER_REFERENCE.md` - **Complete technical reference (850+ lines)** - Covers gameversions table, run system, ratings, settings, UI, IPC, and everything needed for new developers/agents
+- `docs/ELECTRON_APP_QUICK_START.md` - User guide
+- `docs/ELECTRON_DATABASE_INTEGRATION_PLAN.md` - Integration architecture
+- `docs/ELECTRON_IPC_ARCHITECTURE.md` - IPC specifications
+- `docs/ENHANCED_RATINGS_AND_RUN_SYSTEM.md` - Rating + run system
+- `docs/CLIENTDATA_USER_ANNOTATIONS.md` - User annotation guide
+
+**Database & Schema**:
+- `docs/SCHEMACHANGES.md` - Database schema changes log
+- `docs/DBMIGRATE.md` - Migration commands
+- `docs/GAMEVERSIONS_TABLE_SCHEMA.md` - gameversions table documentation
+
+**Verification & Compatibility**:
 - `docs/VERIFICATION_TOOLS.md` - Verification scripts guide
 - `docs/UPDATEGAMES_DECODER_001.md` - Blob format troubleshooting
 - `docs/PYTHON_COMPATIBILITY_GUIDE.md` - Python integration
 - `docs/BLOB_COMPATIBILITY_SOLUTION.md` - Compatibility solution
 - `docs/VERIFY_RESULT_FEATURE.md` - Result verification
 - `docs/NEWER_THAN_FEATURE.md` - Incremental verification
-- `docs/SCHEMACHANGES.md` - Database schema changes log
-- `docs/DBMIGRATE.md` - Migration commands
 
 ### Testing Documentation
 - `tests/README_BLOB_TESTS.md` - Test suite documentation

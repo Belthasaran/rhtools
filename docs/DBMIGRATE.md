@@ -955,3 +955,98 @@ sqlite3 electron/clientdata.db "SELECT * FROM v_games_with_annotations LIMIT 1;"
 *Last Updated: October 12, 2025*  
 *Total Migrations: 9 (4 rhdata schema + 1 Phase 1 tables + 1 rhdata runexcluded + 3 clientdata)*
 *Status: ALL MIGRATIONS APPLIED AND TESTED ✅*
+
+
+## 2025-10-12: Apply Migration 004 - Fix run_results gameid NULL Constraint
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Fix the `run_results.gameid` column to allow NULL values for unresolved random game/stage challenges.
+
+### Command
+```bash
+sqlite3 electron/clientdata.db < electron/sql/migrations/004_clientdata_fix_run_results_gameid.sql
+```
+
+### Prerequisites
+- clientdata.db exists
+- Migrations 001-003 have been applied
+
+### Expected Outcome
+- `run_results.gameid` column now allows NULL values
+- Random challenges can be stored without gameid
+- Existing data preserved (if any)
+- Indexes recreated
+
+### Verification
+```bash
+# Check schema
+sqlite3 electron/clientdata.db "PRAGMA table_info(run_results);"
+
+# Look for gameid column - should NOT show 'NOT NULL' in notnull column
+# Column info: cid|name|type|notnull|dflt_value|pk
+# gameid should have notnull=0 (means nullable)
+
+# Test with a query
+sqlite3 electron/clientdata.db "SELECT gameid FROM run_results WHERE gameid IS NULL LIMIT 1;"
+# Should not error (means NULL is allowed)
+```
+
+### Important Notes
+- **Data Safety**: Migration preserves existing data via backup table
+- **Table Recreation**: SQLite requires full table recreation to modify constraints
+- **Indexes**: All indexes are recreated after table recreation
+- **Impact**: Enables run system to work with random challenges
+
+---
+
+
+
+## 2025-10-12: Apply Migration 006 - Add Seed Mappings Table
+
+### Date Added
+October 12, 2025
+
+### Purpose
+Add `seedmappings` table to support deterministic random game selection with seed mappings for competitive runs and run sharing.
+
+### Command
+```bash
+sqlite3 electron/clientdata.db < electron/sql/migrations/006_clientdata_seed_mappings.sql
+```
+
+### Prerequisites
+- clientdata.db exists
+- Migrations 001-005 have been applied
+
+### Expected Outcome
+- `seedmappings` table created
+- Ready for seed generation
+- No data populated yet (created on first use)
+
+### Verification
+```bash
+# Check table exists
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='table' AND name='seedmappings';"
+# Should output: seedmappings
+
+# Check schema
+sqlite3 electron/clientdata.db "PRAGMA table_info(seedmappings);"
+# Should show: mapid, mappingdata, game_count, mapping_hash, created_at, description
+
+# Check indexes
+sqlite3 electron/clientdata.db "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='seedmappings';"
+# Should show: idx_seedmappings_count, idx_seedmappings_created
+```
+
+### Important Notes
+- **Automatic Creation**: First mapping created automatically when generating first seed
+- **Game Snapshot**: Each mapping freezes list of candidate games at that time
+- **Immutable**: Once created, mappings don't change (ensures reproducibility)
+- **Import/Export**: Mappings are exported with runs for compatibility
+- **Seed Format**: Seeds have format "MAPID-SUFFIX" (e.g., "A7K9M-XyZ3q")
+
+---
+

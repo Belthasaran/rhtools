@@ -755,3 +755,108 @@ Scripts importing JSON data must exclude these fields.
 
 *Last Updated: October 12, 2025*  
 *Next Migration: TBD*
+
+
+## 2025-10-12: Fix run_results gameid NULL Constraint (clientdata.db - Migration 004)
+
+### Date
+October 12, 2025
+
+### Description
+Fixed the `run_results.gameid` column to allow NULL values for unresolved random challenges. Previously, the column had a NOT NULL constraint which caused failures when creating runs with random game/stage challenges that haven't been resolved yet.
+
+### Rationale
+- **Support Random Challenges**: Random game/stage challenges don't have a gameid until they are resolved at runtime
+- **Database Integrity**: Allows proper storage of pending random challenges
+- **Flexibility**: Permits name masking ("???") until challenge is attempted
+- **Consistency**: Aligns with run system design where random selections are resolved lazily
+
+### Tables/Columns Affected
+
+**Database**: `clientdata.db`
+
+**Modified Table**: `run_results`
+
+**Column Changed**:
+- `gameid VARCHAR(255)` - Changed from `NOT NULL` to nullable
+  - NULL value indicates an unresolved random challenge
+  - Non-NULL value indicates a specific or resolved challenge
+
+**Impact**:
+- Random game/stage challenges can now be properly stored in the database
+- `game_name` field stores "???" for masked/unresolved challenges
+- `was_random` flag indicates if challenge was randomly selected
+- `revealed_early` flag tracks if name was revealed before attempt
+
+### Data Type Changes
+No data type changes, only constraint modification (removed NOT NULL).
+
+### Migration Script
+`electron/sql/migrations/004_clientdata_fix_run_results_gameid.sql`
+
+**Method**: Table recreation (required for SQLite constraint changes)
+1. Backup existing data
+2. Drop old table
+3. Create new table with nullable gameid
+4. Restore data
+5. Recreate indexes
+
+**Safety**: Data is preserved via backup table during migration.
+
+---
+
+
+
+## 2025-10-12: Seed Mappings Table (clientdata.db - Migration 006)
+
+### Date
+October 12, 2025
+
+### Description
+Added `seedmappings` table to support deterministic random game selection across different installations. This enables reproducible random challenges for competitive runs and run sharing.
+
+### Rationale
+- **Reproducibility**: Same seed should select same games across different player installations
+- **Competitive Support**: Enable fair races with identical random challenges
+- **Game Snapshot**: Freeze available games at specific point in time
+- **Import/Export**: Share runs with seed compatibility validation
+- **Custom Challenges**: Allow players to create custom game lists for random selection
+
+### Tables/Columns Affected
+
+**Database**: `clientdata.db`
+
+**New Table**: `seedmappings`
+
+**Columns**:
+1. `mapid` (VARCHAR(20) PRIMARY KEY) - Mapping identifier (first 5 chars of seed, e.g., "A7K9M")
+2. `mappingdata` (TEXT NOT NULL) - JSON object mapping gameid to version for all candidate games
+3. `game_count` (INTEGER NOT NULL) - Number of games in this mapping
+4. `mapping_hash` (VARCHAR(64)) - SHA-256 hash of mappingdata for verification
+5. `created_at` (TIMESTAMP) - When mapping was created
+6. `description` (TEXT) - Optional description
+
+**Indexes**:
+- `idx_seedmappings_count` ON game_count DESC (find largest mapping)
+- `idx_seedmappings_created` ON created_at DESC (find newest mapping)
+
+### Data Type Changes
+None - new table only.
+
+### Impact
+- Enables deterministic random game selection
+- Seeds have format: "MAPID-SUFFIX" (e.g., "A7K9M-XyZ3q")
+- Same seed + same mapping = same game selections
+- Import validation ensures compatibility
+- Players can share runs and compete fairly
+
+### Migration Script
+`electron/sql/migrations/006_clientdata_seed_mappings.sql`
+
+### Related Systems
+- Run system: random_game and random_stage entry types
+- Export/Import: Run sharing with seed compatibility
+- Random selection: Deterministic algorithm using seed + challenge index
+
+---
+

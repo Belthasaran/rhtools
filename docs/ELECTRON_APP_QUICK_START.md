@@ -10,14 +10,23 @@
 
 ### Run the App (Development)
 
+**⚠️ IMPORTANT**: Run from ROOT directory (`/home/main/proj/rhtools`)
+
+**Option 1: One Command (Easiest)**
+```bash
+cd /home/main/proj/rhtools
+npm run app:dev
+```
+
+**Option 2: Manual (Two Terminals)**
 ```bash
 # Terminal 1: Start Vite dev server
-cd /home/main/proj/rhtools/electron/renderer
-npm run dev
+cd /home/main/proj/rhtools
+npm run renderer:dev
 
 # Terminal 2: Start Electron
-cd /home/main/proj/rhtools/electron
-npm start
+cd /home/main/proj/rhtools
+npm run electron:start
 ```
 
 The app will open showing **3,168 games** loaded from the database!
