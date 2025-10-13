@@ -543,6 +543,9 @@ function registerDatabaseHandlers(dbManager) {
       const db = dbManager.getConnection('clientdata');
       
       const transaction = db.transaction((runId) => {
+        // Clean up any existing run_results for this run (in case of previous failed attempt)
+        db.prepare(`DELETE FROM run_results WHERE run_uuid = ?`).run(runId);
+        
         // Update run status
         db.prepare(`
           UPDATE runs 
@@ -568,6 +571,8 @@ function registerDatabaseHandlers(dbManager) {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         `);
         
+        let resultSequence = 1;  // Unique sequence number for actual results
+        
         planEntries.forEach((planEntry) => {
           const count = planEntry.count || 1;
           const isRandom = planEntry.entry_type === 'random_game' || planEntry.entry_type === 'random_stage';
@@ -576,28 +581,28 @@ function registerDatabaseHandlers(dbManager) {
           for (let i = 0; i < count; i++) {
             const resultUuid = crypto.randomUUID();
             
-            // For random entries, mask name until attempted
+            // For random entries, mask name until attempted and leave gameid NULL
             let gameName = '???';
             let gameid = null;
             
             // For specific entries, use the gameid
             if (!isRandom) {
               gameid = planEntry.gameid;
-              // We'll fetch name from gameversions in a real implementation
-              gameName = planEntry.gameid; // Placeholder
+              // Placeholder - in full implementation, fetch actual name from gameversions
+              gameName = planEntry.gameid || 'Unknown';
             }
             
             insertStmt.run(
               resultUuid,
               runId,
               planEntry.entry_uuid,
-              planEntry.sequence_number,
-              gameid,
-              gameName,
-              planEntry.exit_number,
+              resultSequence++,  // Use unique sequence number for each result
+              gameid,  // NULL for random challenges
+              gameName,  // "???" for random challenges
+              planEntry.exit_number || null,
               planEntry.entry_type === 'stage' ? 'Stage' : null,
               isRandom ? 1 : 0,
-              planEntry.conditions
+              planEntry.conditions || null
             );
           }
         });
@@ -689,6 +694,43 @@ function registerDatabaseHandlers(dbManager) {
     } catch (error) {
       console.error('Error cancelling run:', error);
       return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Get run results (expanded challenges)
+   * Channel: db:runs:get-results
+   */
+  ipcMain.handle('db:runs:get-results', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      const results = db.prepare(`
+        SELECT 
+          result_uuid,
+          run_uuid,
+          plan_entry_uuid,
+          sequence_number,
+          gameid,
+          game_name,
+          exit_number,
+          stage_description,
+          was_random,
+          revealed_early,
+          status,
+          started_at,
+          completed_at,
+          duration_seconds,
+          conditions
+        FROM run_results
+        WHERE run_uuid = ?
+        ORDER BY sequence_number
+      `).all(runUuid);
+      
+      return results;
+    } catch (error) {
+      console.error('Error getting run results:', error);
+      throw error;
     }
   });
 

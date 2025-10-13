@@ -299,6 +299,7 @@
           <template v-if="isRunActive">
             <span class="run-timer">⏱ {{ formatTime(runElapsedSeconds) }}</span>
             <span class="run-progress">Challenge {{ currentChallengeIndex + 1 }} / {{ runEntries.length }}</span>
+            <button @click="undoChallenge" :disabled="!canUndo" class="btn-back">↶ Back</button>
             <button @click="nextChallenge" :disabled="!currentChallenge" class="btn-next">✓ Done</button>
             <button @click="skipChallenge" :disabled="!currentChallenge" class="btn-skip">⏭ Skip</button>
             <button @click="cancelRun" class="btn-cancel-run">✕ Cancel Run</button>
@@ -357,6 +358,8 @@
                   <input type="checkbox" :checked="allRunChecked" @change="toggleCheckAllRun($event)" />
                 </th>
                 <th class="col-seq">#</th>
+                <th v-if="isRunActive" class="col-status">Status</th>
+                <th v-if="isRunActive" class="col-duration">Time</th>
                 <th class="col-actions">Actions</th>
                 <th>ID</th>
                 <th>Entry Type</th>
@@ -389,6 +392,12 @@
                   <input type="checkbox" :checked="checkedRun.has(entry.key)" @change="toggleRunEntrySelection(entry.key, $event)" :disabled="isRunActive" />
                 </td>
                 <td class="col-seq">{{ idx + 1 }}</td>
+                <td v-if="isRunActive" class="col-status" :class="getChallengeStatusClass(idx)">
+                  <span class="status-icon">{{ getChallengeStatusIcon(idx) }}</span>
+                </td>
+                <td v-if="isRunActive" class="col-duration">
+                  {{ getChallengeDuration(idx) }}
+                </td>
                 <td class="col-actions">
                   <button class="btn-mini" @click="moveRowUp(idx)" :disabled="isRunActive || idx === 0" title="Move up">↑</button>
                   <button class="btn-mini" @click="moveRowDown(idx)" :disabled="isRunActive || idx === runEntries.length - 1" title="Move down">↓</button>
@@ -1171,6 +1180,16 @@ const runStartTime = ref<number | null>(null);
 const runElapsedSeconds = ref<number>(0);
 const runTimerInterval = ref<number | null>(null);
 
+// Challenge results tracking
+type ChallengeResult = {
+  index: number;
+  status: 'pending' | 'success' | 'skipped' | 'ok';
+  durationSeconds: number;
+  revealedEarly: boolean;
+};
+const challengeResults = ref<ChallengeResult[]>([]);
+const undoStack = ref<ChallengeResult[]>([]);
+
 // Run name input modal
 const runNameModalOpen = ref(false);
 const runNameInput = ref<string>('My Challenge Run');
@@ -1183,6 +1202,7 @@ const currentChallenge = computed(() => {
   if (!isRunActive.value || currentChallengeIndex.value >= runEntries.length) return null;
   return runEntries[currentChallengeIndex.value];
 });
+const canUndo = computed(() => undoStack.value.length > 0);
 
 function openRunModal() {
   if (!randomFilter.seed) randomFilter.seed = Math.random().toString(36).slice(2, 10);
@@ -1424,7 +1444,7 @@ async function startRun() {
   
   const confirmed = confirm(
     `Start run "${currentRunName.value}"?\n\n` +
-    `${runEntries.length} challenges\n` +
+    `${runEntries.length} plan entries\n` +
     `Global conditions: ${globalRunConditions.value.length > 0 ? globalRunConditions.value.join(', ') : 'None'}\n\n` +
     `Once started, the run cannot be edited.`
   );
@@ -1437,19 +1457,70 @@ async function startRun() {
     });
     
     if (result.success) {
+      // Fetch the expanded run results from database
+      const expandedResults = await (window as any).electronAPI.getRunResults({
+        runUuid: currentRunUuid.value
+      });
+      
+      if (!expandedResults || expandedResults.length === 0) {
+        alert('Failed to load run results');
+        return;
+      }
+      
+      // Replace runEntries with expanded results
+      runEntries.length = 0;  // Clear array
+      expandedResults.forEach((res: any) => {
+        runEntries.push({
+          key: res.result_uuid,
+          id: res.gameid || '(random)',
+          entryType: res.was_random ? 'random_game' : 'game',
+          name: res.game_name || '???',
+          stageNumber: res.exit_number,
+          stageName: res.stage_description,
+          count: 1,  // Each result is now a single challenge
+          isLocked: true,  // All entries locked during active run
+          conditions: JSON.parse(res.conditions || '[]')
+        });
+      });
+      
       currentRunStatus.value = 'active';
       currentChallengeIndex.value = 0;
       runStartTime.value = Date.now();
       runElapsedSeconds.value = 0;
       
+      // Initialize challenge results tracking
+      challengeResults.value = runEntries.map((_, idx) => ({
+        index: idx,
+        status: 'pending',
+        durationSeconds: 0,
+        revealedEarly: false
+      }));
+      undoStack.value = [];
+      
+      // Start timer for first challenge
+      if (challengeResults.value.length > 0) {
+        challengeResults.value[0].durationSeconds = 0;
+      }
+      
       // Start timer
       runTimerInterval.value = window.setInterval(() => {
         if (runStartTime.value) {
           runElapsedSeconds.value = Math.floor((Date.now() - runStartTime.value) / 1000);
+          // Update current challenge duration
+          if (currentChallengeIndex.value < challengeResults.value.length) {
+            const current = challengeResults.value[currentChallengeIndex.value];
+            if (current.status === 'pending') {
+              // Calculate duration since this challenge started
+              const prevDuration = challengeResults.value
+                .slice(0, currentChallengeIndex.value)
+                .reduce((sum, r) => sum + r.durationSeconds, 0);
+              current.durationSeconds = runElapsedSeconds.value - prevDuration;
+            }
+          }
         }
       }, 1000);
       
-      console.log('Run started');
+      console.log(`Run started with ${runEntries.length} challenges`);
     } else {
       alert('Failed to start run: ' + result.error);
     }
@@ -1493,20 +1564,38 @@ async function cancelRun() {
 async function nextChallenge() {
   if (!currentChallenge.value) return;
   
+  const idx = currentChallengeIndex.value;
+  const result = challengeResults.value[idx];
+  
+  // Save current state to undo stack
+  undoStack.value.push({
+    index: idx,
+    status: result.status,
+    durationSeconds: result.durationSeconds,
+    revealedEarly: result.revealedEarly
+  });
+  
+  // Mark as success
+  result.status = 'success';
+  
   try {
     if (isElectronAvailable()) {
       await (window as any).electronAPI.recordChallengeResult({
         runUuid: currentRunUuid.value,
-        challengeIndex: currentChallengeIndex.value,
+        challengeIndex: idx,
         status: 'success'
       });
     }
     
-    console.log(`Challenge ${currentChallengeIndex.value + 1} completed`);
+    console.log(`Challenge ${idx + 1} completed`);
     
     // Move to next challenge
-    if (currentChallengeIndex.value < runEntries.length - 1) {
+    if (idx < runEntries.length - 1) {
       currentChallengeIndex.value++;
+      // Start timing next challenge
+      if (idx + 1 < challengeResults.value.length) {
+        challengeResults.value[idx + 1].durationSeconds = 0;
+      }
     } else {
       // Run completed
       completeRun();
@@ -1523,20 +1612,44 @@ async function skipChallenge() {
   const confirmed = confirm(`Skip challenge ${currentChallengeIndex.value + 1}?`);
   if (!confirmed) return;
   
+  const idx = currentChallengeIndex.value;
+  const result = challengeResults.value[idx];
+  
+  // Check if this is a random challenge - mark as revealed early
+  const entry = runEntries[idx];
+  if (entry.entryType === 'random_game' || entry.entryType === 'random_stage') {
+    result.revealedEarly = true;
+  }
+  
+  // Save current state to undo stack
+  undoStack.value.push({
+    index: idx,
+    status: result.status,
+    durationSeconds: result.durationSeconds,
+    revealedEarly: result.revealedEarly
+  });
+  
+  // Mark as skipped
+  result.status = 'skipped';
+  
   try {
     if (isElectronAvailable()) {
       await (window as any).electronAPI.recordChallengeResult({
         runUuid: currentRunUuid.value,
-        challengeIndex: currentChallengeIndex.value,
+        challengeIndex: idx,
         status: 'skipped'
       });
     }
     
-    console.log(`Challenge ${currentChallengeIndex.value + 1} skipped`);
+    console.log(`Challenge ${idx + 1} skipped`);
     
     // Move to next challenge
-    if (currentChallengeIndex.value < runEntries.length - 1) {
+    if (idx < runEntries.length - 1) {
       currentChallengeIndex.value++;
+      // Start timing next challenge
+      if (idx + 1 < challengeResults.value.length) {
+        challengeResults.value[idx + 1].durationSeconds = 0;
+      }
     } else {
       // Run completed
       completeRun();
@@ -1544,6 +1657,35 @@ async function skipChallenge() {
   } catch (error) {
     console.error('Error recording skip:', error);
     alert('Error recording skip');
+  }
+}
+
+async function undoChallenge() {
+  if (undoStack.value.length === 0) return;
+  
+  const previousState = undoStack.value.pop()!;
+  const idx = previousState.index;
+  
+  // Restore previous state
+  challengeResults.value[idx] = { ...previousState };
+  
+  // Go back to that challenge
+  currentChallengeIndex.value = idx;
+  
+  try {
+    if (isElectronAvailable()) {
+      // Undo the database record
+      await (window as any).electronAPI.recordChallengeResult({
+        runUuid: currentRunUuid.value,
+        challengeIndex: idx,
+        status: 'pending'  // Reset to pending
+      });
+    }
+    
+    console.log(`Undone: Challenge ${idx + 1} back to pending`);
+  } catch (error) {
+    console.error('Error undoing challenge:', error);
+    alert('Error undoing challenge');
   }
 }
 
@@ -1577,6 +1719,51 @@ function formatTime(seconds: number): string {
   } else {
     return `${s}s`;
   }
+}
+
+function getChallengeStatusIcon(index: number): string {
+  if (index >= challengeResults.value.length) return '';
+  const result = challengeResults.value[index];
+  
+  switch (result.status) {
+    case 'success':
+      return '✓';  // Green checkmark
+    case 'ok':
+      return '✓';  // Green checkmark (but maybe different styling)
+    case 'skipped':
+      return '✗';  // Red X
+    case 'pending':
+    default:
+      return '';
+  }
+}
+
+function getChallengeStatusClass(index: number): string {
+  if (index >= challengeResults.value.length) return '';
+  const result = challengeResults.value[index];
+  
+  switch (result.status) {
+    case 'success':
+      return 'status-success';
+    case 'ok':
+      return 'status-ok';
+    case 'skipped':
+      return 'status-skipped';
+    case 'pending':
+    default:
+      return '';
+  }
+}
+
+function getChallengeDuration(index: number): string {
+  if (index >= challengeResults.value.length) return '';
+  const result = challengeResults.value[index];
+  
+  // Only show duration for current and completed challenges
+  if (index > currentChallengeIndex.value) return '';
+  if (result.durationSeconds === 0 && result.status === 'pending') return '';
+  
+  return formatTime(result.durationSeconds);
 }
 
 // Helper: Check if entry is random type
@@ -2118,6 +2305,9 @@ button { padding: 6px 10px; }
 .btn-start-run:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
 .btn-cancel-run { background: #ef4444; color: white; }
 .btn-cancel-run:hover { background: #dc2626; }
+.btn-back { background: #6b7280; color: white; }
+.btn-back:hover:not(:disabled) { background: #4b5563; }
+.btn-back:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
 .btn-next { background: #10b981; color: white; }
 .btn-next:hover:not(:disabled) { background: #059669; }
 .btn-skip { background: #f59e0b; color: white; }
@@ -2126,6 +2316,14 @@ button { padding: 6px 10px; }
 .run-progress { color: #6b7280; padding: 0 8px; }
 .data-table tbody tr.current-challenge { background: #dbeafe !important; border-left: 4px solid #3b82f6; font-weight: 600; }
 .data-table tbody tr.current-challenge td { background: #dbeafe; }
+
+/* Challenge status */
+.col-status { width: 50px; text-align: center; font-size: 20px; }
+.col-duration { width: 80px; text-align: right; font-family: monospace; }
+.status-icon { font-weight: bold; }
+.status-success .status-icon { color: #10b981; }
+.status-ok .status-icon { color: #10b981; opacity: 0.7; }
+.status-skipped .status-icon { color: #ef4444; }
 
 /* Settings Modal */
 .settings-modal { width: 800px; max-width: 95vw; }

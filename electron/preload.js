@@ -145,4 +145,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * @returns {Promise<{success: boolean}>}
    */
   cancelRun: (params) => ipcRenderer.invoke('db:runs:cancel', params),
+  
+  /**
+   * Get run results (expanded challenges)
+   * @param {Object} params - {runUuid: string}
+   * @returns {Promise<Array>} Array of run results
+   */
+  getRunResults: (params) => ipcRenderer.invoke('db:runs:get-results', params),
 });
