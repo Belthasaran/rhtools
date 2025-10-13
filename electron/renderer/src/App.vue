@@ -553,8 +553,18 @@
           <div class="setting-row">
             <label class="setting-label">Launch Program</label>
             <div class="setting-control">
-              <input type="text" v-model="settings.launchProgram" placeholder="Path to launch program" />
+              <div 
+                class="drop-zone"
+                @dragover.prevent
+                @drop.prevent="handleLaunchProgramDrop"
+              >
+                Drag program file here
+              </div>
+              <button @click="browseLaunchProgram">Browse</button>
             </div>
+          </div>
+          <div v-if="settings.launchProgram" class="setting-current-path">
+            Current: <code>{{ settings.launchProgram }}</code>
           </div>
         </div>
 
@@ -1229,6 +1239,16 @@ async function handleAsarDrop(e: DragEvent) {
   }
 }
 
+async function handleLaunchProgramDrop(e: DragEvent) {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    const filePath = files[0].path;
+    settings.launchProgram = filePath;
+    console.log('✓ Launch program path set:', filePath);
+  }
+}
+
 async function browseAsarFile() {
   if (!isElectronAvailable()) {
     alert('File selection requires Electron environment');
@@ -1251,6 +1271,32 @@ async function browseAsarFile() {
   } catch (error: any) {
     console.error('Error browsing ASAR file:', error);
     alert('Error selecting ASAR file: ' + error.message);
+  }
+}
+
+async function browseLaunchProgram() {
+  if (!isElectronAvailable()) {
+    alert('File selection requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.selectFile({
+      title: 'Select Launch Program',
+      filters: [
+        { name: 'Executable Files', extensions: ['exe', 'sh', 'bat', 'cmd', '*'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.success && result.filePath) {
+      settings.launchProgram = result.filePath;
+      console.log('✓ Launch program path set:', result.filePath);
+    }
+  } catch (error: any) {
+    console.error('Error browsing launch program:', error);
+    alert('Error selecting launch program: ' + error.message);
   }
 }
 
