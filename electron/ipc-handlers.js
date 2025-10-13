@@ -7,7 +7,9 @@
 
 const { ipcMain } = require('electron');
 const crypto = require('crypto');
+const { app } = require('electron');
 const seedManager = require('./seed-manager');
+const gameStager = require('./game-stager');
 
 /**
  * Register all IPC handlers with the database manager
@@ -770,6 +772,159 @@ function registerDatabaseHandlers(dbManager) {
     } catch (error) {
       console.error('Error getting run results:', error);
       throw error;
+    }
+  });
+
+  /**
+   * Get active run (for startup check)
+   * Channel: db:runs:get-active
+   */
+  ipcMain.handle('db:runs:get-active', async (event) => {
+    try {
+      const activeRun = gameStager.getActiveRun(dbManager);
+      
+      if (!activeRun) {
+        return null;
+      }
+      
+      // Calculate elapsed time
+      const elapsedSeconds = gameStager.calculateRunElapsed(activeRun);
+      const isPaused = gameStager.isRunPaused(activeRun);
+      
+      return {
+        ...activeRun,
+        elapsedSeconds,
+        isPaused
+      };
+    } catch (error) {
+      console.error('Error getting active run:', error);
+      return null;
+    }
+  });
+
+  /**
+   * Pause a run
+   * Channel: db:runs:pause
+   */
+  ipcMain.handle('db:runs:pause', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      // Set pause_start for run
+      db.prepare(`
+        UPDATE runs
+        SET pause_start = CURRENT_TIMESTAMP,
+            pause_end = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE run_uuid = ? AND status = 'active'
+      `).run(runUuid);
+      
+      // Get current challenge index and set pause_start for it
+      const currentResult = db.prepare(`
+        SELECT result_uuid FROM run_results
+        WHERE run_uuid = ? AND status = 'pending'
+        ORDER BY sequence_number
+        LIMIT 1
+      `).get(runUuid);
+      
+      if (currentResult) {
+        db.prepare(`
+          UPDATE run_results
+          SET pause_start = CURRENT_TIMESTAMP,
+              pause_end = NULL
+          WHERE result_uuid = ?
+        `).run(currentResult.result_uuid);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error pausing run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Unpause a run
+   * Channel: db:runs:unpause
+   */
+  ipcMain.handle('db:runs:unpause', async (event, { runUuid }) => {
+    try {
+      const db = dbManager.getConnection('clientdata');
+      
+      // Calculate pause duration for run
+      const run = db.prepare(`SELECT pause_start, pause_seconds FROM runs WHERE run_uuid = ?`).get(runUuid);
+      
+      if (run && run.pause_start) {
+        const pauseStart = new Date(run.pause_start).getTime();
+        const pauseDuration = Math.floor((Date.now() - pauseStart) / 1000);
+        const totalPaused = (run.pause_seconds || 0) + pauseDuration;
+        
+        // Update run
+        db.prepare(`
+          UPDATE runs
+          SET pause_seconds = ?,
+              pause_start = NULL,
+              pause_end = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE run_uuid = ?
+        `).run(totalPaused, runUuid);
+      }
+      
+      // Calculate pause duration for current challenge
+      const currentResult = db.prepare(`
+        SELECT result_uuid, pause_start, pause_seconds 
+        FROM run_results
+        WHERE run_uuid = ? AND status = 'pending'
+        ORDER BY sequence_number
+        LIMIT 1
+      `).get(runUuid);
+      
+      if (currentResult && currentResult.pause_start) {
+        const pauseStart = new Date(currentResult.pause_start).getTime();
+        const pauseDuration = Math.floor((Date.now() - pauseStart) / 1000);
+        const totalPaused = (currentResult.pause_seconds || 0) + pauseDuration;
+        
+        db.prepare(`
+          UPDATE run_results
+          SET pause_seconds = ?,
+              pause_start = NULL,
+              pause_end = CURRENT_TIMESTAMP
+          WHERE result_uuid = ?
+        `).run(totalPaused, currentResult.result_uuid);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error unpausing run:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Stage run games (create SFC files)
+   * Channel: db:runs:stage-games
+   */
+  ipcMain.handle('db:runs:stage-games', async (event, { runUuid, expandedResults, vanillaRomPath, flipsPath }) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      
+      const result = await gameStager.stageRunGames({
+        dbManager,
+        runUuid,
+        expandedResults,
+        userDataPath,
+        vanillaRomPath,
+        flipsPath,
+        onProgress: (current, total, gameName) => {
+          // Send progress updates to renderer
+          event.sender.send('staging-progress', { current, total, gameName });
+        }
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error staging games:', error);
+      return { success: false, error: error.message };
     }
   });
 

@@ -160,6 +160,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   revealChallenge: (params) => ipcRenderer.invoke('db:runs:reveal-challenge', params),
   
+  /**
+   * Get active run (for startup check)
+   * @returns {Promise<Object|null>} Active run with calculated elapsed time
+   */
+  getActiveRun: () => ipcRenderer.invoke('db:runs:get-active'),
+  
+  /**
+   * Pause a run
+   * @param {string} runUuid - Run UUID
+   * @returns {Promise<{success: boolean}>}
+   */
+  pauseRun: (runUuid) => ipcRenderer.invoke('db:runs:pause', { runUuid }),
+  
+  /**
+   * Unpause a run
+   * @param {string} runUuid - Run UUID
+   * @returns {Promise<{success: boolean}>}
+   */
+  unpauseRun: (runUuid) => ipcRenderer.invoke('db:runs:unpause', { runUuid }),
+  
+  /**
+   * Stage run games (create SFC files)
+   * @param {Object} params - {runUuid, expandedResults, vanillaRomPath, flipsPath}
+   * @returns {Promise<{success: boolean, stagingFolder?: string, error?: string}>}
+   */
+  stageRunGames: (params) => ipcRenderer.invoke('db:runs:stage-games', params),
+  
   // =============================
   // Seed Management
   // =============================
