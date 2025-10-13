@@ -1343,6 +1343,147 @@ function registerDatabaseHandlers(dbManager) {
     }
   });
 
+  // ===========================================================================
+  // File Selection and Validation
+  // ===========================================================================
+
+  /**
+   * Open file selection dialog
+   * Channel: file:select
+   */
+  ipcMain.handle('file:select', async (event, options) => {
+    try {
+      const { dialog, BrowserWindow } = require('electron');
+      const result = await dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), options);
+      
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      
+      return { success: true, filePath: result.filePaths[0] };
+    } catch (error) {
+      console.error('Error selecting file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Validate ROM file (SHA-224 hash check)
+   * Channel: file:validate-rom
+   */
+  ipcMain.handle('file:validate-rom', async (event, { filePath }) => {
+    try {
+      const fs = require('fs');
+      const crypto = require('crypto');
+      
+      if (!fs.existsSync(filePath)) {
+        return { valid: false, error: 'File not found' };
+      }
+      
+      // Expected SHA-224 hash for valid SMW ROM
+      const EXPECTED_SHA224 = 'fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08';
+      
+      // Calculate SHA-224 hash
+      const fileBuffer = fs.readFileSync(filePath);
+      const hash = crypto.createHash('sha224').update(fileBuffer).digest('hex');
+      
+      if (hash === EXPECTED_SHA224) {
+        return { valid: true, hash, filePath };
+      } else {
+        return { valid: false, error: `Invalid ROM hash. Expected: ${EXPECTED_SHA224}, Got: ${hash}` };
+      }
+    } catch (error) {
+      console.error('Error validating ROM:', error);
+      return { valid: false, error: error.message };
+    }
+  });
+
+  /**
+   * Validate FLIPS executable
+   * Channel: file:validate-flips
+   */
+  ipcMain.handle('file:validate-flips', async (event, { filePath }) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      if (!fs.existsSync(filePath)) {
+        return { valid: false, error: 'File not found' };
+      }
+      
+      // Check if file is executable (Unix) or has .exe extension (Windows)
+      const stats = fs.statSync(filePath);
+      const isExecutable = (stats.mode & 0o111) !== 0 || path.extname(filePath).toLowerCase() === '.exe';
+      
+      if (!isExecutable) {
+        return { valid: false, error: 'File is not executable' };
+      }
+      
+      // Basic validation - check if file exists and is executable
+      // More advanced validation would require actually running it
+      return { valid: true, filePath };
+    } catch (error) {
+      console.error('Error validating FLIPS:', error);
+      return { valid: false, error: error.message };
+    }
+  });
+
+  /**
+   * Validate ASAR executable
+   * Channel: file:validate-asar
+   */
+  ipcMain.handle('file:validate-asar', async (event, { filePath }) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      if (!fs.existsSync(filePath)) {
+        return { valid: false, error: 'File not found' };
+      }
+      
+      // Check if file is executable
+      const stats = fs.statSync(filePath);
+      const isExecutable = (stats.mode & 0o111) !== 0 || path.extname(filePath).toLowerCase() === '.exe';
+      
+      if (!isExecutable) {
+        return { valid: false, error: 'File is not executable' };
+      }
+      
+      return { valid: true, filePath };
+    } catch (error) {
+      console.error('Error validating ASAR:', error);
+      return { valid: false, error: error.message };
+    }
+  });
+
+  /**
+   * Validate UberASM executable
+   * Channel: file:validate-uberasm
+   */
+  ipcMain.handle('file:validate-uberasm', async (event, { filePath }) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      if (!fs.existsSync(filePath)) {
+        return { valid: false, error: 'File not found' };
+      }
+      
+      // Check if file is executable
+      const stats = fs.statSync(filePath);
+      const isExecutable = (stats.mode & 0o111) !== 0 || path.extname(filePath).toLowerCase() === '.exe';
+      
+      if (!isExecutable) {
+        return { valid: false, error: 'File is not executable' };
+      }
+      
+      return { valid: true, filePath };
+    } catch (error) {
+      console.error('Error validating UberASM:', error);
+      return { valid: false, error: error.message };
+    }
+  });
+
   console.log('IPC handlers registered successfully');
 }
 

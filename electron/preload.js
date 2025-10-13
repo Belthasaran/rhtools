@@ -251,5 +251,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   shell: {
     openPath: (path) => ipcRenderer.invoke('shell:open-path', path)
-  }
+  },
+  
+  /**
+   * File selection and validation
+   */
+  selectFile: (options) => ipcRenderer.invoke('file:select', options),
+  validateRomFile: (filePath) => ipcRenderer.invoke('file:validate-rom', { filePath }),
+  validateFlipsFile: (filePath) => ipcRenderer.invoke('file:validate-flips', { filePath }),
+  validateAsarFile: (filePath) => ipcRenderer.invoke('file:validate-asar', { filePath }),
+  validateUberAsmFile: (filePath) => ipcRenderer.invoke('file:validate-uberasm', { filePath }),
 });

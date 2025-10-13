@@ -501,6 +501,9 @@
               <button @click="browseRomFile">Browse</button>
             </div>
           </div>
+          <div v-if="settings.vanillaRomPath" class="setting-current-path">
+            Current: <code>{{ settings.vanillaRomPath }}</code>
+          </div>
           <div class="setting-caption">
             You must have a legally-obtained SMW SFC file that you are authorized to play with, required to proceed.<br>
             The acceptable file has a sha224 sum of <code>fdc4c00e09a8e08d395003e9c8a747f45a9e5e94cbfedc508458eb08</code><br>
@@ -524,6 +527,9 @@
               </div>
               <button @click="browseFlipsFile">Browse</button>
             </div>
+          </div>
+          <div v-if="settings.flipsPath" class="setting-current-path">
+            Current: <code>{{ settings.flipsPath }}</code>
           </div>
           <div class="setting-caption">
             Floating IPS <a href="https://www.gamebrew.org/wiki/Floating_IPS" target="_blank">https://www.gamebrew.org/wiki/Floating_IPS</a>
@@ -637,6 +643,9 @@
               <button @click="browseAsarFile">Browse</button>
             </div>
           </div>
+          <div v-if="settings.asarPath" class="setting-current-path">
+            Current: <code>{{ settings.asarPath }}</code>
+          </div>
           <div class="setting-caption">
             Download ASAR from <a href="https://smwc.me/s/37443" target="_blank">https://smwc.me/s/37443</a>
           </div>
@@ -658,6 +667,9 @@
               </div>
               <button @click="browseUberAsmFile">Browse</button>
             </div>
+          </div>
+          <div v-if="settings.uberAsmPath" class="setting-current-path">
+            Current: <code>{{ settings.uberAsmPath }}</code>
           </div>
           <div class="setting-caption">
             Download UberASM from <a href="https://smwc.me/s/39036" target="_blank">https://smwc.me/s/39036</a>
@@ -1064,9 +1076,13 @@ async function saveSettings() {
   try {
     // Convert settings to object with string values
     const settingsToSave = {
+      vanillaRomPath: settings.vanillaRomPath,
       vanillaRomValid: String(settings.vanillaRomValid),
+      flipsPath: settings.flipsPath,
       flipsValid: String(settings.flipsValid),
+      asarPath: settings.asarPath,
       asarValid: String(settings.asarValid),
+      uberAsmPath: settings.uberAsmPath,
       uberAsmValid: String(settings.uberAsmValid),
       launchMethod: settings.launchMethod,
       launchProgram: settings.launchProgram,
@@ -1093,61 +1109,225 @@ async function saveSettings() {
   closeSettings();
 }
 
-// File import handlers (placeholders for IPC integration)
-function handleRomDrop(e: DragEvent) {
+// File import handlers
+async function handleRomDrop(e: DragEvent) {
   e.preventDefault();
   const files = e.dataTransfer?.files;
   if (files && files.length > 0) {
-    console.log('ROM file dropped:', files[0].name);
-    // TODO: Validate and import via IPC
+    const filePath = files[0].path;
+    await validateAndSetRom(filePath);
   }
 }
 
-function browseRomFile() {
-  console.log('Browse ROM file');
-  // TODO: Open file picker via IPC
+async function browseRomFile() {
+  if (!isElectronAvailable()) {
+    alert('File selection requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.selectFile({
+      title: 'Select Vanilla SMW ROM',
+      filters: [
+        { name: 'SNES ROM Files', extensions: ['sfc', 'smc'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.success && result.filePath) {
+      await validateAndSetRom(result.filePath);
+    }
+  } catch (error: any) {
+    console.error('Error browsing ROM file:', error);
+    alert('Error selecting ROM file: ' + error.message);
+  }
 }
 
-function handleFlipsDrop(e: DragEvent) {
+async function validateAndSetRom(filePath: string) {
+  if (!isElectronAvailable()) return;
+  
+  try {
+    const validation = await (window as any).electronAPI.validateRomFile(filePath);
+    
+    if (validation.valid) {
+      settings.vanillaRomPath = filePath;
+      settings.vanillaRomValid = true;
+      console.log('✓ Valid ROM file set:', filePath);
+    } else {
+      settings.vanillaRomValid = false;
+      alert('Invalid ROM file: ' + validation.error);
+    }
+  } catch (error: any) {
+    console.error('Error validating ROM:', error);
+    settings.vanillaRomValid = false;
+    alert('Error validating ROM: ' + error.message);
+  }
+}
+
+async function handleFlipsDrop(e: DragEvent) {
   e.preventDefault();
   const files = e.dataTransfer?.files;
   if (files && files.length > 0) {
-    console.log('FLIPS file dropped:', files[0].name);
-    // TODO: Import via IPC
+    const filePath = files[0].path;
+    await validateAndSetFlips(filePath);
   }
 }
 
-function browseFlipsFile() {
-  console.log('Browse FLIPS file');
-  // TODO: Open file picker via IPC
+async function browseFlipsFile() {
+  if (!isElectronAvailable()) {
+    alert('File selection requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.selectFile({
+      title: 'Select FLIPS Executable',
+      filters: [
+        { name: 'Executable Files', extensions: ['exe', '*'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.success && result.filePath) {
+      await validateAndSetFlips(result.filePath);
+    }
+  } catch (error: any) {
+    console.error('Error browsing FLIPS file:', error);
+    alert('Error selecting FLIPS file: ' + error.message);
+  }
 }
 
-function handleAsarDrop(e: DragEvent) {
+async function validateAndSetFlips(filePath: string) {
+  if (!isElectronAvailable()) return;
+  
+  try {
+    const validation = await (window as any).electronAPI.validateFlipsFile(filePath);
+    
+    if (validation.valid) {
+      settings.flipsPath = filePath;
+      settings.flipsValid = true;
+      console.log('✓ Valid FLIPS file set:', filePath);
+    } else {
+      settings.flipsValid = false;
+      alert('Invalid FLIPS file: ' + validation.error);
+    }
+  } catch (error: any) {
+    console.error('Error validating FLIPS:', error);
+    settings.flipsValid = false;
+    alert('Error validating FLIPS: ' + error.message);
+  }
+}
+
+async function handleAsarDrop(e: DragEvent) {
   e.preventDefault();
   const files = e.dataTransfer?.files;
   if (files && files.length > 0) {
-    console.log('ASAR file dropped:', files[0].name);
-    // TODO: Import via IPC
+    const filePath = files[0].path;
+    await validateAndSetAsar(filePath);
   }
 }
 
-function browseAsarFile() {
-  console.log('Browse ASAR file');
-  // TODO: Open file picker via IPC
+async function browseAsarFile() {
+  if (!isElectronAvailable()) {
+    alert('File selection requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.selectFile({
+      title: 'Select ASAR Executable',
+      filters: [
+        { name: 'Executable Files', extensions: ['exe', '*'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.success && result.filePath) {
+      await validateAndSetAsar(result.filePath);
+    }
+  } catch (error: any) {
+    console.error('Error browsing ASAR file:', error);
+    alert('Error selecting ASAR file: ' + error.message);
+  }
 }
 
-function handleUberAsmDrop(e: DragEvent) {
+async function validateAndSetAsar(filePath: string) {
+  if (!isElectronAvailable()) return;
+  
+  try {
+    const validation = await (window as any).electronAPI.validateAsarFile(filePath);
+    
+    if (validation.valid) {
+      settings.asarPath = filePath;
+      settings.asarValid = true;
+      console.log('✓ Valid ASAR file set:', filePath);
+    } else {
+      settings.asarValid = false;
+      alert('Invalid ASAR file: ' + validation.error);
+    }
+  } catch (error: any) {
+    console.error('Error validating ASAR:', error);
+    settings.asarValid = false;
+    alert('Error validating ASAR: ' + error.message);
+  }
+}
+
+async function handleUberAsmDrop(e: DragEvent) {
   e.preventDefault();
   const files = e.dataTransfer?.files;
   if (files && files.length > 0) {
-    console.log('UberASM file dropped:', files[0].name);
-    // TODO: Import via IPC
+    const filePath = files[0].path;
+    await validateAndSetUberAsm(filePath);
   }
 }
 
-function browseUberAsmFile() {
-  console.log('Browse UberASM file');
-  // TODO: Open file picker via IPC
+async function browseUberAsmFile() {
+  if (!isElectronAvailable()) {
+    alert('File selection requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.selectFile({
+      title: 'Select UberASM Executable',
+      filters: [
+        { name: 'Executable Files', extensions: ['exe', '*'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.success && result.filePath) {
+      await validateAndSetUberAsm(result.filePath);
+    }
+  } catch (error: any) {
+    console.error('Error browsing UberASM file:', error);
+    alert('Error selecting UberASM file: ' + error.message);
+  }
+}
+
+async function validateAndSetUberAsm(filePath: string) {
+  if (!isElectronAvailable()) return;
+  
+  try {
+    const validation = await (window as any).electronAPI.validateUberAsmFile(filePath);
+    
+    if (validation.valid) {
+      settings.uberAsmPath = filePath;
+      settings.uberAsmValid = true;
+      console.log('✓ Valid UberASM file set:', filePath);
+    } else {
+      settings.uberAsmValid = false;
+      alert('Invalid UberASM file: ' + validation.error);
+    }
+  } catch (error: any) {
+    console.error('Error validating UberASM:', error);
+    settings.uberAsmValid = false;
+    alert('Error validating UberASM: ' + error.message);
+  }
 }
 
 // Right-side panels state and helpers
@@ -1645,7 +1825,7 @@ async function stageRunGames(runUuid: string, runName: string) {
     stagingProgressGameName.value = 'Creating game files...';
     const stagingResult = await (window as any).electronAPI.stageRunGames({
       runUuid,
-      vanillaRomPath: settings.romPath,
+      vanillaRomPath: settings.vanillaRomPath,
       flipsPath: settings.flipsPath
     });
     
@@ -2401,9 +2581,13 @@ async function loadSettings() {
     const savedSettings = await (window as any).electronAPI.getSettings();
     
     // Apply saved settings to reactive state
+    if (savedSettings.vanillaRomPath) settings.vanillaRomPath = savedSettings.vanillaRomPath;
     if (savedSettings.vanillaRomValid) settings.vanillaRomValid = savedSettings.vanillaRomValid === 'true';
+    if (savedSettings.flipsPath) settings.flipsPath = savedSettings.flipsPath;
     if (savedSettings.flipsValid) settings.flipsValid = savedSettings.flipsValid === 'true';
+    if (savedSettings.asarPath) settings.asarPath = savedSettings.asarPath;
     if (savedSettings.asarValid) settings.asarValid = savedSettings.asarValid === 'true';
+    if (savedSettings.uberAsmPath) settings.uberAsmPath = savedSettings.uberAsmPath;
     if (savedSettings.uberAsmValid) settings.uberAsmValid = savedSettings.uberAsmValid === 'true';
     if (savedSettings.launchMethod) settings.launchMethod = savedSettings.launchMethod as any;
     if (savedSettings.launchProgram) settings.launchProgram = savedSettings.launchProgram;
@@ -3021,6 +3205,8 @@ button { padding: 6px 10px; }
 .setting-caption code { background: #f3f4f6; padding: 2px 4px; border-radius: 2px; font-size: 11px; }
 .setting-caption a { color: #3b82f6; text-decoration: none; }
 .setting-caption a:hover { text-decoration: underline; }
+.setting-current-path { font-size: 12px; color: #059669; margin-top: 4px; margin-left: 300px; font-weight: 500; }
+.setting-current-path code { background: #ecfdf5; padding: 2px 6px; border-radius: 2px; font-size: 11px; color: #047857; word-break: break-all; }
 .drop-zone { flex: 1; border: 2px dashed #d1d5db; border-radius: 4px; padding: 12px; text-align: center; color: #6b7280; background: #f9fafb; cursor: pointer; transition: all 0.2s; }
 .drop-zone:hover { border-color: #3b82f6; background: #eff6ff; color: #3b82f6; }
 .modal-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px; background: #f9fafb; }
