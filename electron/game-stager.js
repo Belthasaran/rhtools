@@ -69,12 +69,12 @@ async function decodeBlob(encryptedData, keyBase64) {
 }
 
 /**
- * Get staging folder path
- * @param {string} userDataPath - App user data path
+ * Get staging folder path (uses OS temp directory)
  * @returns {string} Path to staging folder
  */
-function getStagingBasePath(userDataPath) {
-  return path.join(userDataPath, 'RunStaging');
+function getStagingBasePath() {
+  const os = require('os');
+  return path.join(os.tmpdir(), 'RHTools-Runs');
 }
 
 /**
@@ -224,14 +224,14 @@ async function createPatchedSFC(params) {
  * @param {string} params.vanillaRomPath - Path to vanilla ROM
  * @param {string} params.flipsPath - Path to FLIPS
  * @param {Function} params.onProgress - Progress callback (current, total, gameName)
- * @returns {Promise<{success: boolean, stagingFolder?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, folderPath?: string, gamesStaged?: number, error?: string}>}
  */
 async function stageRunGames(params) {
   const { dbManager, runUuid, expandedResults, userDataPath, vanillaRomPath, flipsPath, onProgress } = params;
   
   try {
     // Create staging base directory if it doesn't exist
-    const stagingBase = getStagingBasePath(userDataPath);
+    const stagingBase = getStagingBasePath();
     if (!fs.existsSync(stagingBase)) {
       fs.mkdirSync(stagingBase, { recursive: true });
     }
@@ -304,15 +304,18 @@ async function stageRunGames(params) {
     if (errors.length > 0) {
       return {
         success: false,
-        stagingFolder: runFolder,
+        folderPath: runFolder,
+        gamesStaged: successCount,
         error: `Failed to stage ${errors.length} games:\n${errors.join('\n')}`
       };
     }
     
+    console.log(`Staging complete! Folder: ${runFolder}, Games: ${successCount}`);
+    
     return {
       success: true,
-      stagingFolder: runFolder,
-      stagedCount: successCount
+      folderPath: runFolder,
+      gamesStaged: successCount
     };
     
   } catch (error) {

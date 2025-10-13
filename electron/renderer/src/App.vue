@@ -1837,12 +1837,16 @@ async function stageRunGames(runUuid: string, runName: string) {
     // Hide progress modal
     stagingProgressModalOpen.value = false;
     
+    console.log('Staging result:', stagingResult);
+    
     if (!stagingResult.success) {
       alert('Failed to stage run games: ' + stagingResult.error);
       return;
     }
     
     // Show success modal
+    console.log('Setting folder path:', stagingResult.folderPath);
+    console.log('Setting games staged:', stagingResult.gamesStaged);
     stagingFolderPath.value = stagingResult.folderPath;
     stagingSfcCount.value = stagingResult.gamesStaged;
     stagingSuccessModalOpen.value = true;
@@ -3272,17 +3276,25 @@ button { padding: 6px 10px; }
 .staging-success-modal { width: 700px; max-width: 95vw; }
 .success-info { padding: 24px; }
 .success-message { 
-  font-size: 16px; 
-  margin-bottom: 20px; 
+  font-size: 18px; 
+  margin-bottom: 24px; 
   text-align: center;
-  color: #374151;
+  color: #059669;
+  font-weight: 600;
 }
-.folder-info { margin: 20px 0; }
+.folder-info { 
+  margin: 24px 0; 
+  padding: 16px;
+  background: #f0f9ff;
+  border: 2px solid #0ea5e9;
+  border-radius: 8px;
+}
 .folder-label { 
   display: block; 
-  font-weight: 600; 
-  margin-bottom: 8px; 
-  color: #374151;
+  font-weight: 700; 
+  margin-bottom: 10px; 
+  color: #0c4a6e;
+  font-size: 15px;
 }
 .folder-path { 
   display: flex; 
@@ -3291,23 +3303,41 @@ button { padding: 6px 10px; }
 }
 .folder-path-input { 
   flex: 1; 
-  padding: 8px 12px; 
-  border: 1px solid #d1d5db; 
-  border-radius: 4px;
-  background: #f9fafb;
-  font-family: monospace;
-  font-size: 13px;
+  padding: 10px 14px; 
+  border: 2px solid #0ea5e9; 
+  border-radius: 6px;
+  background: white;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0c4a6e;
+  cursor: text;
+  user-select: all;
+}
+.folder-path-input:focus {
+  outline: none;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 .btn-open-folder { 
-  padding: 8px 16px; 
-  background: #3b82f6; 
+  padding: 10px 18px; 
+  background: #0ea5e9; 
   color: white; 
   border: none; 
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.btn-open-folder:hover { background: #2563eb; }
+.btn-open-folder:hover { 
+  background: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+}
+.btn-open-folder:active {
+  transform: translateY(0);
+}
 .staging-actions { 
   margin-top: 24px; 
   display: flex; 
