@@ -46,6 +46,12 @@ export interface ThemeColors {
   // Modal colors
   modalBg: string;
   modalOverlay: string;
+  modalBorder: string;
+  
+  // Scrollbar colors
+  scrollbarTrack: string;
+  scrollbarThumb: string;
+  scrollbarThumbHover: string;
 }
 
 export interface TextSizeConfig {
@@ -105,6 +111,11 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
     
     modalBg: '#ffffff',
     modalOverlay: 'rgba(0, 0, 0, 0.4)',
+    modalBorder: '#d1d5db',
+    
+    scrollbarTrack: '#f3f4f6',
+    scrollbarThumb: '#d1d5db',
+    scrollbarThumbHover: '#9ca3af',
   },
   
   dark: {
@@ -137,6 +148,11 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
     
     modalBg: '#36393f',
     modalOverlay: 'rgba(0, 0, 0, 0.7)',
+    modalBorder: '#1a1c1e',
+    
+    scrollbarTrack: '#2f3136',
+    scrollbarThumb: '#1a1c1e',
+    scrollbarThumbHover: '#3a3d42',
   },
   
   onyx: {
@@ -170,6 +186,11 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
     
     modalBg: '#000000',
     modalOverlay: 'rgba(0, 0, 0, 0.85)',
+    modalBorder: '#444444',
+    
+    scrollbarTrack: '#0a0a0a',
+    scrollbarThumb: '#1a1a1a',
+    scrollbarThumbHover: '#2a2a2a',
   },
   
   ash: {
@@ -203,6 +224,11 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
     
     modalBg: '#4a4a4a',
     modalOverlay: 'rgba(0, 0, 0, 0.6)',
+    modalBorder: '#2a2a2a',
+    
+    scrollbarTrack: '#3a3a3a',
+    scrollbarThumb: '#2a2a2a',
+    scrollbarThumbHover: '#555555',
   },
 };
 

@@ -4,6 +4,24 @@
 
 ### Features
 
+**Theme and Text Size Customization**
+- Added comprehensive theming system with 4 theme options:
+  - Light Theme (default)
+  - Dark (dark theme)
+  - Onyx (Black & Gray with white text)
+  - Ash (Mid-Gray with white text)
+- Added Text Size control with 4 size options (Small, Medium, Large, Extra Large)
+- Theme setting appears as first option in Settings panel for easy access
+- Text Size setting with interactive slider appears below Theme setting
+- Themes apply dynamically from Settings panel without requiring restart
+- Created centralized theme configuration file (`themeConfig.ts`) with `DEFAULT_THEME` constant for easy default theme changes
+- Implemented CSS custom properties (CSS variables) for dynamic theming
+- Theme and text size preferences saved to database and persist across sessions
+- Custom scrollbar styling that adapts to each theme (darker scrollbars for dark themes blend better with UI)
+- Modal dialogs now have solid contrasting borders to clearly define dialog boundaries
+- Files created: `electron/renderer/src/themeConfig.ts`
+- Files modified: `electron/renderer/src/App.vue`
+
 **Quick Launch Feature (Start Button)**
 - Implemented "Start" button functionality to stage and launch games directly without creating a run
 - Allows selection of 1-21 games at a time for quick launching

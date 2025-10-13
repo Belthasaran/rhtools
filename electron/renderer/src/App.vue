@@ -3457,6 +3457,10 @@ async function cancelRunFromStartup() {
   --error-color: #ef4444;
   --modal-bg: #ffffff;
   --modal-overlay: rgba(0, 0, 0, 0.4);
+  --modal-border: #d1d5db;
+  --scrollbar-track: #f3f4f6;
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-thumb-hover: #9ca3af;
   
   /* Default text sizes (Medium) */
   --base-font-size: 14px;
@@ -3473,6 +3477,31 @@ html, body, #app {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: var(--base-font-size);
+}
+
+/* Custom Scrollbar Styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 6px;
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 .layout { 
@@ -3638,6 +3667,7 @@ button:disabled {
   max-height: 90vh; 
   background: var(--modal-bg); 
   border-radius: 8px; 
+  border: 2px solid var(--modal-border);
   overflow: hidden; 
   display: flex; 
   flex-direction: column; 
