@@ -292,6 +292,8 @@
             <button @click="editGlobalConditions" class="btn-conditions-header" :title="`Global Conditions: ${globalRunConditions.length > 0 ? globalRunConditions.join(', ') : 'None'}`">
               {{ globalRunConditions.length > 0 ? `✓ Global Conditions (${globalRunConditions.length})` : 'Set Global Conditions' }}
             </button>
+            <button @click="exportRunToFile" :disabled="!isRunSaved">📤 Export</button>
+            <button @click="importRunFromFile">📥 Import</button>
             <button @click="stageRun('save')" :disabled="runEntries.length === 0">Stage and Save</button>
             <button @click="startRun" :disabled="!isRunSaved" class="btn-start-run">▶ Start Run</button>
           </template>
@@ -343,8 +345,9 @@
           </label>
           <label>
             Seed
-            <input class="seed" v-model="randomFilter.seed" type="text" placeholder="(random by default)" />
+            <input class="seed" v-model="randomFilter.seed" type="text" placeholder="Auto-generated" />
           </label>
+          <button @click="regenerateSeed" title="Generate new random seed">🎲</button>
           <button @click="addRandomGameToRun" :disabled="!isRandomAddValid">Add Random Game</button>
         </div>
       </section>
@@ -1204,9 +1207,36 @@ const currentChallenge = computed(() => {
 });
 const canUndo = computed(() => undoStack.value.length > 0);
 
-function openRunModal() {
-  if (!randomFilter.seed) randomFilter.seed = Math.random().toString(36).slice(2, 10);
+// Watch for current challenge changes to reveal random challenges
+watch(currentChallengeIndex, async (newIndex) => {
+  if (!isRunActive.value || newIndex >= runEntries.length) return;
+  
+  const challenge = runEntries[newIndex];
+  
+  // Check if this is an unrevealed random challenge
+  if (challenge.id === '(random)' && challenge.name === '???') {
+    await revealCurrentChallenge(false);  // Not revealed early (normal reveal)
+  }
+});
+
+async function openRunModal() {
   if (!randomFilter.count) randomFilter.count = 1;
+  
+  // Generate a new seed if not set
+  if (!randomFilter.seed && isElectronAvailable()) {
+    try {
+      const result = await (window as any).electronAPI.generateSeed();
+      if (result.success) {
+        randomFilter.seed = result.seed;
+        console.log(`Generated seed: ${result.seed} (mapping ${result.mapId}, ${result.gameCount} games)`);
+      }
+    } catch (error) {
+      console.error('Error generating seed:', error);
+      // Fallback
+      randomFilter.seed = 'ERROR-' + Math.random().toString(36).slice(2, 7);
+    }
+  }
+  
   runModalOpen.value = true;
 }
 function closeRunModal() {
@@ -1332,12 +1362,38 @@ function moveCheckedDown() {
 
 const randomFilter = reactive({ type: 'any', difficulty: 'any', pattern: '', count: 1 as number | null, seed: '' });
 const isRandomAddValid = computed(() => typeof randomFilter.count === 'number' && randomFilter.count >= 1 && randomFilter.count <= 100);
+async function regenerateSeed() {
+  if (!isElectronAvailable()) {
+    randomFilter.seed = 'MOCK-' + Math.random().toString(36).slice(2, 7);
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.generateSeed();
+    if (result.success) {
+      randomFilter.seed = result.seed;
+      console.log(`Generated seed: ${result.seed} (${result.gameCount} games)`);
+    } else {
+      alert('Failed to generate seed: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Error generating seed:', error);
+    alert('Error generating seed');
+  }
+}
+
 function addRandomGameToRun() {
   if (!isRandomAddValid.value) return;
   const key = `rand-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const seed = (randomFilter.seed && randomFilter.seed.trim().length > 0)
     ? randomFilter.seed.trim()
-    : Math.random().toString(36).slice(2, 10);
+    : '';
+  
+  if (!seed) {
+    alert('Seed is required for random challenges. Please wait for seed generation or enter manually.');
+    return;
+  }
+  
   runEntries.push({
     key,
     id: '(random)',
@@ -1353,6 +1409,9 @@ function addRandomGameToRun() {
     isLocked: false,  // Can change between random_game and random_stage
     conditions: [],  // Challenge conditions
   });
+  
+  // Generate new seed for next entry
+  regenerateSeed();
 }
 
 function stageRun(mode: 'save' | 'upload') {
@@ -1567,6 +1626,9 @@ async function nextChallenge() {
   const idx = currentChallengeIndex.value;
   const result = challengeResults.value[idx];
   
+  // Determine status: 'success' if not revealed early, 'ok' if revealed early
+  const finalStatus = result.revealedEarly ? 'ok' : 'success';
+  
   // Save current state to undo stack
   undoStack.value.push({
     index: idx,
@@ -1575,19 +1637,19 @@ async function nextChallenge() {
     revealedEarly: result.revealedEarly
   });
   
-  // Mark as success
-  result.status = 'success';
+  // Mark as success or ok
+  result.status = finalStatus;
   
   try {
     if (isElectronAvailable()) {
       await (window as any).electronAPI.recordChallengeResult({
         runUuid: currentRunUuid.value,
         challengeIndex: idx,
-        status: 'success'
+        status: finalStatus
       });
     }
     
-    console.log(`Challenge ${idx + 1} completed`);
+    console.log(`Challenge ${idx + 1} completed (${finalStatus})`);
     
     // Move to next challenge
     if (idx < runEntries.length - 1) {
@@ -1609,17 +1671,18 @@ async function nextChallenge() {
 async function skipChallenge() {
   if (!currentChallenge.value) return;
   
-  const confirmed = confirm(`Skip challenge ${currentChallengeIndex.value + 1}?`);
+  const idx = currentChallengeIndex.value;
+  const entry = runEntries[idx];
+  
+  // If this is a random challenge, reveal it first (marked as revealed early)
+  if ((entry.entryType === 'random_game' || entry.entryType === 'random_stage') && entry.name === '???') {
+    await revealCurrentChallenge(true);  // Revealed early = true
+  }
+  
+  const confirmed = confirm(`Skip challenge ${idx + 1}: ${entry.name}?`);
   if (!confirmed) return;
   
-  const idx = currentChallengeIndex.value;
   const result = challengeResults.value[idx];
-  
-  // Check if this is a random challenge - mark as revealed early
-  const entry = runEntries[idx];
-  if (entry.entryType === 'random_game' || entry.entryType === 'random_stage') {
-    result.revealedEarly = true;
-  }
   
   // Save current state to undo stack
   undoStack.value.push({
@@ -1689,6 +1752,43 @@ async function undoChallenge() {
   }
 }
 
+async function revealCurrentChallenge(revealedEarly: boolean = false) {
+  if (!isElectronAvailable()) return;
+  if (!currentChallenge.value) return;
+  
+  const challenge = currentChallenge.value;
+  const idx = currentChallengeIndex.value;
+  
+  // Only reveal if it's a random challenge that hasn't been revealed
+  if (challenge.id !== '(random)' || challenge.name !== '???') {
+    return;  // Already revealed or not random
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.revealChallenge({
+      runUuid: currentRunUuid.value,
+      resultUuid: challenge.key,  // result_uuid
+      revealedEarly
+    });
+    
+    if (result.success && !result.alreadyRevealed) {
+      // Update UI with revealed game
+      challenge.id = result.gameid;
+      challenge.name = result.gameName;
+      
+      // Mark as revealed early if skipped/peeked
+      if (revealedEarly) {
+        challengeResults.value[idx].revealedEarly = true;
+      }
+      
+      console.log(`Revealed challenge ${idx + 1}: ${result.gameName} (${result.gameid})`);
+    }
+  } catch (error) {
+    console.error('Error revealing challenge:', error);
+    // Continue anyway - show error but don't block gameplay
+  }
+}
+
 function completeRun() {
   // Stop timer
   if (runTimerInterval.value) {
@@ -1727,11 +1827,11 @@ function getChallengeStatusIcon(index: number): string {
   
   switch (result.status) {
     case 'success':
-      return '✓';  // Green checkmark
+      return '✓';  // Green checkmark - Perfect completion
     case 'ok':
-      return '✓';  // Green checkmark (but maybe different styling)
+      return '⚠';  // Warning triangle - Completed but revealed early
     case 'skipped':
-      return '✗';  // Red X
+      return '✗';  // Red X - Skipped
     case 'pending':
     default:
       return '';
@@ -2231,6 +2331,82 @@ function setVersionSpecificRating() {
     alert(`Version-specific rating enabled for version ${selectedVersion.value}`);
   }
 }
+
+// Export/Import Run
+async function exportRunToFile() {
+  if (!currentRunUuid.value) {
+    alert('No run to export. Please save the run first.');
+    return;
+  }
+  
+  if (!isElectronAvailable()) {
+    alert('Export requires Electron environment');
+    return;
+  }
+  
+  try {
+    const result = await (window as any).electronAPI.exportRun(currentRunUuid.value);
+    
+    if (result.success) {
+      const exportJson = JSON.stringify(result.data, null, 2);
+      const blob = new Blob([exportJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `run-${currentRunName.value.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      console.log('Run exported successfully');
+    } else {
+      alert('Failed to export run: ' + result.error);
+    }
+  } catch (error) {
+    console.error('Error exporting run:', error);
+    alert('Error exporting run');
+  }
+}
+
+async function importRunFromFile() {
+  if (!isElectronAvailable()) {
+    alert('Import requires Electron environment');
+    return;
+  }
+  
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const importData = JSON.parse(text);
+      
+      const result = await (window as any).electronAPI.importRun(importData);
+      
+      if (result.success) {
+        let message = `Run imported successfully!`;
+        if (result.warnings && result.warnings.length > 0) {
+          message += `\n\nWarnings:\n${result.warnings.join('\n')}`;
+        }
+        alert(message);
+        
+        // Close modal and reload (could load the imported run)
+        closeRunModal();
+      } else {
+        alert('Failed to import run: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error importing run:', error);
+      alert('Error importing run: Invalid file or format');
+    }
+  };
+  
+  input.click();
+}
 </script>
 
 <style>
@@ -2321,9 +2497,9 @@ button { padding: 6px 10px; }
 .col-status { width: 50px; text-align: center; font-size: 20px; }
 .col-duration { width: 80px; text-align: right; font-family: monospace; }
 .status-icon { font-weight: bold; }
-.status-success .status-icon { color: #10b981; }
-.status-ok .status-icon { color: #10b981; opacity: 0.7; }
-.status-skipped .status-icon { color: #ef4444; }
+.status-success .status-icon { color: #10b981; }  /* Green checkmark */
+.status-ok .status-icon { color: #f59e0b; }  /* Orange warning - revealed early */
+.status-skipped .status-icon { color: #ef4444; }  /* Red X */
 
 /* Settings Modal */
 .settings-modal { width: 800px; max-width: 95vw; }
