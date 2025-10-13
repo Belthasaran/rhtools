@@ -4,13 +4,63 @@
       <div class="left-controls">
         <button @click="openSettings">Open settings</button>
 
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search or filter..."
-          class="search"
-        />
-        <button @click="clearFilters" :disabled="!hasActiveFilters">Clear filters</button>
+        <div class="filter-dropdown-container">
+          <button @click="toggleFilterDropdown" class="filter-dropdown-btn" :class="{ 'has-active-filter': hasActiveFilters }">
+            <span>Search/Filters</span>
+            <span class="dropdown-arrow">▼</span>
+            <span v-if="hasActiveFilters" class="filter-indicator">●</span>
+          </button>
+
+          <div v-if="filterDropdownOpen" class="filter-dropdown" @click.stop>
+            <div class="filter-header">
+              <h3>Search & Filters</h3>
+              <button @click="closeFilterDropdown" class="close">✕</button>
+            </div>
+
+            <div class="filter-body">
+              <div class="filter-search-row">
+                <input
+                  ref="filterSearchInput"
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="Search or filter... (try: rating:>3, added:2025, Kaizo)"
+                  class="filter-search-input"
+                  @keydown.esc="closeFilterDropdown"
+                />
+                <button @click="clearFilters" :disabled="!hasActiveFilters" class="btn-clear-filter">Clear</button>
+              </div>
+
+              <div class="common-filters">
+                <div class="filter-section-label">Common Filters:</div>
+                <div class="filter-tags">
+                  <button @click="addFilterTag('Kaizo')" class="filter-tag">Kaizo</button>
+                  <button @click="addFilterTag('Standard')" class="filter-tag">Standard</button>
+                  <button @click="addFilterTag('Puzzle')" class="filter-tag">Puzzle</button>
+                  <button @click="addFilterTag('Troll')" class="filter-tag">Troll</button>
+                  <button @click="addFilterTag('Vanilla')" class="filter-tag">Vanilla</button>
+                  <button @click="addFilterTag('added:2025')" class="filter-tag">Added: 2025</button>
+                  <button @click="addFilterTag('added:2024')" class="filter-tag">Added: 2024</button>
+                  <button @click="addFilterTag('rating:>3')" class="filter-tag">Rating > 3</button>
+                  <button @click="addFilterTag('rating:5')" class="filter-tag">Rating: 5</button>
+                  <button @click="addFilterTag('rating:4')" class="filter-tag">Rating: 4</button>
+                </div>
+              </div>
+
+              <div class="filter-help">
+                <details>
+                  <summary>Filter Syntax Guide</summary>
+                  <div class="filter-help-content">
+                    <p><strong>Attribute Search:</strong> <code>&lt;attribute&gt;:&lt;value&gt;</code></p>
+                    <p>Examples: <code>added:2025</code>, <code>author:FuSoYa</code>, <code>name:Cave</code></p>
+                    <p><strong>Rating Filters:</strong> <code>rating:5</code>, <code>rating:>3</code>, <code>rating:&lt;4</code></p>
+                    <p><strong>Version Filters:</strong> <code>version:1</code> (specific), <code>version:*</code> (all versions)</p>
+                    <p><em>By default, only the highest version of each game is searched.</em></p>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <button @click="checkAllVisible" :disabled="filteredItems.length === 0">Check all</button>
         <button @click="uncheckAll">Uncheck all</button>
@@ -949,7 +999,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, onMounted, watch } from 'vue';
+import { computed, reactive, ref, onMounted, onUnmounted, watch } from 'vue';
 import { 
   DEFAULT_THEME, 
   DEFAULT_TEXT_SIZE, 
@@ -1006,30 +1056,111 @@ const showHidden = ref(false);
 const hideFinished = ref(false);
 const bulkStatus = ref('');
 
+// Filter dropdown state
+const filterDropdownOpen = ref(false);
+const filterSearchInput = ref<HTMLInputElement | null>(null);
+
 // Version management (must be declared before watchers use it)
 const selectedVersion = ref<number>(1);
 
 const normalized = (s: string) => s.toLowerCase();
 
+/**
+ * Parse and apply advanced filter query
+ */
+function matchesFilter(item: Item, query: string): boolean {
+  if (!query) return true;
+  
+  const q = query.trim().toLowerCase();
+  
+  // Check for attribute:value pattern
+  const attributeMatch = q.match(/^(\w+):(>|<|>=|<=)?(.+)$/);
+  
+  if (attributeMatch) {
+    const [, attr, operator, value] = attributeMatch;
+    
+    // Handle rating filters with operators
+    if (attr === 'rating') {
+      const rating = item.Publicrating ?? 0;
+      const targetValue = parseFloat(value);
+      
+      if (isNaN(targetValue)) return false;
+      
+      if (operator === '>') return rating > targetValue;
+      if (operator === '<') return rating < targetValue;
+      if (operator === '>=') return rating >= targetValue;
+      if (operator === '<=') return rating <= targetValue;
+      return rating === targetValue;
+    }
+    
+    // Handle version filters (not implemented for filtering yet, but reserved)
+    if (attr === 'version') {
+      // For now, we always search latest version unless specified
+      // This is a placeholder for future version-specific filtering
+      return true;
+    }
+    
+    // Handle other attribute searches
+    const itemValue = getItemAttribute(item, attr);
+    if (itemValue === null) return false;
+    
+    return itemValue.toLowerCase().includes(value.toLowerCase());
+  }
+  
+  // Default: search across all fields
+  const haystack = [
+    item.Id,
+    item.Name,
+    item.Type,
+    item.Author,
+    item.Length,
+    item.Status,
+    String(item.MyDifficultyRating ?? ''),
+    String(item.MyReviewRating ?? ''),
+    String(item.Publicrating ?? ''),
+    String(item.Mynotes ?? ''),
+    // Include JSON data if available
+    item.JsonData?.added ? String(item.JsonData.added) : '',
+    item.JsonData?.difficulty ? String(item.JsonData.difficulty) : '',
+  ].join(' ').toLowerCase();
+  
+  return haystack.includes(q);
+}
+
+/**
+ * Get attribute value from item or its JSON data
+ */
+function getItemAttribute(item: Item, attr: string): string | null {
+  // Direct properties
+  const directProps: Record<string, any> = {
+    id: item.Id,
+    name: item.Name,
+    type: item.Type,
+    author: item.Author,
+    length: item.Length,
+    status: item.Status,
+    rating: item.Publicrating,
+    notes: item.Mynotes,
+  };
+  
+  if (directProps[attr] !== undefined) {
+    return String(directProps[attr] ?? '');
+  }
+  
+  // Check JSON data attributes
+  if (item.JsonData && item.JsonData[attr] !== undefined) {
+    return String(item.JsonData[attr]);
+  }
+  
+  return null;
+}
+
 const filteredItems = computed(() => {
-  const q = normalized(searchQuery.value.trim());
+  const q = searchQuery.value.trim();
   return items.filter((it) => {
     if (!showHidden.value && it.Hidden) return false;
     if (hideFinished.value && it.Status === 'Finished') return false;
-    if (q.length === 0) return true;
-    const haystack = [
-      it.Id,
-      it.Name,
-      it.Type,
-      it.Author,
-      it.Length,
-      it.Status,
-      String(it.MyDifficultyRating ?? ''),
-      String(it.MyReviewRating ?? ''),
-      String(it.Publicrating ?? ''),
-      String(it.Mynotes ?? ''),
-    ].join(' ').toLowerCase();
-    return haystack.includes(q);
+    return matchesFilter(it, q);
   });
 });
 
@@ -1110,6 +1241,69 @@ function clearFilters() {
   searchQuery.value = '';
   hideFinished.value = false;
   showHidden.value = false;
+}
+
+// Filter dropdown functions
+function toggleFilterDropdown() {
+  filterDropdownOpen.value = !filterDropdownOpen.value;
+  if (filterDropdownOpen.value) {
+    // Focus input after dropdown opens
+    setTimeout(() => {
+      filterSearchInput.value?.focus();
+    }, 100);
+  }
+}
+
+function closeFilterDropdown() {
+  filterDropdownOpen.value = false;
+}
+
+function addFilterTag(tag: string) {
+  // Append tag to search query
+  const current = searchQuery.value.trim();
+  if (current) {
+    searchQuery.value = current + ' ' + tag;
+  } else {
+    searchQuery.value = tag;
+  }
+  // Keep dropdown open and refocus input
+  setTimeout(() => {
+    filterSearchInput.value?.focus();
+  }, 50);
+}
+
+// Global keyboard shortcut handler
+function handleGlobalKeydown(e: KeyboardEvent) {
+  // Check if "/" key is pressed and not in an input field
+  if (e.key === '/' && !filterDropdownOpen.value) {
+    const target = e.target as HTMLElement;
+    // Don't trigger if already in an input/textarea
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    e.preventDefault();
+    filterDropdownOpen.value = true;
+    setTimeout(() => {
+      filterSearchInput.value?.focus();
+    }, 100);
+  }
+  
+  // Close dropdown on Escape
+  if (e.key === 'Escape' && filterDropdownOpen.value) {
+    closeFilterDropdown();
+  }
+}
+
+// Close dropdown when clicking outside
+function handleGlobalClick(e: MouseEvent) {
+  if (filterDropdownOpen.value) {
+    const target = e.target as HTMLElement;
+    const dropdown = document.querySelector('.filter-dropdown-container');
+    if (dropdown && !dropdown.contains(target)) {
+      closeFilterDropdown();
+    }
+  }
 }
 
 function checkAllVisible() {
@@ -3004,6 +3198,10 @@ onMounted(async () => {
   console.log('=== APP MOUNTED ===');
   console.log('Electron API available:', isElectronAvailable());
   
+  // Add global event listeners for filter shortcuts
+  window.addEventListener('keydown', handleGlobalKeydown);
+  window.addEventListener('click', handleGlobalClick);
+  
   // Check for active run first
   if (isElectronAvailable()) {
     try {
@@ -3035,6 +3233,14 @@ onMounted(async () => {
   }
   
   console.log('=== INITIALIZATION COMPLETE ===');
+});
+
+/**
+ * Cleanup on unmount
+ */
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown);
+  window.removeEventListener('click', handleGlobalClick);
 });
 
 /**
@@ -3888,6 +4094,213 @@ button:disabled {
   text-align: right;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+/* Filter Dropdown */
+.filter-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.filter-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.filter-dropdown-btn.has-active-filter {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.filter-dropdown-btn.has-active-filter:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.filter-indicator {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: var(--warning-color);
+  border-radius: 50%;
+  font-size: 10px;
+  color: var(--warning-color);
+}
+
+.filter-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 500px;
+  max-width: 600px;
+  background: var(--modal-bg);
+  border: 2px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--modal-overlay);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-size: var(--medium-font-size);
+  color: var(--text-primary);
+}
+
+.filter-header .close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.filter-header .close:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.filter-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-search-input {
+  flex: 1;
+  padding: var(--input-padding);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--base-font-size);
+}
+
+.filter-search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.btn-clear-filter {
+  padding: var(--button-padding);
+  white-space: nowrap;
+}
+
+.common-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-section-label {
+  font-size: var(--small-font-size);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-tag {
+  padding: 4px 10px;
+  font-size: var(--small-font-size);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 16px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-tag:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.filter-help {
+  margin-top: 8px;
+}
+
+.filter-help details {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.filter-help summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--small-font-size);
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.filter-help summary:hover {
+  color: var(--accent-primary);
+}
+
+.filter-help-content {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.filter-help-content p {
+  margin: 6px 0;
+  font-size: var(--small-font-size);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.filter-help-content code {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--accent-primary);
+}
+
+.filter-help-content em {
+  color: var(--text-tertiary);
+  font-style: italic;
 }
 
 /* Run Name Modal */
