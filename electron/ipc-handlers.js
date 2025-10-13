@@ -546,6 +546,13 @@ function registerDatabaseHandlers(dbManager) {
       const db = dbManager.getConnection('clientdata');
       
       const transaction = db.transaction((runId) => {
+        // Cancel any other active runs (only one run can be active at a time)
+        db.prepare(`
+          UPDATE runs 
+          SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+          WHERE status = 'active' AND run_uuid != ?
+        `).run(runId);
+        
         // Clean up any existing run_results for this run (in case of previous failed attempt)
         db.prepare(`DELETE FROM run_results WHERE run_uuid = ?`).run(runId);
         
@@ -579,9 +586,13 @@ function registerDatabaseHandlers(dbManager) {
         // Track used gameids to avoid duplicates within same run
         const usedGameids = [];
         
+        console.log('Starting run expansion, plan entries:', planEntries.length);
+        
         planEntries.forEach((planEntry) => {
           const count = planEntry.count || 1;
           const isRandom = planEntry.entry_type === 'random_game' || planEntry.entry_type === 'random_stage';
+          
+          console.log('Processing plan entry:', planEntry.entry_uuid, 'type:', planEntry.entry_type, 'count:', count);
           
           // Create multiple results if count > 1
           for (let i = 0; i < count; i++) {
@@ -633,7 +644,9 @@ function registerDatabaseHandlers(dbManager) {
               gameName = game ? game.name : planEntry.gameid;
             }
             
-            insertStmt.run(
+            console.log('Inserting result:', resultSequence, 'gameid:', gameid, 'name:', gameName);
+            
+            const insertResult = insertStmt.run(
               resultUuid,
               runId,
               planEntry.entry_uuid,
@@ -645,15 +658,33 @@ function registerDatabaseHandlers(dbManager) {
               isRandom ? 1 : 0,
               planEntry.conditions || null
             );
+            
+            console.log('Insert result:', insertResult.changes, 'rows changed');
           }
         });
+        
+        console.log('Finished inserting all results');
         
         // Update total challenges count
         const total = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE run_uuid = ?`).get(runId);
         db.prepare(`UPDATE runs SET total_challenges = ? WHERE run_uuid = ?`).run(total.count, runId);
       });
       
-      transaction(runUuid);
+      try {
+        transaction(runUuid);
+        console.log('Transaction completed successfully');
+      } catch (transactionError) {
+        console.error('Transaction failed:', transactionError);
+        throw transactionError;
+      }
+      
+      // Verify results were inserted
+      const verifyCount = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE run_uuid = ?`).get(runUuid);
+      console.log('Verification: run_results count =', verifyCount.count);
+      
+      if (verifyCount.count === 0) {
+        throw new Error('Failed to create run results - no entries inserted');
+      }
       
       return { success: true };
     } catch (error) {
@@ -893,7 +924,10 @@ function registerDatabaseHandlers(dbManager) {
         `).run(totalPaused, currentResult.result_uuid);
       }
       
-      return { success: true };
+      // Get updated pause_seconds to return
+      const updatedRun = db.prepare(`SELECT pause_seconds FROM runs WHERE run_uuid = ?`).get(runUuid);
+      
+      return { success: true, pauseSeconds: updatedRun ? updatedRun.pause_seconds : 0 };
     } catch (error) {
       console.error('Error unpausing run:', error);
       return { success: false, error: error.message };

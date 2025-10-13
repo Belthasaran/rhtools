@@ -247,7 +247,10 @@ function getActiveRun(dbManager) {
   const db = dbManager.getConnection('clientdata');
   
   const activeRun = db.prepare(`
-    SELECT * FROM runs WHERE status = 'active' LIMIT 1
+    SELECT * FROM runs 
+    WHERE status = 'active' 
+    ORDER BY started_at DESC 
+    LIMIT 1
   `).get();
   
   return activeRun || null;

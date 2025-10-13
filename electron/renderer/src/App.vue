@@ -300,10 +300,13 @@
           <!-- Active state -->
           <template v-if="isRunActive">
             <span class="run-timer">⏱ {{ formatTime(runElapsedSeconds) }}</span>
+            <span class="pause-time" v-if="runPauseSeconds > 0">⏸ {{ formatTime(runPauseSeconds) }}</span>
             <span class="run-progress">Challenge {{ currentChallengeIndex + 1 }} / {{ runEntries.length }}</span>
-            <button @click="undoChallenge" :disabled="!canUndo" class="btn-back">↶ Back</button>
-            <button @click="nextChallenge" :disabled="!currentChallenge" class="btn-next">✓ Done</button>
-            <button @click="skipChallenge" :disabled="!currentChallenge" class="btn-skip">⏭ Skip</button>
+            <button @click="pauseRun" v-if="!isRunPaused" class="btn-pause">⏸ Pause</button>
+            <button @click="unpauseRun" v-if="isRunPaused" class="btn-unpause">▶ Unpause</button>
+            <button @click="undoChallenge" :disabled="!canUndo || isRunPaused" class="btn-back">↶ Back</button>
+            <button @click="nextChallenge" :disabled="!currentChallenge || isRunPaused" class="btn-next">✓ Done</button>
+            <button @click="skipChallenge" :disabled="!currentChallenge || isRunPaused" class="btn-skip">⏭ Skip</button>
             <button @click="cancelRun" class="btn-cancel-run">✕ Cancel Run</button>
           </template>
           <button class="close" @click="closeRunModal">✕</button>
@@ -689,6 +692,42 @@
       <footer class="modal-footer">
         <button @click="confirmRunName" class="btn-primary">Save Run</button>
         <button @click="cancelRunName">Cancel</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Resume Run Modal (on app startup) -->
+  <div v-if="resumeRunModalOpen" class="modal-backdrop">
+    <div class="modal resume-run-modal">
+      <header class="modal-header">
+        <h3>⚠ Active Run Found</h3>
+      </header>
+      <section class="modal-body resume-run-body">
+        <p class="resume-message">You have an active run in progress:</p>
+        <div class="run-info">
+          <div class="run-info-row">
+            <span class="label">Run Name:</span>
+            <span class="value">{{ resumeRunData?.run_name }}</span>
+          </div>
+          <div class="run-info-row">
+            <span class="label">Status:</span>
+            <span class="value">{{ resumeRunData?.isPaused ? '⏸ Paused' : '▶ Running' }}</span>
+          </div>
+          <div class="run-info-row">
+            <span class="label">Elapsed Time:</span>
+            <span class="value">⏱ {{ formatTime(resumeRunData?.elapsedSeconds || 0) }}</span>
+          </div>
+          <div class="run-info-row" v-if="resumeRunData?.pause_seconds > 0">
+            <span class="label">Paused Time:</span>
+            <span class="value pause-time">⏸ {{ formatTime(resumeRunData?.pause_seconds || 0) }}</span>
+          </div>
+        </div>
+        <p class="resume-prompt">What would you like to do?</p>
+      </section>
+      <footer class="modal-footer resume-run-footer">
+        <button @click="resumeRunFromStartup" class="btn-primary btn-large">▶ Resume Run</button>
+        <button @click="pauseRunFromStartup" class="btn-secondary btn-large">⏸ View (Paused)</button>
+        <button @click="cancelRunFromStartup" class="btn-danger btn-large">✕ Cancel Run</button>
       </footer>
     </div>
   </div>
@@ -1181,6 +1220,8 @@ const currentRunName = ref<string>('');
 const currentChallengeIndex = ref<number>(0);
 const runStartTime = ref<number | null>(null);
 const runElapsedSeconds = ref<number>(0);
+const runPauseSeconds = ref<number>(0);
+const isRunPaused = ref<boolean>(false);
 const runTimerInterval = ref<number | null>(null);
 
 // Challenge results tracking
@@ -1196,6 +1237,10 @@ const undoStack = ref<ChallengeResult[]>([]);
 // Run name input modal
 const runNameModalOpen = ref(false);
 const runNameInput = ref<string>('My Challenge Run');
+
+// Resume run modal
+const resumeRunModalOpen = ref(false);
+const resumeRunData = ref<any>(null);
 
 const allRunChecked = computed(() => runEntries.length > 0 && runEntries.every((e) => checkedRun.value.has(e.key)));
 const checkedRunCount = computed(() => checkedRun.value.size);
@@ -1580,12 +1625,55 @@ async function startRun() {
       }, 1000);
       
       console.log(`Run started with ${runEntries.length} challenges`);
+      
+      // Reveal first challenge if it's random (watcher won't trigger for initial index=0)
+      if (runEntries.length > 0) {
+        const firstChallenge = runEntries[0];
+        if ((firstChallenge.entryType === 'random_game' || firstChallenge.entryType === 'random_stage') && firstChallenge.name === '???') {
+          await revealCurrentChallenge(false);
+        }
+      }
     } else {
       alert('Failed to start run: ' + result.error);
     }
   } catch (error) {
     console.error('Error starting run:', error);
     alert('Error starting run');
+  }
+}
+
+async function pauseRun() {
+  if (!currentRunUuid.value || isRunPaused.value) return;
+  
+  try {
+    if (isElectronAvailable()) {
+      await (window as any).electronAPI.pauseRun(currentRunUuid.value);
+    }
+    
+    isRunPaused.value = true;
+    console.log('Run paused');
+  } catch (error) {
+    console.error('Error pausing run:', error);
+    alert('Error pausing run');
+  }
+}
+
+async function unpauseRun() {
+  if (!currentRunUuid.value || !isRunPaused.value) return;
+  
+  try {
+    if (isElectronAvailable()) {
+      const result = await (window as any).electronAPI.unpauseRun({ runUuid: currentRunUuid.value });
+      if (result.success) {
+        // Update pause time with the returned value
+        runPauseSeconds.value = result.pauseSeconds || 0;
+        isRunPaused.value = false;
+        console.log('Run unpaused, total pause time:', runPauseSeconds.value);
+      }
+    }
+  } catch (error) {
+    console.error('Error unpausing run:', error);
+    alert('Error unpausing run');
   }
 }
 
@@ -2177,6 +2265,21 @@ async function loadGameVersion(gameid: string, version: number) {
 onMounted(async () => {
   console.log('=== APP MOUNTED ===');
   console.log('Electron API available:', isElectronAvailable());
+  
+  // Check for active run first
+  if (isElectronAvailable()) {
+    try {
+      const activeRun = await (window as any).electronAPI.getActiveRun();
+      if (activeRun) {
+        resumeRunData.value = activeRun;
+        resumeRunModalOpen.value = true;
+        console.log('Active run found:', activeRun.run_name);
+      }
+    } catch (error) {
+      console.error('Error checking for active run:', error);
+    }
+  }
+  
   console.log('Starting data load...');
   
   try {
@@ -2407,6 +2510,187 @@ async function importRunFromFile() {
   
   input.click();
 }
+
+// Resume run from startup
+async function resumeRunFromStartup() {
+  if (!resumeRunData.value) {
+    console.error('No resume run data available');
+    return;
+  }
+  
+  console.log('Resuming run:', resumeRunData.value);
+  
+  try {
+    // Close resume modal first
+    resumeRunModalOpen.value = false;
+    
+    // Load the run
+    currentRunUuid.value = resumeRunData.value.run_uuid;
+    currentRunName.value = resumeRunData.value.run_name;
+    currentRunStatus.value = 'active';
+    runPauseSeconds.value = resumeRunData.value.pause_seconds || 0;
+    isRunPaused.value = resumeRunData.value.isPaused;
+    
+    console.log('Loading run results for:', currentRunUuid.value);
+    
+    // Check if electronAPI exists
+    if (!isElectronAvailable()) {
+      throw new Error('Electron API not available');
+    }
+    
+    // Fetch expanded results
+    const expandedResults = await (window as any).electronAPI.getRunResults({
+      runUuid: currentRunUuid.value
+    });
+    
+    console.log('Fetched run results:', expandedResults);
+    
+    if (!expandedResults || expandedResults.length === 0) {
+      // The run is marked as active but has no results - this is a corrupted run
+      // Offer to cancel it
+      if (confirm('This run appears to be corrupted (no results found). Would you like to cancel it and start fresh?')) {
+        try {
+          await (window as any).electronAPI.cancelRun({ runUuid: currentRunUuid.value });
+          alert('Run cancelled. You can now create a new run.');
+          resumeRunModalOpen.value = false;
+          return;
+        } catch (cancelError) {
+          console.error('Error cancelling corrupted run:', cancelError);
+          throw new Error('Could not cancel corrupted run. Please contact support.');
+        }
+      } else {
+        resumeRunModalOpen.value = false;
+        return;
+      }
+    }
+    
+    // Load run entries
+    runEntries.length = 0;
+    expandedResults.forEach((res: any) => {
+      runEntries.push({
+        key: res.result_uuid,
+        id: res.gameid || '(random)',
+        entryType: res.was_random ? 'random_game' : 'game',
+        name: res.game_name || '???',
+        stageNumber: res.exit_number,
+        stageName: res.stage_description,
+        count: 1,
+        isLocked: true,
+        conditions: JSON.parse(res.conditions || '[]')
+      });
+    });
+    
+    console.log('Loaded run entries:', runEntries.length);
+    
+    // Find current challenge index (first pending)
+    currentChallengeIndex.value = expandedResults.findIndex((r: any) => r.status === 'pending');
+    if (currentChallengeIndex.value === -1) {
+      currentChallengeIndex.value = expandedResults.length - 1;  // All complete, show last
+    }
+    
+    console.log('Current challenge index:', currentChallengeIndex.value);
+    
+    // Initialize challenge results
+    challengeResults.value = expandedResults.map((res: any, idx: number) => ({
+      index: idx,
+      status: res.status || 'pending',
+      durationSeconds: res.duration_seconds || 0,
+      revealedEarly: res.revealed_early || false
+    }));
+    
+    // Use the original started_at timestamp from database
+    const startedAtString = resumeRunData.value.started_at;
+    console.log('DEBUG: started_at from DB:', startedAtString);
+    console.log('DEBUG: type:', typeof startedAtString);
+    
+    // Parse the timestamp (SQLite returns UTC strings, need to handle properly)
+    const originalStartTime = new Date(startedAtString + 'Z').getTime(); // Add 'Z' to treat as UTC
+    const now = Date.now();
+    
+    console.log('DEBUG: originalStartTime (ms):', originalStartTime);
+    console.log('DEBUG: now (ms):', now);
+    console.log('DEBUG: difference (ms):', now - originalStartTime);
+    
+    runStartTime.value = originalStartTime;
+    
+    // Calculate current elapsed time (don't use pre-calculated value from backend)
+    const totalElapsed = Math.floor((now - originalStartTime) / 1000);
+    runElapsedSeconds.value = totalElapsed - runPauseSeconds.value;
+    
+    console.log('Resuming run. Started at:', startedAtString, 
+                'Total elapsed:', totalElapsed, 'Pause seconds:', runPauseSeconds.value, 
+                'Net active:', runElapsedSeconds.value, 'Is paused:', isRunPaused.value);
+    
+    // Start timer (will not update if paused)
+    console.log('Starting timer');
+    runTimerInterval.value = window.setInterval(() => {
+      if (runStartTime.value && !isRunPaused.value) {
+        // Calculate from original start time
+        const now = Date.now();
+        const totalElapsed = Math.floor((now - runStartTime.value) / 1000);
+        runElapsedSeconds.value = totalElapsed - runPauseSeconds.value;
+        
+        // Update current challenge duration
+        if (currentChallengeIndex.value < challengeResults.value.length) {
+          const current = challengeResults.value[currentChallengeIndex.value];
+          if (current.status === 'pending') {
+            const prevDuration = challengeResults.value
+              .slice(0, currentChallengeIndex.value)
+              .reduce((sum, r) => sum + r.durationSeconds, 0);
+            current.durationSeconds = runElapsedSeconds.value - prevDuration;
+          }
+        }
+      }
+    }, 1000);
+    
+    // Open run modal
+    runModalOpen.value = true;
+    
+    console.log('Run modal opened, resume complete');
+  } catch (error) {
+    console.error('Error resuming run:', error);
+    alert(`Error resuming run: ${error.message}`);
+    resumeRunModalOpen.value = false;
+  }
+}
+
+async function pauseRunFromStartup() {
+  if (!resumeRunData.value) return;
+  
+  resumeRunModalOpen.value = false;
+  
+  // Load run in paused state
+  await resumeRunFromStartup();
+  
+  // Pause it
+  if (currentRunUuid.value) {
+    await pauseRun();
+  }
+}
+
+async function cancelRunFromStartup() {
+  if (!resumeRunData.value) return;
+  
+  const confirmed = confirm(`Cancel run "${resumeRunData.value.run_name}"?`);
+  if (!confirmed) {
+    resumeRunModalOpen.value = false;
+    return;
+  }
+  
+  try {
+    if (isElectronAvailable()) {
+      await (window as any).electronAPI.cancelRun({
+        runUuid: resumeRunData.value.run_uuid
+      });
+    }
+    
+    resumeRunModalOpen.value = false;
+    console.log('Run cancelled from startup');
+  } catch (error) {
+    console.error('Error cancelling run:', error);
+    alert('Error cancelling run');
+  }
+}
 </script>
 
 <style>
@@ -2488,7 +2772,12 @@ button { padding: 6px 10px; }
 .btn-next:hover:not(:disabled) { background: #059669; }
 .btn-skip { background: #f59e0b; color: white; }
 .btn-skip:hover:not(:disabled) { background: #d97706; }
+.btn-pause { background: #6b7280; color: white; }
+.btn-pause:hover { background: #4b5563; }
+.btn-unpause { background: #10b981; color: white; font-weight: bold; }
+.btn-unpause:hover { background: #059669; }
 .run-timer { font-weight: bold; color: #059669; font-size: 16px; padding: 0 8px; }
+.pause-time { font-weight: bold; color: #ef4444; font-size: 16px; padding: 0 8px; }
 .run-progress { color: #6b7280; padding: 0 8px; }
 .data-table tbody tr.current-challenge { background: #dbeafe !important; border-left: 4px solid #3b82f6; font-weight: 600; }
 .data-table tbody tr.current-challenge td { background: #dbeafe; }
@@ -2528,6 +2817,23 @@ button { padding: 6px 10px; }
 .run-name-body label { display: block; font-weight: 600; margin-bottom: 8px; color: #374151; }
 .run-name-body input[type="text"] { width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
 .run-name-body input[type="text"]:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+
+/* Resume Run Modal */
+.resume-run-modal { width: 600px; max-width: 95vw; }
+.resume-run-body { padding: 24px; }
+.resume-message { font-size: 16px; margin-bottom: 16px; color: #374151; }
+.resume-prompt { font-size: 16px; margin-top: 20px; margin-bottom: 0; font-weight: 600; color: #374151; }
+.run-info { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin: 16px 0; }
+.run-info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+.run-info-row:last-child { border-bottom: none; }
+.run-info-row .label { font-weight: 600; color: #6b7280; }
+.run-info-row .value { font-weight: 500; color: #111827; }
+.resume-run-footer { display: flex; gap: 12px; justify-content: center; }
+.btn-large { padding: 12px 24px; font-size: 16px; font-weight: 600; }
+.btn-secondary { background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.btn-secondary:hover { background: #4b5563; }
+.btn-danger { background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.btn-danger:hover { background: #dc2626; }
 
 /* New UI Components */
 
