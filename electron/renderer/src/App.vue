@@ -3,6 +3,7 @@
     <header class="toolbar">
       <div class="left-controls">
         <button @click="openSettings">Open settings</button>
+        <button v-if="settings.usb2snesEnabled === 'yes'" @click="openUsb2snesTools">USB2SNES Tools</button>
 
         <div class="filter-dropdown-container">
           <button @click="toggleFilterDropdown" class="filter-dropdown-btn" :class="{ 'has-active-filter': hasActiveFilters }">
@@ -62,12 +63,36 @@
           </div>
         </div>
 
-        <button @click="checkAllVisible" :disabled="filteredItems.length === 0">Check all</button>
-        <button @click="uncheckAll">Uncheck all</button>
-        <button @click="checkRandom" :disabled="filteredItems.length === 0">Check random</button>
+        <div class="filter-dropdown-container">
+          <button @click="toggleIgnoreDropdown" class="filter-dropdown-btn">
+            <span>Ignore</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+
+          <div v-if="ignoreDropdownOpen" class="filter-dropdown simple-dropdown" @click.stop>
+            <div class="simple-dropdown-body">
+              <button @click="hideChecked(); closeIgnoreDropdown()" :disabled="numChecked === 0" class="dropdown-action-btn">Hide checked</button>
+              <button @click="unhideChecked(); closeIgnoreDropdown()" :disabled="numChecked === 0" class="dropdown-action-btn">Unhide checked</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-dropdown-container">
+          <button @click="toggleSelectDropdown" class="filter-dropdown-btn">
+            <span>Select</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+
+          <div v-if="selectDropdownOpen" class="filter-dropdown simple-dropdown" @click.stop>
+            <div class="simple-dropdown-body">
+              <button @click="checkAllVisible(); closeSelectDropdown()" :disabled="filteredItems.length === 0" class="dropdown-action-btn">Check all</button>
+              <button @click="uncheckAll(); closeSelectDropdown()" class="dropdown-action-btn">Uncheck all</button>
+              <button @click="checkRandom(); closeSelectDropdown()" :disabled="filteredItems.length === 0" class="dropdown-action-btn">Check random</button>
+            </div>
+          </div>
+        </div>
+
         <button @click="addSelectedToRun" :disabled="numChecked === 0">Add to Run</button>
-        <button @click="hideChecked" :disabled="numChecked === 0">Hide checked</button>
-        <button @click="unhideChecked" :disabled="numChecked === 0">Unhide checked</button>
 
         <label class="status-setter">
           Status for checked:
@@ -806,6 +831,74 @@
     </div>
   </div>
 
+  <!-- USB2SNES Tools Modal -->
+  <div v-if="usb2snesToolsModalOpen" class="modal-backdrop" @click.self="closeUsb2snesTools">
+    <div class="modal usb2snes-tools-modal">
+      <header class="modal-header">
+        <h3>USB2SNES Tools & Diagnostics</h3>
+        <button class="close" @click="closeUsb2snesTools">✕</button>
+      </header>
+
+      <div class="modal-body">
+        <div class="usb2snes-section">
+          <h4>Connection Status</h4>
+          <div class="status-row">
+            <label>WebSocket Address:</label>
+            <code>{{ settings.usb2snesAddress }}</code>
+          </div>
+          <div class="status-row">
+            <label>Connection Status:</label>
+            <span :class="['status-indicator', usb2snesStatus.connected ? 'connected' : 'disconnected']">
+              {{ usb2snesStatus.connected ? '✓ Connected' : '✗ Disconnected' }}
+            </span>
+          </div>
+          <div class="status-row">
+            <label>Device:</label>
+            <span>{{ usb2snesStatus.device || 'N/A' }}</span>
+          </div>
+          <button @click="testUsb2snesConnection" class="btn-primary">Test Connection</button>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>Upload Settings</h4>
+          <div class="status-row">
+            <label>Upload Directory:</label>
+            <code>{{ settings.usb2snesUploadDir }}</code>
+          </div>
+          <div class="status-row">
+            <label>Upload Preference:</label>
+            <span>{{ settings.usb2snesUploadPref }}</span>
+          </div>
+          <div class="status-row">
+            <label>Launch Preference:</label>
+            <span>{{ settings.usb2snesLaunchPref }}</span>
+          </div>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>Diagnostics</h4>
+          <div class="diagnostic-info">
+            <p><strong>Last Connection Attempt:</strong> {{ usb2snesStatus.lastAttempt || 'Never' }}</p>
+            <p><strong>Last Error:</strong> {{ usb2snesStatus.lastError || 'None' }}</p>
+          </div>
+          <button @click="clearUsb2snesErrors" class="btn-secondary">Clear Error Log</button>
+        </div>
+
+        <div class="usb2snes-section">
+          <h4>Quick Actions</h4>
+          <div class="action-buttons">
+            <button @click="resetUsb2snesConnection" class="btn-secondary">Reset Connection</button>
+            <button @click="openUsb2snesWebsite" class="btn-secondary">Open USB2SNES Website</button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="modal-footer">
+        <button @click="closeUsb2snesTools" class="btn-primary">Close</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Run Name Input Modal -->
   <div v-if="runNameModalOpen" class="modal-backdrop" @click.self="cancelRunName">
     <div class="modal run-name-modal">
@@ -1060,6 +1153,21 @@ const bulkStatus = ref('');
 const filterDropdownOpen = ref(false);
 const filterSearchInput = ref<HTMLInputElement | null>(null);
 
+// Select dropdown state
+const selectDropdownOpen = ref(false);
+
+// Ignore dropdown state
+const ignoreDropdownOpen = ref(false);
+
+// USB2SNES Tools modal state
+const usb2snesToolsModalOpen = ref(false);
+const usb2snesStatus = reactive({
+  connected: false,
+  device: '',
+  lastAttempt: '',
+  lastError: ''
+});
+
 // Version management (must be declared before watchers use it)
 const selectedVersion = ref<number>(1);
 
@@ -1272,6 +1380,65 @@ function addFilterTag(tag: string) {
   }, 50);
 }
 
+// Select dropdown functions
+function toggleSelectDropdown() {
+  selectDropdownOpen.value = !selectDropdownOpen.value;
+}
+
+function closeSelectDropdown() {
+  selectDropdownOpen.value = false;
+}
+
+// Ignore dropdown functions
+function toggleIgnoreDropdown() {
+  ignoreDropdownOpen.value = !ignoreDropdownOpen.value;
+}
+
+function closeIgnoreDropdown() {
+  ignoreDropdownOpen.value = false;
+}
+
+// USB2SNES Tools modal functions
+function openUsb2snesTools() {
+  usb2snesToolsModalOpen.value = true;
+}
+
+function closeUsb2snesTools() {
+  usb2snesToolsModalOpen.value = false;
+}
+
+async function testUsb2snesConnection() {
+  usb2snesStatus.lastAttempt = new Date().toLocaleString();
+  try {
+    // TODO: Implement actual USB2SNES connection test
+    // For now, just simulate a test
+    await new Promise(resolve => setTimeout(resolve, 500));
+    alert('USB2SNES connection test - to be implemented');
+    // usb2snesStatus.connected = true;
+    // usb2snesStatus.device = 'SD2SNES';
+  } catch (error) {
+    usb2snesStatus.lastError = String(error);
+    usb2snesStatus.connected = false;
+  }
+}
+
+function clearUsb2snesErrors() {
+  usb2snesStatus.lastError = '';
+  usb2snesStatus.lastAttempt = '';
+}
+
+function resetUsb2snesConnection() {
+  usb2snesStatus.connected = false;
+  usb2snesStatus.device = '';
+  usb2snesStatus.lastError = '';
+  usb2snesStatus.lastAttempt = '';
+  alert('USB2SNES connection reset');
+}
+
+function openUsb2snesWebsite() {
+  window.open('https://usb2snes.com/', '_blank');
+}
+
 // Global keyboard shortcut handler
 function handleGlobalKeydown(e: KeyboardEvent) {
   // Check if "/" key is pressed and not in an input field
@@ -1293,16 +1460,32 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && filterDropdownOpen.value) {
     closeFilterDropdown();
   }
+  if (e.key === 'Escape' && selectDropdownOpen.value) {
+    closeSelectDropdown();
+  }
+  if (e.key === 'Escape' && ignoreDropdownOpen.value) {
+    closeIgnoreDropdown();
+  }
 }
 
 // Close dropdown when clicking outside
 function handleGlobalClick(e: MouseEvent) {
-  if (filterDropdownOpen.value) {
-    const target = e.target as HTMLElement;
-    const dropdown = document.querySelector('.filter-dropdown-container');
-    if (dropdown && !dropdown.contains(target)) {
-      closeFilterDropdown();
+  const target = e.target as HTMLElement;
+  
+  // Close all dropdowns unless clicking inside them
+  const allDropdowns = document.querySelectorAll('.filter-dropdown-container');
+  
+  let clickedInsideAnyDropdown = false;
+  allDropdowns.forEach(dropdown => {
+    if (dropdown.contains(target)) {
+      clickedInsideAnyDropdown = true;
     }
+  });
+  
+  if (!clickedInsideAnyDropdown) {
+    closeFilterDropdown();
+    closeSelectDropdown();
+    closeIgnoreDropdown();
   }
 }
 
@@ -4301,6 +4484,146 @@ button:disabled {
 .filter-help-content em {
   color: var(--text-tertiary);
   font-style: italic;
+}
+
+/* Simple Dropdown Styles */
+.simple-dropdown {
+  min-width: 180px;
+  max-width: 220px;
+}
+
+.simple-dropdown-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropdown-action-btn {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: var(--small-font-size);
+  transition: background 0.2s;
+}
+
+.dropdown-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.dropdown-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--text-tertiary);
+}
+
+/* USB2SNES Tools Modal */
+.usb2snes-tools-modal {
+  width: 600px;
+  max-width: 95vw;
+}
+
+.usb2snes-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.usb2snes-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.usb2snes-section h4 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: var(--medium-font-size);
+  font-weight: 600;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.status-row label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 140px;
+}
+
+.status-row code {
+  background: var(--bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: var(--small-font-size);
+  color: var(--text-primary);
+}
+
+.status-indicator {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: var(--small-font-size);
+  font-weight: 600;
+}
+
+.status-indicator.connected {
+  background: #10b981;
+  color: white;
+}
+
+.status-indicator.disconnected {
+  background: #ef4444;
+  color: white;
+}
+
+.diagnostic-info {
+  background: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.diagnostic-info p {
+  margin: 8px 0;
+  font-size: var(--small-font-size);
+  color: var(--text-secondary);
+}
+
+.diagnostic-info strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--small-font-size);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
 }
 
 /* Run Name Modal */
